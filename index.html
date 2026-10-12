@@ -1087,7 +1087,7 @@
     var i;
     tick++; applyShake();
     if (scene !== 'play') {
-      var ssig = [scene, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, menuNote, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       return;
     }
@@ -1377,7 +1377,26 @@
   var hits = [], navPrev = { x: 0, y: 0, jump: false, dash: false, back: false };
   var MENU = [['MAP', 'Climb through the worlds, level by level', function () { sel.w = Math.min(sel.w, levels.length - 1); toMap(); }],
               ['ENDLESS', 'Every level you have unlocked, shuffled', startEndless],
-              ['SETTINGS', 'Controller buttons', function () { scene = 'settings'; set.row = 0; set.mode = 'idle'; lastSig = ''; }]];
+              ['SETTINGS', 'Controller buttons', function () { scene = 'settings'; set.row = 0; set.mode = 'idle'; lastSig = ''; }],
+              ['RELOAD', 'Fetch the newest version of the game', reloadGame],
+              ['EXIT', 'Close the game', exitGame]];
+  var menuNote = '';
+  // Reload asks the server for a fresh copy first, so a new build shows up without clearing anything by hand.
+  function reloadGame() {
+    menuNote = 'Reloading'; lastSig = '';
+    var go = function () { window.location.reload(); };
+    if (window.fetch) fetch(window.location.pathname, { cache: 'reload' }).then(go, go); else go();
+  }
+  // A web page is only allowed to close itself in some setups (an installed app usually can, a browser tab usually cannot).
+  // So: try to close, then try to go back to wherever the game was opened from, and say so if neither worked.
+  function exitGame() {
+    try { if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+    try { window.close(); } catch (e) {}
+    setTimeout(function () {
+      if (window.history.length > 1) { try { window.history.back(); } catch (e) {} }
+      setTimeout(function () { menuNote = 'This screen cannot close itself here. Use Home or Back.'; lastSig = ''; }, 500);
+    }, 300);
+  }
 
   // ---- settings: the controller picture, what each button does, and changing it ----
   var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
@@ -1506,7 +1525,7 @@
       return;
     }
     if (scene === 'menu') {
-      if (dy) sel.menu = (sel.menu + dy + MENU.length) % MENU.length;
+      if (dy) { sel.menu = (sel.menu + dy + MENU.length) % MENU.length; menuNote = ''; }
       if (go) MENU[sel.menu][2]();
       return;
     }
@@ -1535,18 +1554,18 @@
     if (scene === 'settings') drawSettings(u);
     else if (scene === 'menu') {
       box(0, 0, LW, LH, THEMES.brick.bg);
-      for (i = 0; i < 9; i++) box(0, 392 - i * 6, LW, 1, i % 2 ? '#10152e' : '#141a38');
+      for (i = 0; i < 6; i++) box(0, 446 - i * 6, LW, 1, i % 2 ? '#10152e' : '#141a38');
       // the lantern, big
       box(119, 96, 32, 40, C.body); box(135, 108, 4, 8, C.eye); box(143, 108, 4, 8, C.eye);
       box(127, 88, 16, 8, C.flame); box(131, 80, 8, 8, C.flame);
       t('CLIMBER', 135, 186, 30, C.flame, 'center');
       for (i = 0; i < MENU.length; i++) {
-        var on = i === sel.menu, y = 232 + i * 40;
-        box(55, y - 20, 160, 34, on ? C.flame : '#131a33');
-        t(MENU[i][0], 135, y + 3, 15, on ? '#1a1205' : C.dim, 'center');
-        hits.push({ x: 55, y: y - 20, w: 160, h: 34, fn: (function (k) { return function () { sel.menu = k; MENU[k][2](); }; })(i) });
+        var on = i === sel.menu, y = 226 + i * 32;
+        box(55, y - 17, 160, 28, on ? C.flame : '#131a33');
+        t(MENU[i][0], 135, y + 2, 13, on ? '#1a1205' : C.dim, 'center');
+        hits.push({ x: 55, y: y - 17, w: 160, h: 28, fn: (function (k) { return function () { sel.menu = k; MENU[k][2](); }; })(i) });
       }
-      t(MENU[sel.menu][1], 135, 346, 7, C.text, 'center');
+      t(menuNote || MENU[sel.menu][1], 135, 392, 7, menuNote ? C.flame : C.text, 'center');
       t(usedPad ? 'Up and down to choose   Jump to start' : 'Arrows choose   C or Space starts   or click', 135, 468, 6.5, C.dim, 'center');
     } else {
       var w = sel.w, wd = WORLDS[w], th = THEMES[wd.theme], list = levels[w], open = worldOpen(w), got = 0;

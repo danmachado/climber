@@ -28,7 +28,7 @@ const { chromium } = require('playwright');
   await p.reload(); await p.waitForTimeout(300); v = await V(); console.log('after reload saved', Object.keys(v.prog));
   // mouse: click MAP, then click level 1-2 twice
   const st = await p.locator('#stage').boundingBox(), at = (x, y) => p.mouse.click(st.x + x / 270 * st.width, st.y + y / 480 * st.height);
-  await at(135, 230); await p.waitForTimeout(150); await at(135, 230); await p.waitForTimeout(150); v = await V(); console.log('click MAP ->', v.scene);
+  await at(135, 224); await p.waitForTimeout(150); await at(135, 224); await p.waitForTimeout(150); v = await V(); console.log('click MAP ->', v.scene);
   await at(135, 392); await p.waitForTimeout(100); await at(135, 392); await p.waitForTimeout(200); v = await V(); console.log('click 1-2 twice ->', v.scene, v.room);
   // world 2 with everything unlocked
   await p.goto('file:///home/claude/climber/index.html#unlock'); await p.reload(); await p.waitForTimeout(300);
