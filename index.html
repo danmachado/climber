@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Climber Slice</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b1020">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; background: #0a0d1c; }
+  #stage canvas { position: absolute; display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<!-- Built-in starter rooms (level format v1). The game only ever reads rooms as data through loadRoom(). -->
+<script type="application/json" id="starter-rooms">[{"format":1,"id":"starter-01","name":"First Light","difficulty":1,"grid":{"cols":27,"rows":48,"tile":10},"legend":{".":"empty","#":"solid","^":"spike_up","v":"spike_down","<":"spike_left",">":"spike_right","S":"start","E":"exit","o":"dash_refill"},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#....................EEE..#","#....................EEE..#","#........##.....###########","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##>....##........#","#........##>....##........#","#........##>....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#.........................#","#.........................#","#.........................#","#..........#######........#","#.........................#","#.........................#","#.........................#","#............o............#","#......................####","#.........................#","#....####..........########","#....####.................#","#....####.................#","#....####^^^^^^^^^^.......#","#....##############.......#","#....####.................#","#....####.................#","#....####.................#","#....####.................#","#.........................#","#.........................#","################..........#","#.........................#","#...................#######","#...................#######","#...................#######","#......###..........#######","#..S...###....^^^^..#######","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-02","name":"Low Road","difficulty":1,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.....................EE..#","#..........^^.........EE..#","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####.........^^...........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#..........^^..........####","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####.........^^...........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#........^^............####","#...#######################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.............^^..........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#..S....^^.............####","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-03","name":"Brickwork","difficulty":1,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#..............##.........#","#..............##.........#","#..............##.....EE..#","#........^^....##.....EE..#","#...#######################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#......^^....^^...........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#..........^^..........####","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####..........^^..........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#...........^^.........####","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####............^^........#","#######################...#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#..S....^^....^^..........#","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-04","name":"Switchback","difficulty":2,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#..............##.........#","#..............##.........#","#..............##.....EE..#","#........^^^...##.....EE..#","#....######################","#....##...................#","#....##...................#","#....##...................#","#....##...................#","#....##...................#","#.........................#","#............^^...........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#..........^^^.........####","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####.............^^.......#","#######################...#","#....................##...#","#....................##...#","#....................##...#","#....................##...#","#....................##...#","#....................##...#","#.........................#","#..........^^^............#","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####........^^....^^...S..#","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-05","name":"Long Reach","difficulty":2,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.....................EE..#","#..........^^^........EE..#","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####........^^^...........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#...........^^^........####","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####...........^^.........#","#######################...#","#.........................#","#.........................#","#.............o...........#","#.........................#","#.........................#","#..........^^^^^^.........#","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####...........^^.........#","######################....#","#.........................#","#.........................#","#.........o...............#","#.........................#","#.........................#","#..S...^^^^^^.............#","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-06","name":"Needle Row","difficulty":3,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.....................EE..#","#..........^^^........EE..#","#.......###################","#.........................#","#....###..................#","#.........................#","####...........^^.........#","####...........##.........#","######################....#","#...................##....#","#...................##...<#","#...................##...<#","#...................##....#","#...................##....#","#.........................#","#..........^^^............#","#.......###################","#.........................#","#....###..................#","#.........................#","####........^^............#","####........##............#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#......^^^.............####","#...#######################","#...##....................#","#>..##....................#","#>..##....................#","#...##......##............#","#...##......##............#","#...##......##............#","#...........##............#","#...........##...^^^...S..#","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-07","name":"Updraft","difficulty":3,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........^^..........EE..#","#.........##....^^....EE..#","#....######################","#....##...................#","#>...##...................#","#>...##...................#","#....##...................#","#....##...................#","#.............^^..........#","#.............##..........#","#####################.....#","#..................##.....#","#..................##....<#","#..................##....<#","#..................##.....#","#..................##.....#","#.........................#","#.......^^^...^^..........#","#....######################","#....##...................#","#>...##...................#","#....##...................#","#....##...................#","#.........................#","#...........^^^^..........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#.......^^^^...........####","#....######################","#....##...................#","#>...##...................#","#>...##...................#","#....##.....##............#","#....##.....##............#","#....##.....##............#","#...........##....^^......#","#...........##....##...S..#","###########################","###########################"],"entities":[]},{"format":1,"id":"starter-08","name":"High Wire","difficulty":4,"grid":{"cols":27,"rows":48,"tile":10},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.........................#","#.....................EE..#","#.........^^^^........EE..#","#....######################","#.........................#","#.........................#","#.........................#","#.........................#","#.......^^...^^^^^........#","#######################...#","#.........................#","#..............o..........#","#.........................#","#.........................#","#..........^^^^^^^^.......#","#.......###################","#.........................#","#....###..................#","#.........................#","####......................#","####........^^^^..........#","###################.......#","#.........................#","#..................###....#","#.........................#","#......................####","#......^^^^^...........####","#...#######################","#...##....................#","#>..##....................#","#...##....................#","#...##....................#","#...........^^^...........#","#...........###...........#","######################....#","#.........................#","#.........................#","#.........................#","#.........................#","#..S...^^^^...^^^^^.......#","###########################","###########################"],"entities":[]}]</script>
+
+<script>
+(function () {
+  'use strict';
+
+  var LW = 270, LH = 480, STEP = 1 / 60;
+  var K = 1.25; // tiles are 10px, so classic 8px-tile platformer speeds are scaled up by 10/8
+
+  // ---- movement tuning (px and seconds) ----
+  var P = {
+    maxRun: 90 * K, runAccel: 1000 * K, runReduce: 400 * K, airMult: 0.65,
+    gravity: 900 * K, maxFall: 160 * K, wallSlideMax: 40 * K, halfGravBelow: 40 * K,
+    jumpSpeed: -105 * K, jumpHBoost: 40 * K, varJumpTime: 0.2,
+    coyote: 0.1, jumpBuffer: 0.1, dashBuffer: 0.08,
+    dashSpeed: 240 * K, endDashSpeed: 160 * K, dashTime: 0.15, dashCooldown: 0.2, dashFreeze: 0.05,
+    wallJumpH: 130 * K, wallJumpForce: 0.16, wallCheck: 3,
+    climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
+    stamina: 110, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
+    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, exitTime: 0.35, dieTime: 0.45, hurtTime: 0.08, spawnTime: 0.45, refillRespawn: 2.5
+  };
+
+  var C = {
+    bg: '#0a0d1c', dot: '#1b2145', solid: '#36416e', cap: '#93a4de', under: '#262f55',
+    spike: '#e9edf7', body: '#ffe9b8', tired: '#c7a58c', eye: '#0a0d1c',
+    flame: '#ffb74a', flameOut: '#56608a', hurt: '#ff8f7d', smoke: '#8d9ac0', teal: '#5fd6b3', tealDim: '#2b6f66',
+    text: '#eef1fa', dim: '#9aa6cc'
+  };
+
+  // ---- shared tile art (used by the game and the builder so both always match) ----
+  // Built the way Celeste-style tilesets are: one flat dark fill inside every wall, a one-pixel highlight on the
+  // exposed edge (light on top, dark underneath, as if lit from above), a few random variants of each edge tile
+  // so repeats do not show, and a ring of sparse "infill" detail just inside the edge. Each terrain type is its
+  // own tileset with the same layout, so new looks can be swapped in without touching the rules.
+  var TILESETS = {
+    brick: { face: '#4a5ad0', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#161c4a', core: '#10142c', infill: '#1b2254' },
+    ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
+  };
+  var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
+  function tileHash(c, r) { var h = (c * 374761393 + r * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+  // solidAt(c, r) says whether a neighbouring cell is part of a wall (anything off the map counts as wall)
+  function drawSolid(b, x, y, kind, solidAt, c, r) {
+    var S = TILESETS[kind] || TILESETS.brick, v = tileHash(c, r);
+    var up = !solidAt(c, r - 1), dn = !solidAt(c, r + 1), lf = !solidAt(c - 1, r), rt = !solidAt(c + 1, r);
+    var edge = up || dn || lf || rt || !solidAt(c - 1, r - 1) || !solidAt(c + 1, r - 1) || !solidAt(c - 1, r + 1) || !solidAt(c + 1, r + 1);
+    if (!edge) {
+      b.fillStyle = S.core; b.fillRect(x, y, 10, 10);
+      var near = false;
+      for (var dy = -2; dy <= 2 && !near; dy++) for (var dx = -2; dx <= 2; dx++) if (!solidAt(c + dx, r + dy)) { near = true; break; }
+      if (near && v > 0.15) { // infill ring: a fragment or two of the edge pattern, in a colour close to the fill
+        b.fillStyle = S.infill;
+        var k = Math.floor(v * 4);
+        if (k === 0) { b.fillRect(x + 1, y + 1, 5, 3); b.fillRect(x + 6, y + 6, 3, 3); }
+        else if (k === 1) { b.fillRect(x + 4, y + 1, 5, 3); }
+        else if (k === 2) { b.fillRect(x + 1, y + 5, 4, 4); b.fillRect(x + 7, y + 2, 2, 2); }
+        else { b.fillRect(x + 2, y + 2, 6, 3); b.fillRect(x + 1, y + 7, 3, 2); }
+      }
+      return;
+    }
+    if (kind === 'ice') {
+      b.fillStyle = S.face; b.fillRect(x, y, 10, 10);
+      b.fillStyle = S.line;
+      if (v < 0.34) { b.fillRect(x + 2, y + 7, 3, 1); b.fillRect(x + 6, y + 4, 2, 1); }
+      else if (v < 0.67) { b.fillRect(x + 5, y + 6, 4, 1); b.fillRect(x + 1, y + 3, 2, 1); }
+      else { b.fillRect(x + 3, y + 5, 2, 1); b.fillRect(x + 7, y + 8, 2, 1); }
+      b.fillStyle = S.hi;                                   // a glint, in one of three places
+      var gx = v < 0.34 ? 2 : (v < 0.67 ? 5 : 3);
+      b.fillRect(x + gx + 1, y + 2, 1, 1); b.fillRect(x + gx, y + 3, 1, 1);
+    } else {
+      b.fillStyle = S.line; b.fillRect(x, y, 10, 10);       // mortar, then two courses of brick with the joints shifted per variant
+      b.fillStyle = S.face;
+      var j1 = v < 0.34 ? 9 : (v < 0.67 ? 6 : 3), j2 = v < 0.34 ? 4 : (v < 0.67 ? 2 : 7);
+      b.fillRect(x, y, j1, 4); if (j1 < 9) b.fillRect(x + j1 + 1, y, 9 - j1, 4);
+      b.fillRect(x, y + 5, j2, 4); b.fillRect(x + j2 + 1, y + 5, 9 - j2, 4);
+    }
+    // one-pixel edge light: bright on top, dimmer on the sides, dark underneath
+    if (lf) { b.fillStyle = S.side; b.fillRect(x, y, 1, 10); }
+    if (rt) { b.fillStyle = S.side; b.fillRect(x + 9, y, 1, 10); }
+    if (dn) { b.fillStyle = S.lo; b.fillRect(x, y + 9, 10, 1); }
+    if (up) { b.fillStyle = S.hi; b.fillRect(x, y, 10, 1); }
+  }
+  // Crumbling block: every tile has its own outline and cracks so it reads as loose.
+  function drawCrumble(b, x, y, c, r) {
+    var v = tileHash(c, r);
+    b.fillStyle = '#5a3516'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#c98f4a'; b.fillRect(x + 1, y + 1, 8, 8);
+    b.fillStyle = '#f0c27a'; b.fillRect(x + 1, y + 1, 8, 1);
+    b.fillStyle = '#8f5f2a'; b.fillRect(x + 1, y + 8, 8, 1);
+    b.fillStyle = '#5a3516';
+    if (v < 0.5) { b.fillRect(x + 3, y + 2, 1, 2); b.fillRect(x + 4, y + 4, 1, 2); b.fillRect(x + 6, y + 6, 1, 2); }
+    else { b.fillRect(x + 6, y + 2, 1, 2); b.fillRect(x + 5, y + 4, 1, 2); b.fillRect(x + 3, y + 5, 1, 3); }
+  }
+  // Moving platform: one tile of a plank; left and right say whether it continues on that side.
+  function drawPlank(b, x, y, left, right) {
+    b.fillStyle = '#3a4258'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#9aa5bb'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 7);
+    b.fillStyle = '#e6ebf5'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
+    b.fillStyle = '#5c667d'; b.fillRect(x + (left ? 0 : 1), y + 7, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
+    b.fillStyle = '#3a4258'; b.fillRect(x + 4, y + 4, 2, 2);
+  }
+  function drawTrack(b, x, y, vertical) {
+    b.fillStyle = '#2f3a6b';
+    if (vertical) { b.fillRect(x + 4, y + 1, 2, 3); b.fillRect(x + 4, y + 6, 2, 3); }
+    else { b.fillRect(x + 1, y + 4, 3, 2); b.fillRect(x + 6, y + 4, 3, 2); }
+  }
+
+
+  // ---- hero sprite sheet: 16 x 16 frames, one row per animation, facing right (Eyeless human adventurer, thicker left head, rounded right head, full blue-shirt shoulder and short shaded shoes) ----
+  var HERO = {"enabled": false, "frame": 16, "dashColor": [255, 241, 193], "spentColor": [138, 72, 44], "tired": [[[99, 145, 215], [53, 90, 157]], [[241, 198, 154], [200, 148, 104]]], "trail": [[244, 122, 32], [241, 198, 154]], "burst": ["#ffe9b8", "#ffb74a"], "anims": {"idle": {"row": 0, "n": 4, "fps": 4, "loop": true}, "run": {"row": 1, "n": 6, "fps": 12, "loop": true}, "jump_up": {"row": 2, "n": 2, "fps": 16, "loop": false}, "fall": {"row": 3, "n": 2, "fps": 16, "loop": false}, "land": {"row": 4, "n": 2, "fps": 12, "loop": false}, "dash_side": {"row": 5, "n": 2, "fps": 16, "loop": false}, "dash_up": {"row": 6, "n": 2, "fps": 16, "loop": false}, "dash_down": {"row": 7, "n": 2, "fps": 16, "loop": false}, "dash_diag_up": {"row": 8, "n": 2, "fps": 16, "loop": false}, "dash_diag_down": {"row": 9, "n": 2, "fps": 16, "loop": false}, "wall_hold": {"row": 10, "n": 2, "fps": 4, "loop": true}, "climb": {"row": 11, "n": 4, "fps": 8, "loop": true}, "wall_slide": {"row": 12, "n": 2, "fps": 8, "loop": true}, "hurt": {"row": 13, "n": 1, "fps": 16, "loop": false}, "spawn": {"row": 14, "n": 5, "fps": 12, "loop": false}, "exit": {"row": 15, "n": 4, "fps": 12, "loop": false}}, "src": "data:image/png;base64,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"};
+
+
+  // ---- level loading: rooms are data, never hard-coded ----
+  // ---- where published rooms live (this key is the public, read-only kind and is safe to ship) ----
+  var BACKEND = window.CLIMBER_BACKEND || {
+    url: 'https://idgdoglrbegjorqekadr.supabase.co',
+    key: 'sb_publishable_5CPsQIpba-pLQFGgiQzdQw_PiJOsvuR'
+  };
+
+  var LIVE_KEY = 'climber.live.v1';
+  var starters = JSON.parse(document.getElementById('starter-rooms').textContent); // built-in set, also the offline fallback
+  var pool = starters, queue = [];
+  function usable(d) {
+    return d && d.format === 1 && d.grid && d.grid.cols * d.grid.tile === LW && d.grid.rows * d.grid.tile === LH && d.tiles && d.tiles.length === d.grid.rows;
+  }
+  // The endless run: easier rooms first, shuffled inside each difficulty, then round again.
+  function nextFromQueue() {
+    if (!queue.length) {
+      var byDiff = {}, keys = [], i, j, k;
+      for (i = 0; i < pool.length; i++) { k = pool[i].difficulty || 1; if (!byDiff[k]) { byDiff[k] = []; keys.push(k); } byDiff[k].push(pool[i]); }
+      keys.sort(function (a, b) { return a - b; });
+      for (i = 0; i < keys.length; i++) {
+        var list = byDiff[keys[i]];
+        for (j = list.length - 1; j > 0; j--) { k = Math.floor(Math.random() * (j + 1)); var tmp = list[j]; list[j] = list[k]; list[k] = tmp; }
+        queue = queue.concat(list);
+      }
+      if (pool === starters) { queue.splice(queue.indexOf(starters[0]), 1); queue.unshift(starters[0]); }
+    }
+    return queue.shift();
+  }
+  // Published rooms are fetched as plain data. If that fails, the last good copy is used, then the built-in set.
+  function useLive(list) {
+    var ok = [];
+    for (var i = 0; i < (list || []).length; i++) if (usable(list[i])) ok.push(list[i]);
+    if (ok.length) { pool = ok; queue = []; }
+    return ok.length;
+  }
+  function fetchLive() {
+    if (!window.fetch) return;
+    var head = { headers: { apikey: BACKEND.key } }, rows;
+    fetch(BACKEND.url + '/rest/v1/rooms?select=id,name,difficulty,published_version_id&published_version_id=not.is.null', head)
+      .then(function (r) { if (!r.ok) throw new Error('rooms ' + r.status); return r.json(); })
+      .then(function (list) {
+        rows = list;
+        if (!rows.length) return [];
+        var ids = rows.map(function (x) { return x.published_version_id; }).join(',');
+        return fetch(BACKEND.url + '/rest/v1/room_versions?select=id,data&id=in.(' + ids + ')', head)
+          .then(function (r) { if (!r.ok) throw new Error('versions ' + r.status); return r.json(); });
+      })
+      .then(function (vers) {
+        var byId = {}, out = [], i;
+        for (i = 0; i < vers.length; i++) byId[vers[i].id] = vers[i].data;
+        for (i = 0; i < rows.length; i++) {
+          var d = byId[rows[i].published_version_id];
+          if (d) { d.id = rows[i].id; d.name = rows[i].name; d.difficulty = rows[i].difficulty; out.push(d); }
+        }
+        if (useLive(out)) { try { localStorage.setItem(LIVE_KEY, JSON.stringify(out)); } catch (e) {} }
+        else { pool = starters; queue = []; try { localStorage.removeItem(LIVE_KEY); } catch (e) {} }
+      })
+      .catch(function () {});
+  }
+
+  var room, T, cols, rows, grid, spawn, hazards, exits, refills, tileLayer;
+  var crumbles = [], crumbleAt = {}, movers = [], tracks = [];
+  var KIND = { '#': 1, 'I': 2, 'C': 3 }; // 1 brick, 2 ice, 3 crumbling block
+
+  function buildRoom(data) {
+    if (data.format !== 1) { throw new Error('Unsupported level format ' + data.format); }
+    if (data.grid.cols * data.grid.tile !== LW || data.grid.rows * data.grid.tile !== LH || data.tiles.length !== data.grid.rows) {
+      throw new Error('Room must fill ' + LW + ' by ' + LH + ' pixels');
+    }
+    room = data; T = data.grid.tile; cols = data.grid.cols; rows = data.grid.rows;
+    grid = []; hazards = []; exits = []; refills = []; spawn = { x: T, y: T };
+    crumbles = []; crumbleAt = {}; movers = []; tracks = [];
+    for (var r = 0; r < rows; r++) {
+      grid.push([]);
+      for (var c = 0; c < cols; c++) {
+        var ch = data.tiles[r].charAt(c), x = c * T, y = r * T;
+        grid[r].push(KIND[ch] || 0);
+        if (ch === 'C') { var cb = { c: c, r: r, x: x, y: y, state: 'idle', t: 0 }; crumbles.push(cb); crumbleAt[r * cols + c] = cb; }
+        else if (ch === '-' || ch === '|') tracks.push({ x: x, y: y, v: ch === '|' });
+        if (ch === 'S') spawn = { x: x + 1, y: y };
+        else if (ch === 'E') exits.push({ x: x, y: y, w: T, h: T });
+        else if (ch === 'o') refills.push({ x: x + 1, y: y + 1, w: T - 2, h: T - 2, timer: 0 });
+        else if (ch === '^') hazards.push({ x: x + 1, y: y + 6, w: T - 2, h: 4, dir: 0, tx: x, ty: y });
+        else if (ch === 'v') hazards.push({ x: x + 1, y: y, w: T - 2, h: 4, dir: 2, tx: x, ty: y });
+        else if (ch === '>') hazards.push({ x: x, y: y + 1, w: 4, h: T - 2, dir: 1, tx: x, ty: y });
+        else if (ch === '<') hazards.push({ x: x + 6, y: y + 1, w: 4, h: T - 2, dir: 3, tx: x, ty: y });
+      }
+    }
+    findMovers(data.tiles);
+    drawTileLayer();
+  }
+
+  // Moving platforms are painted as a run of '=' tiles. A line of '-' tiles beside it, or '|' tiles above or below it,
+  // is the track it shuttles along. With no track it just stays put.
+  function findMovers(t) {
+    function at(c, r) { return (r >= 0 && r < rows && c >= 0 && c < cols) ? t[r].charAt(c) : ''; }
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      if (at(c, r) !== '=' || at(c - 1, r) === '=') continue;
+      var c1 = c; while (at(c1 + 1, r) === '=') c1++;
+      var m = { x: c * T, y: r * T, w: (c1 - c + 1) * T, h: T, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, vx: 0, vy: 0 };
+      var a = c, b = c1; while (at(a - 1, r) === '-') a--; while (at(b + 1, r) === '-') b++;
+      if (a < c || b > c1) { m.axis = 'x'; m.min = a * T; m.max = (b + 1) * T - m.w; m.dir = (b - c1) >= (c - a) ? 1 : -1; }
+      else {
+        var top = r, bot = r;
+        for (var k = c; k <= c1; k++) { var u = r, d = r; while (at(k, u - 1) === '|') u--; while (at(k, d + 1) === '|') d++; top = Math.min(top, u); bot = Math.max(bot, d); }
+        if (top < r || bot > r) { m.axis = 'y'; m.min = top * T; m.max = bot * T; m.dir = (r - top) >= (bot - r) ? -1 : 1; }
+      }
+      m.x0 = m.x; m.y0 = m.y; m.dir0 = m.dir;
+      movers.push(m);
+    }
+  }
+  function resetDynamics() {
+    var i;
+    for (i = 0; i < crumbles.length; i++) { crumbles[i].state = 'idle'; crumbles[i].t = 0; crumbles[i].dirty = true; }
+    for (i = 0; i < movers.length; i++) { var m = movers[i]; m.x = m.x0; m.y = m.y0; m.dir = m.dir0; m.wait = 0; m.rem = 0; m.vx = 0; m.vy = 0; }
+  }
+
+  function solidTile(c, r) {
+    if (c < 0 || c >= cols || r < 0) return true;
+    if (r >= rows) return false;
+    var k = grid[r][c];
+    if (k === 3) return crumbleAt[r * cols + c].state !== 'gone';
+    return k > 0;
+  }
+  function kindAt(c, r) { return (c < 0 || c >= cols || r < 0 || r >= rows) ? 1 : (solidTile(c, r) ? grid[r][c] : 0); }
+  function hitMover(x, y, w, h, skip) {
+    for (var i = 0; i < movers.length; i++) { var m = movers[i]; if (m !== skip && x < m.x + m.w && x + w > m.x && y < m.y + m.h && y + h > m.y) return m; }
+    return null;
+  }
+  function hitTiles(x, y, w, h) {
+    var c0 = Math.floor(x / T), c1 = Math.floor((x + w - 1) / T);
+    var r0 = Math.floor(y / T), r1 = Math.floor((y + h - 1) / T);
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) if (solidTile(c, r)) return true;
+    return false;
+  }
+  // What the character is touching in a strip of cells: 'ice' only if every solid cell there is ice.
+  function surface(x, y, w, h) {
+    var c0 = Math.floor(x / T), c1 = Math.floor((x + w - 1) / T), r0 = Math.floor(y / T), r1 = Math.floor((y + h - 1) / T), any = false, allIce = true;
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) { var k = kindAt(c, r); if (k) { any = true; if (k !== 2) allIce = false; } }
+    if (hitMover(x, y, w, h)) { any = true; allIce = false; }
+    return any ? (allIce ? 'ice' : 'solid') : '';
+  }
+  function touchCrumble(x, y, w, h) {
+    var c0 = Math.floor(x / T), c1 = Math.floor((x + w - 1) / T), r0 = Math.floor(y / T), r1 = Math.floor((y + h - 1) / T);
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) {
+      var cb = (r >= 0 && r < rows && c >= 0 && c < cols) ? crumbleAt[r * cols + c] : null;
+      if (cb && cb.state === 'idle') { cb.state = 'shake'; cb.t = 0; }
+    }
+  }
+  function riding(m) {
+    if (pl.dead) return false;
+    if (pl.vy >= 0 && pl.y + pl.h === m.y && pl.x + pl.w > m.x && pl.x < m.x + m.w) return true;        // standing on it
+    return pl.state === 'climb' && pl.y + pl.h > m.y && pl.y < m.y + m.h &&                                // holding its side
+      (pl.climbDir > 0 ? pl.x + pl.w === m.x : pl.x === m.x + m.w);
+  }
+  // Platforms move one pixel at a time. Anything riding is carried, anything in the way is pushed, and being
+  // pushed into a wall is fatal.
+  function stepMovers(dt) {
+    for (var i = 0; i < movers.length; i++) {
+      var m = movers[i];
+      m.vx = 0; m.vy = 0;
+      if (!m.axis || m.min === m.max) continue;
+      if (m.wait > 0) { m.wait -= dt; continue; }
+      m.rem += P.moverSpeed * dt;
+      var n = Math.floor(m.rem); m.rem -= n;
+      if (m.axis === 'x') m.vx = m.dir * P.moverSpeed; else m.vy = m.dir * P.moverSpeed;
+      while (n-- > 0) {
+        var pos = m.axis === 'x' ? m.x : m.y;
+        if ((m.dir > 0 && pos >= m.max) || (m.dir < 0 && pos <= m.min)) { m.dir = -m.dir; m.wait = P.moverWait; m.rem = 0; break; }
+        var dx = m.axis === 'x' ? m.dir : 0, dy = m.axis === 'y' ? m.dir : 0, carry = riding(m);
+        m.x += dx; m.y += dy;
+        if (pl.dead || fx.mode !== 'none') continue;
+        var pushed = pl.x < m.x + m.w && pl.x + pl.w > m.x && pl.y < m.y + m.h && pl.y + pl.h > m.y;
+        if (pushed || carry) {
+          var free = !hitTiles(pl.x + dx, pl.y + dy, pl.w, pl.h) && !hitMover(pl.x + dx, pl.y + dy, pl.w, pl.h, m);
+          if (free) { pl.x += dx; pl.y += dy; }
+          else if (pushed) { die(); }
+        }
+      }
+    }
+  }
+  function stepCrumbles(dt) {
+    for (var i = 0; i < crumbles.length; i++) {
+      var cb = crumbles[i];
+      if (cb.state === 'idle') continue;
+      cb.t += dt; cb.dirty = true;
+      if (cb.state === 'shake' && cb.t >= P.crumbleDelay) { cb.state = 'gone'; cb.t = 0; }
+      else if (cb.state === 'gone' && cb.t >= P.crumbleRespawn && !(pl.x < cb.x + T && pl.x + pl.w > cb.x && pl.y < cb.y + T && pl.y + pl.h > cb.y)) { cb.state = 'idle'; cb.t = 0; }
+    }
+  }
+  function collide(x, y, w, h) { return hitTiles(x, y, w, h) || !!hitMover(x, y, w, h); }
+  function overlap(a, x, y, w, h) { return x < a.x + a.w && x + w > a.x && y < a.y + a.h && y + h > a.y; }
+  function approach(v, target, amount) { return v < target ? Math.min(v + amount, target) : Math.max(v - amount, target); }
+
+  // ---- player ----
+  var pl, run, fx = { mode: 'none', t: 0, x: 0, y: 0, facing: 1 };
+  function resetPlayer() {
+    pl = {
+      x: spawn.x, y: spawn.y, w: 8, h: 10, rx: 0, ry: 0, vx: 0, vy: 0, facing: 1,
+      state: 'normal', onGround: false, coyote: 0, jumpBuf: 0, dashBuf: 0,
+      varJumpTimer: 0, varJumpSpeed: 0, dashes: 1, dashTimer: 0, dashCooldown: 0, dashDirX: 0, dashDirY: 0,
+      freeze: 0, forceMove: 0, forceDir: 0, climbDir: 0, stamina: P.stamina,
+      dead: false, prevJump: false, prevDash: false, trail: [], trailTick: 0
+    };
+    for (var i = 0; i < refills.length; i++) refills[i].timer = 0;
+  }
+  function startSpawn() { resetPlayer(); resetDynamics(); fx = { mode: 'spawn', t: 0, x: pl.x, y: pl.y, facing: 1 }; }
+  // A fresh run. In a builder test it replays the room being edited; in the demo it plays the first built-in room.
+  function resetRun() {
+    run = { deaths: 0, time: 0, won: false, count: 1 };
+    if (!testMode) {
+      if (demo.on) { if (room !== starters[0]) buildRoom(starters[0]); }
+      else { queue = []; buildRoom(nextFromQueue()); }
+    }
+    startSpawn();
+  }
+  function nextRoom() { run.count++; buildRoom(nextFromQueue()); startSpawn(); }
+
+  function hit(x, y) { return collide(x, y, pl.w, pl.h); }
+  function touching(dir, dist) { return hit(pl.x + dir * dist, pl.y); }
+
+  function moveX(amount) {
+    pl.rx += amount;
+    var move = Math.round(pl.rx);
+    if (!move) return;
+    pl.rx -= move;
+    var s = move > 0 ? 1 : -1;
+    while (move) {
+      if (!hit(pl.x + s, pl.y)) { pl.x += s; move -= s; continue; }
+      var fixed = false;
+      if (pl.state === 'dash' && pl.dashDirY === 0) {
+        for (var i = 1; i <= P.cornerCorrect && !fixed; i++) {
+          if (!hit(pl.x + s, pl.y - i)) { pl.y -= i; fixed = true; }
+          else if (!hit(pl.x + s, pl.y + i)) { pl.y += i; fixed = true; }
+        }
+      }
+      if (!fixed) { pl.vx = 0; pl.rx = 0; return; }
+    }
+  }
+  function moveY(amount) {
+    pl.ry += amount;
+    var move = Math.round(pl.ry);
+    if (!move) return;
+    pl.ry -= move;
+    var s = move > 0 ? 1 : -1;
+    while (move) {
+      if (!hit(pl.x, pl.y + s)) { pl.y += s; move -= s; continue; }
+      var fixed = false;
+      if (s < 0) {
+        for (var i = 1; i <= P.cornerCorrect && !fixed; i++) {
+          if (!hit(pl.x + i, pl.y - 1)) { pl.x += i; fixed = true; }
+          else if (!hit(pl.x - i, pl.y - 1)) { pl.x -= i; fixed = true; }
+        }
+      }
+      if (!fixed) { pl.vy = 0; pl.ry = 0; pl.varJumpTimer = 0; return; }
+    }
+  }
+
+  function jump(mx) {
+    pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal';
+    pl.varJumpTimer = P.varJumpTime;
+    var under = hitMover(pl.x, pl.y + 1, pl.w, pl.h);
+    pl.vx += P.jumpHBoost * mx + (under ? under.vx : 0); // a moving platform lends its speed to the jump
+    pl.vy = P.jumpSpeed; pl.varJumpSpeed = pl.vy;
+  }
+  function wallJump(dir) {
+    pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal';
+    pl.varJumpTimer = P.varJumpTime;
+    pl.vx = P.wallJumpH * dir; pl.vy = P.jumpSpeed; pl.varJumpSpeed = pl.vy;
+    pl.forceMove = P.wallJumpForce; pl.forceDir = dir; pl.facing = dir;
+  }
+  function startDash(inp) {
+    var dx = inp.x, dy = inp.y;
+    if (!dx && !dy) dx = pl.facing;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    pl.dashDirX = dx / len; pl.dashDirY = dy / len;
+    pl.vx = pl.dashDirX * P.dashSpeed; pl.vy = pl.dashDirY * P.dashSpeed;
+    if (dx) pl.facing = dx;
+    pl.state = 'dash'; pl.dashTimer = P.dashTime; pl.freeze = P.dashFreeze;
+    pl.dashes = 0; pl.dashCooldown = P.dashCooldown; pl.dashBuf = 0;
+    pl.varJumpTimer = 0; pl.forceMove = 0;
+  }
+  function die() {
+    if (pl.dead) return;
+    pl.dead = true; run.deaths++;
+    fx = { mode: 'die', t: 0, x: pl.x, y: Math.min(pl.y, rows * T - pl.h), facing: pl.facing };
+  }
+
+  function step(inp) {
+    var dt = STEP, i;
+    var jumpPressed = inp.jump && !pl.prevJump, dashPressed = inp.dash && !pl.prevDash;
+    pl.prevJump = inp.jump; pl.prevDash = inp.dash;
+
+    if (run.won) { if (jumpPressed) resetRun(); return; }
+    run.time += dt;
+    if (fx.mode === 'exit') { fx.t += dt; if (fx.t >= P.exitTime) nextRoom(); return; }
+    if (fx.mode === 'die') { fx.t += dt; if (fx.t >= P.dieTime) startSpawn(); return; }
+    if (fx.mode === 'spawn') { fx.t += dt; if (fx.t >= P.spawnTime) fx.mode = 'none'; return; }
+
+    for (i = 0; i < refills.length; i++) if (refills[i].timer > 0) refills[i].timer -= dt;
+    for (i = pl.trail.length - 1; i >= 0; i--) { pl.trail[i].life -= dt; if (pl.trail[i].life <= 0) pl.trail.splice(i, 1); }
+
+    if (jumpPressed) pl.jumpBuf = P.jumpBuffer; else pl.jumpBuf -= dt;
+    if (dashPressed) pl.dashBuf = P.dashBuffer; else pl.dashBuf -= dt;
+    if (pl.freeze > 0) { pl.freeze -= dt; return; }
+
+    stepMovers(dt); stepCrumbles(dt);
+    if (pl.dead) return;
+    pl.dashCooldown -= dt;
+    pl.onGround = pl.vy >= 0 && hit(pl.x, pl.y + 1);
+    pl.floor = pl.onGround ? surface(pl.x, pl.y + pl.h, pl.w, 1) : '';
+    if (pl.onGround) touchCrumble(pl.x, pl.y + pl.h, pl.w, 1);
+    if (pl.onGround) {
+      pl.coyote = P.coyote; pl.stamina = P.stamina;
+      if (pl.state !== 'dash' && pl.dashCooldown <= 0.1) pl.dashes = 1;
+    } else { pl.coyote -= dt; }
+
+    if (pl.dashBuf > 0 && pl.dashes > 0 && pl.dashCooldown <= 0) { startDash(inp); return; }
+
+    if (pl.state === 'dash') {
+      pl.dashTimer -= dt;
+      if (++pl.trailTick % 2 === 0) pl.trail.push({ x: pl.x, y: pl.y, life: 0.3, facing: pl.facing, dx: pl.dashDirX, dy: pl.dashDirY });
+      if (pl.dashTimer <= 0) {
+        pl.state = 'normal';
+        if (pl.dashDirY <= 0) { pl.vx = pl.dashDirX * P.endDashSpeed; pl.vy = pl.dashDirY * P.endDashSpeed; }
+        if (pl.vy < 0) pl.vy *= 0.75;
+      }
+    } else if (pl.state === 'climb') {
+      var wallHere = touching(pl.climbDir, 1);
+      var wx = pl.climbDir > 0 ? pl.x + pl.w : pl.x - 1, icy = surface(wx, pl.y, 1, pl.h) === 'ice'; // ice gives no grip
+      touchCrumble(wx, pl.y, 1, pl.h);
+      var wallAtHands = collide(pl.x + pl.climbDir, pl.y, pl.w, 4);
+      if (pl.jumpBuf > 0) {
+        if (inp.x === -pl.climbDir) wallJump(-pl.climbDir);
+        else { pl.stamina -= P.climbJumpCost; jump(0); }
+      } else if (wallHere && !wallAtHands && inp.y < 0) {
+        pl.state = 'normal'; pl.vy = Math.min(pl.vy, P.climbHop);
+        pl.forceMove = 0.2; pl.forceDir = pl.climbDir; pl.vx = pl.climbDir * 60;
+      } else if (!inp.grab || pl.stamina <= 0 || !wallHere || icy) {
+        pl.state = 'normal';
+      } else {
+        var target = inp.y < 0 ? P.climbUp : (inp.y > 0 ? P.climbDown : 0);
+        pl.vx = 0;
+        pl.vy = approach(pl.vy, target, P.climbAccel * dt);
+        pl.stamina -= (inp.y < 0 ? P.climbUpCost : (inp.y === 0 ? P.climbStillCost : 0)) * dt;
+      }
+    } else {
+      var mx = inp.x;
+      if (pl.forceMove > 0) { pl.forceMove -= dt; mx = pl.forceDir; }
+      if (mx) pl.facing = mx;
+
+      var grabDir = inp.x || pl.facing;
+      if (inp.grab && pl.stamina > 0 && pl.vy >= 0 && pl.forceMove <= 0 && touching(grabDir, 2) &&
+          surface(grabDir > 0 ? pl.x + pl.w : pl.x - 2, pl.y, 2, pl.h) !== 'ice') {
+        pl.state = 'climb'; pl.climbDir = grabDir; pl.facing = grabDir; pl.vx = 0; pl.vy *= 0.2;
+        if (!touching(grabDir, 1)) pl.x += grabDir;
+      } else {
+        var mult = pl.onGround ? (pl.floor === 'ice' ? P.iceGrip : 1) : P.airMult; // on ice you barely speed up or slow down
+        if (Math.abs(pl.vx) > P.maxRun && mx && (pl.vx > 0) === (mx > 0)) pl.vx = approach(pl.vx, P.maxRun * mx, P.runReduce * mult * dt);
+        else pl.vx = approach(pl.vx, P.maxRun * mx, P.runAccel * mult * dt);
+
+        if (!pl.onGround) {
+          var maxFall = (inp.x && touching(inp.x, 1) && pl.vy > 0 && surface(inp.x > 0 ? pl.x + pl.w : pl.x - 1, pl.y, 1, pl.h) !== 'ice') ? P.wallSlideMax : P.maxFall;
+          var g = (Math.abs(pl.vy) < P.halfGravBelow && inp.jump) ? 0.5 : 1;
+          pl.vy = approach(pl.vy, maxFall, P.gravity * g * dt);
+        }
+        if (pl.varJumpTimer > 0) {
+          pl.varJumpTimer -= dt;
+          if (inp.jump) pl.vy = Math.min(pl.vy, pl.varJumpSpeed); else pl.varJumpTimer = 0;
+        }
+        if (pl.jumpBuf > 0) {
+          if (pl.coyote > 0) jump(mx);
+          else if (touching(1, P.wallCheck)) wallJump(-1);
+          else if (touching(-1, P.wallCheck)) wallJump(1);
+        }
+      }
+    }
+
+    moveX(pl.vx * dt);
+    moveY(pl.vy * dt);
+
+    for (i = 0; i < hazards.length; i++) if (overlap(hazards[i], pl.x, pl.y, pl.w, pl.h)) { die(); return; }
+    if (pl.y > rows * T + 20) { die(); return; }
+    for (i = 0; i < refills.length; i++) {
+      var rf = refills[i];
+      if (rf.timer <= 0 && pl.dashes < 1 && overlap(rf, pl.x, pl.y, pl.w, pl.h)) {
+        pl.dashes = 1; pl.stamina = P.stamina; rf.timer = P.refillRespawn;
+      }
+    }
+    for (i = 0; i < exits.length; i++) if (overlap(exits[i], pl.x, pl.y, pl.w, pl.h)) {
+      if (!testMode && !demo.on) { fx = { mode: 'exit', t: 0, x: pl.x, y: pl.y, facing: pl.facing }; return; }
+      run.won = true;
+      if (embedded) window.parent.postMessage({ type: 'climber-result', won: true, time: run.time, deaths: run.deaths }, '*');
+      return;
+    }
+  }
+
+  // ---- input: keyboard and controller feed one shared shape ----
+  var keys = {}, usedPad = false, wizAsked = false;
+  var embedded = window.parent !== window, testMode = false; // embedded = running inside the room builder
+  window.addEventListener('keydown', function (e) {
+    keys[e.keyCode] = true;
+    if (e.keyCode === 27 && embedded) window.parent.postMessage({ type: 'climber-exit' }, '*');
+    if (e.keyCode === 32 || (e.keyCode >= 37 && e.keyCode <= 40)) e.preventDefault();
+  });
+  window.addEventListener('keyup', function (e) { keys[e.keyCode] = false; });
+  window.addEventListener('blur', function () { keys = {}; });
+
+  function btn(gp, i) {
+    var b = gp.buttons[i];
+    if (!b) return false;
+    return typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5;
+  }
+  var MAP_KEY = 'climber.padmap.v1', padMap = {}, padInfo = '';
+  try { padMap = JSON.parse(localStorage.getItem(MAP_KEY)) || {}; } catch (e) { padMap = {}; }
+  function firstPad() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (var i = 0; i < gps.length; i++) if (gps[i]) return gps[i];
+    return null;
+  }
+  function bound(gp, b) {
+    if (!b) return false;
+    if (b.t === 'b') return btn(gp, b.i);
+    return ((gp.axes[b.i] || 0) - b.rest) * b.dir > 0.5;
+  }
+
+  // Controller setup: asks for each control in turn and remembers the answer for that controller.
+  var WIZ = [['jump', 'Press the button for JUMP'], ['dash', 'Press the button for DASH'], ['grab', 'Press the button for GRAB'],
+             ['up', 'Press UP'], ['down', 'Press DOWN'], ['left', 'Press LEFT'], ['right', 'Press RIGHT']];
+  var wiz = { on: false, i: 0, armed: false, quiet: 0, rest: [], map: {}, id: '' };
+  function startWiz(gp) { wiz = { on: true, i: 0, armed: false, quiet: 0, rest: [], map: {}, id: gp.id }; }
+  function wizTick() {
+    var gp = firstPad(), i, any = false, hit = null;
+    if (!gp) return;
+    for (i = 0; i < gp.buttons.length; i++) if (btn(gp, i)) { any = true; if (!hit) hit = { t: 'b', i: i }; }
+    if (!wiz.armed) { // wait for everything to be let go, then note where the sticks rest
+      var still = !any;
+      for (i = 0; i < gp.axes.length && still; i++) if (wiz.rest.length && Math.abs(gp.axes[i] - wiz.rest[i]) > 0.3) still = false;
+      if (!wiz.rest.length || !still) { wiz.rest = Array.prototype.slice.call(gp.axes); wiz.quiet = 0; }
+      if (still && ++wiz.quiet > 12) wiz.armed = true;
+      return;
+    }
+    if (!hit) for (i = 0; i < gp.axes.length; i++) {
+      var d = gp.axes[i] - wiz.rest[i];
+      if (Math.abs(d) > 0.6) { hit = { t: 'a', i: i, rest: wiz.rest[i], dir: d > 0 ? 1 : -1 }; break; }
+    }
+    if (!hit) return;
+    wiz.map[WIZ[wiz.i][0]] = hit;
+    wiz.i++; wiz.armed = false; wiz.quiet = 0;
+    if (wiz.i >= WIZ.length) {
+      padMap[wiz.id] = wiz.map;
+      try { localStorage.setItem(MAP_KEY, JSON.stringify(padMap)); } catch (e) {}
+      wiz.on = false; usedPad = true; demo.idle = 0; resetRun();
+    }
+  }
+
+  function readInput() {
+    var x = 0, y = 0, jump = false, dash = false, grab = false, i;
+    var gp = firstPad();
+    padInfo = 'none seen yet, press a button on it';
+    if (gp) {
+      var m = padMap[gp.id], p = [];
+      for (i = 0; i < gp.buttons.length; i++) if (btn(gp, i)) p.push(i);
+      padInfo = (m ? 'your setup' : (gp.mapping === 'standard' ? 'standard' : 'unknown layout')) + ', pressed ' + (p.length ? p.join(' ') : 'none');
+      if (!m && gp.mapping !== 'standard' && !wiz.on && !wizAsked) { wizAsked = true; startWiz(gp); }
+      if (m) {
+        if (bound(gp, m.left)) x = -1;
+        if (bound(gp, m.right)) x = 1;
+        if (bound(gp, m.up)) y = -1;
+        if (bound(gp, m.down)) y = 1;
+        jump = bound(gp, m.jump); dash = bound(gp, m.dash); grab = bound(gp, m.grab);
+      } else {
+        if (Math.abs(gp.axes[0] || 0) > 0.5) x = gp.axes[0] > 0 ? 1 : -1;
+        if (Math.abs(gp.axes[1] || 0) > 0.5) y = gp.axes[1] > 0 ? 1 : -1;
+        if (btn(gp, 14)) x = -1;
+        if (btn(gp, 15)) x = 1;
+        if (btn(gp, 12)) y = -1;
+        if (btn(gp, 13)) y = 1;
+        if (btn(gp, 0)) jump = true;
+        if (btn(gp, 2) || btn(gp, 1)) dash = true;
+        if (btn(gp, 4) || btn(gp, 5) || btn(gp, 6) || btn(gp, 7)) grab = true;
+      }
+      if (x || y || jump || dash || grab) usedPad = true;
+    }
+    if (keys[37] || keys[65]) x = -1;
+    if (keys[39] || keys[68]) x = 1;
+    if (keys[38] || keys[87]) y = -1;
+    if (keys[40] || keys[83]) y = 1;
+    if (keys[67] || keys[32]) jump = true;
+    if (keys[88]) dash = true;
+    if (keys[90] || keys[16]) grab = true;
+    return { x: x, y: y, jump: jump, dash: dash, grab: grab };
+  }
+
+  // ---- demo: the game plays the starter room by itself when nobody is at the controls ----
+  var demo = { on: false, stage: 1, f: 0, t0: 0, back: false, winT: 0, idle: 0 };
+  var DEMO_IDLE = 5;
+  function startDemo() { demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun(); }
+  function demoInput() {
+    var inp = { x: 0, y: 0, jump: false, dash: false, grab: false };
+    function I(o) { for (var k in o) inp[k] = o[k]; }
+    function next() { demo.stage++; demo.t0 = demo.f; }
+    if (run.won) { if (++demo.winT > 150) startDemo(); return inp; }
+    if (pl.dead) { demo.stage = 1; demo.back = false; demo.t0 = demo.f; return inp; }
+    var x = pl.x, y = pl.y, vy = Math.round(pl.vy), ground = pl.onGround, dashes = pl.dashes;
+    var sf = demo.f - demo.t0;
+    switch (demo.stage) {
+      case 1: // hop the step, jump the spikes, reach the block face
+        I({ x: 1, jump: (ground && ((x >= 40 && x < 48) || (x >= 112 && x < 132))) || (!ground && vy < 0) });
+        if (x >= 190) next();
+        break;
+      case 2: // climb the block face
+        I({ x: 1, y: -1, grab: true });
+        if (ground && y <= 400) next();
+        break;
+      case 3: // jump left to the shelf, dash at the top of the jump
+        I({ x: -1, jump: x <= 203, dash: !ground && vy >= -10 && x < 200 && dashes > 0 });
+        if (ground && y === 380) next();
+        break;
+      case 4: // run to the left wall, then climb the shaft
+        if (x > 10) I({ x: -1 }); else I({ x: -1, y: -1, grab: true });
+        if (x === 10 && y <= 258) next();
+        break;
+      case 5: // wall jump off to the right, land on the block
+        I({ x: 1, jump: sf < 12 });
+        if (ground && y === 270) next();
+        break;
+      case 6: // jump the spike gap with a dash
+        I({ x: 1, jump: x >= 80, dash: !ground && vy >= -10 && x > 90 && dashes > 0 });
+        if (ground && y === 270 && x >= 182) next();
+        break;
+      case 7: // hop onto the stone
+        if (!demo.back && x > 202) I({ x: -1 });
+        else { demo.back = true; I({ x: 1, jump: (ground && y === 270 && x >= 204 && sf % 2 === 0) || vy < 0 }); }
+        if (ground && y === 250) next();
+        break;
+      case 8: // jump left, dash up and left to the ledge
+        I({ x: -1, jump: x <= 226, dash: !ground && vy >= -10 && dashes > 0 && x < 224 });
+        if (inp.dash) inp.y = -1;
+        if (ground && y === 200) next();
+        break;
+      case 9: // stand under the right chimney wall, jump, grab, climb out
+        if (ground && y === 200 && x < 151) I({ x: 1 });
+        else if (ground && y === 200 && x > 152) I({ x: -1 });
+        else if (ground && y === 200) I({ jump: sf % 2 === 0 });
+        else I({ x: 1, y: -1, grab: true, jump: vy < 0 && pl.state === 'normal' && y > 150 });
+        if (ground && y === 50) next();
+        break;
+      default: I({ x: 1 });
+    }
+    demo.f++;
+    return inp;
+  }
+
+  // ---- drawing ----
+  var stage = document.getElementById('stage');
+  // The frame can only repaint a small part of its 4K screen at full speed. So the picture is drawn to a hidden
+  // 270 x 480 buffer, and the screen is covered by a grid of small canvases. Each frame only the pieces that
+  // actually changed (around the character and effects) are copied across; the rest of the screen is left alone.
+  function makeCanvas(w, h, onStage) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    if (onStage) stage.appendChild(c);
+    return c;
+  }
+  var buf = makeCanvas(LW, LH), g = buf.getContext('2d');
+  var hud = makeCanvas(LW, LH), h = hud.getContext('2d');
+  var CW = 45, CH = 48, chunks = [], dirtyNow = [], dirtyPrev = [], allDirty = true;
+  (function () {
+    for (var cy = 0; cy < LH / CH; cy++) for (var cx = 0; cx < LW / CW; cx++) {
+      var c = makeCanvas(CW, CH, true);
+      chunks.push({ c: c, g: c.getContext('2d', { alpha: false }), x: cx * CW, y: cy * CH });
+    }
+  })();
+  var TOP_H = 12, BOT_H = 16; // text strips, in game pixels
+  var hudTop = makeCanvas(1, 1, true), hudBot = makeCanvas(1, 1, true), hudMid = makeCanvas(1, 1, true);
+  var tctx = hudTop.getContext('2d'), bctx = hudBot.getContext('2d'), mctx = hudMid.getContext('2d');
+  function mark(x, y, w, hh) { dirtyNow.push([x, y, w, hh]); }
+  function flush() {
+    var i, j, r, flags = null;
+    if (!allDirty) {
+      flags = {};
+      var lists = [dirtyNow, dirtyPrev];
+      for (j = 0; j < 2; j++) for (i = 0; i < lists[j].length; i++) {
+        r = lists[j][i];
+        var c0 = Math.max(0, Math.floor(r[0] / CW)), c1 = Math.min(LW / CW - 1, Math.floor((r[0] + r[2] - 1) / CW));
+        var r0 = Math.max(0, Math.floor(r[1] / CH)), r1 = Math.min(LH / CH - 1, Math.floor((r[1] + r[3] - 1) / CH));
+        for (var y = r0; y <= r1; y++) for (var x = c0; x <= c1; x++) flags[y * (LW / CW) + x] = true;
+      }
+    }
+    for (i = 0; i < chunks.length; i++) {
+      if (flags && !flags[i]) continue;
+      chunks[i].g.drawImage(buf, chunks[i].x, chunks[i].y, CW, CH, 0, 0, CW, CH);
+    }
+    dirtyPrev = dirtyNow; dirtyNow = []; allDirty = false;
+  }
+  function blitHud() {
+    var th = hudTop.height, bh = hudBot.height, overlay = run.won || wiz.on || check >= 2;
+    hudMid.style.display = overlay ? 'block' : 'none';
+    hudTop.style.display = hudBot.style.display = overlay ? 'none' : 'block';
+    if (overlay) { mctx.clearRect(0, 0, hudMid.width, hudMid.height); mctx.drawImage(hud, 0, 0); return; }
+    tctx.clearRect(0, 0, hudTop.width, th); tctx.drawImage(hud, 0, 0, hud.width, th, 0, 0, hud.width, th);
+    bctx.clearRect(0, 0, hudBot.width, bh); bctx.drawImage(hud, 0, hud.height - bh, hud.width, bh, 0, 0, hud.width, bh);
+  }
+  var lastSig = '';
+  var view = { scale: 0, whole: false, physW: 0, physH: 0 };
+  var check = 0; // screen check: 0 off, 1 fps in the top bar, 2 full readout and edge markers, 3 adds the tile grid
+  var fps = { now: 0, low: 0, frames: 0, acc: 0, secs: 0 };
+
+  function layout() {
+    var dpr = window.devicePixelRatio || 1;
+    var phys = Math.min(window.innerWidth * dpr / LW, window.innerHeight * dpr / LH);
+    // Whole-number scale when it (nearly) fills the screen; otherwise stretch to fit so there is no dead border.
+    var whole = phys >= 1 && (phys - Math.floor(phys)) / phys < 0.03;
+    var s = whole ? Math.floor(phys) : phys;
+    var cssW = LW * s / dpr;
+    stage.style.width = cssW + 'px';
+    stage.style.height = (LH * s / dpr) + 'px';
+    var bw = Math.max(270, Math.min(Math.round(cssW * dpr), 1080));
+    hud.width = bw; hud.height = Math.round(bw * LH / LW);
+    var u = bw / LW, i, px = function (v) { return Math.round(v * s) / dpr; };
+    for (i = 0; i < chunks.length; i++) {
+      var ch = chunks[i], st = ch.c.style;
+      st.left = px(ch.x) + 'px'; st.top = px(ch.y) + 'px';
+      st.width = (px(ch.x + CW) - px(ch.x)) + 'px'; st.height = (px(ch.y + CH) - px(ch.y)) + 'px';
+    }
+    hudTop.width = hudBot.width = hudMid.width = bw;
+    hudTop.height = Math.round(TOP_H * u); hudBot.height = Math.round(BOT_H * u); hudMid.height = hud.height;
+    hudTop.style.cssText = 'left:0;top:0;width:100%;height:' + px(TOP_H) + 'px';
+    hudBot.style.cssText = 'left:0;bottom:0;width:100%;height:' + px(BOT_H) + 'px';
+    hudMid.style.cssText = 'left:0;top:0;width:100%;height:100%;display:none';
+    allDirty = true;
+    view.scale = s; view.whole = whole;
+    view.physW = Math.round(window.innerWidth * dpr); view.physH = Math.round(window.innerHeight * dpr);
+    lastSig = '';
+  }
+  window.addEventListener('resize', layout);
+  function goFullscreen() {
+    var el = document.documentElement, fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!fn || document.fullscreenElement || document.webkitFullscreenElement) return false;
+    try { var r = fn.call(el); if (r && r.catch) r.catch(function () {}); } catch (e) {}
+    return true;
+  }
+  // First click fills the screen (hides the browser bars). Later clicks: screen check, grid, controller setup, off.
+  window.addEventListener('mousedown', function () {
+    if (wiz.on) { wiz.on = false; return; }
+    if (embedded) { window.focus(); return; }
+    if (goFullscreen()) return;
+    check = (check + 1) % 5;
+    if (check === 4) { check = 0; var gp = firstPad(); if (gp) startWiz(gp); }
+  });
+  window.addEventListener('touchend', function () { if (!embedded) goFullscreen(); });
+  document.addEventListener('fullscreenchange', layout);
+  document.addEventListener('webkitfullscreenchange', layout);
+
+  function drawSpike(b, tx, ty, dir) {
+    var teeth = [1, 3, 5, 3, 1, 1, 3, 5, 3, 1];
+    b.fillStyle = C.spike;
+    for (var i = 0; i < T; i++) {
+      var n = teeth[i];
+      if (dir === 0) b.fillRect(tx + i, ty + T - n, 1, n);
+      else if (dir === 2) b.fillRect(tx + i, ty, 1, n);
+      else if (dir === 1) b.fillRect(tx, ty + i, n, 1);
+      else b.fillRect(tx + T - n, ty + i, n, 1);
+    }
+  }
+
+  function drawTileLayer() {
+    tileLayer = document.createElement('canvas');
+    tileLayer.width = LW; tileLayer.height = LH; allDirty = true;
+    var b = tileLayer.getContext('2d'), r, c, i, seed = 7;
+    b.fillStyle = C.bg; b.fillRect(0, 0, LW, LH);
+    b.fillStyle = C.dot;
+    for (i = 0; i < 70; i++) {
+      seed = (seed * 16807) % 2147483647;
+      var sx = seed % LW;
+      seed = (seed * 16807) % 2147483647;
+      b.fillRect(sx, seed % LH, (i % 5 === 0) ? 2 : 1, (i % 5 === 0) ? 2 : 1);
+    }
+    var wallAt = function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr][cc] === 1 || grid[rr][cc] === 2; };
+    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
+      if (grid[r][c] === 1 || grid[r][c] === 2) drawSolid(b, c * T, r * T, grid[r][c] === 2 ? 'ice' : 'brick', wallAt, c, r);
+    }
+    for (i = 0; i < tracks.length; i++) drawTrack(b, tracks[i].x, tracks[i].y, tracks[i].v);
+    for (i = 0; i < hazards.length; i++) drawSpike(b, hazards[i].tx, hazards[i].ty, hazards[i].dir);
+    if (exits.length) {
+      var x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0;
+      for (i = 0; i < exits.length; i++) {
+        x0 = Math.min(x0, exits[i].x); y0 = Math.min(y0, exits[i].y);
+        x1 = Math.max(x1, exits[i].x + T); y1 = Math.max(y1, exits[i].y + T);
+      }
+      b.fillStyle = C.teal; b.fillRect(x0, y0, x1 - x0, y1 - y0);
+      b.fillStyle = C.tealDim; b.fillRect(x0 + 2, y0 + 2, x1 - x0 - 4, y1 - y0 - 2);
+      b.fillStyle = C.teal; b.fillRect(Math.round((x0 + x1) / 2) - 1, y0 + 6, 2, 2);
+    }
+  }
+
+  function render() {
+    var i;
+    g.drawImage(tileLayer, 0, 0);
+    for (i = 0; i < crumbles.length; i++) {
+      var cb = crumbles[i];
+      if (cb.dirty) { mark(cb.x - 1, cb.y, T + 2, T + 30); cb.dirty = false; }
+      if (cb.state === 'idle') drawCrumble(g, cb.x, cb.y, cb.c, cb.r);
+      else if (cb.state === 'shake') drawCrumble(g, cb.x + (Math.floor(cb.t * 24) % 2 ? 1 : -1), cb.y, cb.c, cb.r);
+      else if (cb.t < 0.3) { g.globalAlpha = 1 - cb.t / 0.3; drawCrumble(g, cb.x, cb.y + Math.round(300 * cb.t * cb.t), cb.c, cb.r); g.globalAlpha = 1; }
+    }
+    for (i = 0; i < movers.length; i++) {
+      var mv = movers[i];
+      for (var px = 0; px < mv.w; px += T) drawPlank(g, mv.x + px, mv.y, px > 0, px + T < mv.w);
+      if (mv.axis) mark(mv.x, mv.y, mv.w, mv.h);
+    }
+    for (i = 0; i < refills.length; i++) {
+      var rf = refills[i], cx = rf.x + 4, cy = rf.y + 4, on = rf.timer <= 0;
+      if (rf.shown !== on) { rf.shown = on; mark(rf.x - 2, rf.y - 2, 12, 12); }
+      g.fillStyle = on ? C.teal : C.tealDim;
+      g.fillRect(cx - 1, cy - 4, 2, 8); g.fillRect(cx - 3, cy - 2, 6, 4);
+      if (!on) { g.fillStyle = C.bg; g.fillRect(cx - 1, cy - 2, 2, 4); }
+    }
+    for (i = 0; i < pl.trail.length; i++) {
+      // dash trail: afterimages of the hero's dash pose, in the hero's first colour when fresh and fading to the second
+      var tr = pl.trail[i], k = Math.max(0, tr.life / 0.3);
+      g.globalAlpha = 0.3 + k * 0.45;
+      if (hero.ready) drawHero(dashAnim(tr.dx, tr.dy), 1, tr.x, tr.y, tr.facing, k > 0.6 ? 4 : 5);
+      else { g.fillStyle = k > 0.5 ? HERO.burst[1] : HERO.burst[0]; g.fillRect(tr.x, tr.y, pl.w, pl.h); }
+      mark(tr.x - 5, tr.y - 7, 18, 18);
+    }
+    g.globalAlpha = 1;
+    if (fx.mode === 'none') mark(pl.x - 5, pl.y - 7, 18, 18);
+    else mark(fx.x - 22, fx.y - 30, 52, 60);
+    if (fx.mode === 'exit') { if (!hero.ready || !drawHero('exit', fx.t, fx.x, fx.y, fx.facing, 0)) drawBody(fx.x, fx.y, Math.max(1, Math.round(pl.h * (1 - fx.t / P.exitTime))), fx.facing, C.teal, null); }
+    else if (fx.mode === 'die') drawDeath();
+    else if (fx.mode === 'spawn') drawSpawn();
+    else if (hero.ready) drawHeroState();
+    else drawBody(pl.x, pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
+    var sig = [hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
+    flush();
+    if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
+  }
+
+  // ---- hero sprite ----
+  // Four copies of the sheet are prepared once: normal, dash spent, tired, and both. Left-facing is drawn mirrored.
+  var hero = { ready: false, sheets: [], anim: '', t: 0, last: 0, landT: 0, wasAir: false };
+  (function () {
+    var img = new Image();
+    img.onload = function () {
+      for (var v = 0; v < 4; v++) {
+        var c = makeCanvas(img.width, img.height), x = c.getContext('2d');
+        x.drawImage(img, 0, 0);
+        var spent = v & 1, tired = v & 2;
+        if (spent || tired) {
+          var d = x.getImageData(0, 0, c.width, c.height), p = d.data, k = HERO.dashColor;
+          for (var i = 0; i < p.length; i += 4) {
+            if (!p[i + 3]) continue;
+            if (spent && p[i] === k[0] && p[i + 1] === k[1] && p[i + 2] === k[2]) { p[i] = HERO.spentColor[0]; p[i + 1] = HERO.spentColor[1]; p[i + 2] = HERO.spentColor[2]; } // badge goes dark
+            else if (tired) for (var w = 0; w < HERO.tired.length; w++) {                                                              // colours drop to their shadow tones
+              var from = HERO.tired[w][0], to = HERO.tired[w][1];
+              if (p[i] === from[0] && p[i + 1] === from[1] && p[i + 2] === from[2]) { p[i] = to[0]; p[i + 1] = to[1]; p[i + 2] = to[2]; break; }
+            }
+          }
+          x.putImageData(d, 0, 0);
+        }
+        hero.sheets.push(c);
+      }
+      var tints = HERO.trail; // variants 4 and 5: flat silhouettes in the hero's two main colours, for the dash trail
+      for (var n = 0; n < 2; n++) {
+        var sc = makeCanvas(img.width, img.height), sx = sc.getContext('2d');
+        sx.drawImage(img, 0, 0);
+        var sd = sx.getImageData(0, 0, sc.width, sc.height), q = sd.data;
+        for (var j = 0; j < q.length; j += 4) if (q[j + 3]) { q[j] = tints[n][0]; q[j + 1] = tints[n][1]; q[j + 2] = tints[n][2]; }
+        sx.putImageData(sd, 0, 0);
+        hero.sheets.push(sc);
+      }
+      hero.ready = true; allDirty = true;
+    };
+    if (HERO.enabled) img.src = HERO.src; // otherwise the simple lantern character is drawn in code
+  })();
+  // Draws one frame with the feet centred on the collision box. Returns false if that animation is missing.
+  function drawHero(name, t, x, y, facing, variant) {
+    var a = HERO.anims[name];
+    if (!a) return false;
+    var f = Math.floor(t * a.fps);
+    f = a.loop ? ((f % a.n) + a.n) % a.n : Math.max(0, Math.min(a.n - 1, f));
+    var F = HERO.frame, dx = x + pl.w / 2 - F / 2, dy = y + pl.h - F, sheet = hero.sheets[variant || 0];
+    if (facing < 0) { g.save(); g.translate(dx + F, dy); g.scale(-1, 1); g.drawImage(sheet, f * F, a.row * F, F, F, 0, 0, F, F); g.restore(); }
+    else g.drawImage(sheet, f * F, a.row * F, F, F, dx, dy, F, F);
+    return true;
+  }
+  function dashAnim(dx, dy) {
+    if (Math.abs(dx) <= 0.3) return dy < 0 ? 'dash_up' : 'dash_down';
+    return dy < -0.3 ? 'dash_diag_up' : (dy > 0.3 ? 'dash_diag_down' : 'dash_side');
+  }
+  // Picks the animation from what the character is doing right now.
+  function drawHeroState() {
+    var now = run.time, dt = Math.max(0, Math.min(0.1, now - hero.last)); hero.last = now;
+    var name, facing = pl.facing, reverse = false;
+    var air = !pl.onGround;
+    if (hero.wasAir && !air) hero.landT = 0.17;
+    hero.wasAir = air; if (hero.landT > 0) hero.landT -= dt;
+    if (pl.state === 'dash') {
+      name = dashAnim(pl.dashDirX, pl.dashDirY);
+    } else if (pl.state === 'climb') {
+      facing = pl.climbDir;
+      if (pl.vy < -5) name = 'climb'; else if (pl.vy > 5) { name = 'climb'; reverse = true; } else name = 'wall_hold';
+    } else if (air) {
+      var slideDir = touching(1, 1) ? 1 : (touching(-1, 1) ? -1 : 0);
+      if (pl.vy > 0 && slideDir && pl.facing === slideDir) { name = 'wall_slide'; facing = slideDir; }
+      else name = pl.vy < 0 ? 'jump_up' : 'fall';
+    } else if (hero.landT > 0 && Math.abs(pl.vx) < 30) name = 'land';
+    else name = Math.abs(pl.vx) > 12 ? 'run' : 'idle';
+    if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += dt;
+    var a = HERO.anims[name], t = reverse ? (a.n / a.fps) - (hero.t % (a.n / a.fps)) - 0.001 : hero.t;
+    drawHero(name, t, pl.x, pl.y, facing, (pl.dashes > 0 ? 0 : 1) | (pl.stamina < P.tiredBelow ? 2 : 0));
+  }
+
+  // Body is drawn from the feet up so it can grow in during a respawn.
+  function drawBody(x, y, height, facing, bodyColor, flameColor) {
+    var top = y + pl.h - height;
+    g.fillStyle = bodyColor; g.fillRect(x, top, pl.w, height);
+    if (height >= 6) {
+      g.fillStyle = C.eye;
+      var ex = facing > 0 ? x + 4 : x + 1;
+      g.fillRect(ex, top + 3, 1, 2); g.fillRect(ex + 2, top + 3, 1, 2);
+    }
+    if (flameColor) { g.fillStyle = flameColor; g.fillRect(x + 2, top - 2, 4, 2); g.fillRect(x + 3, top - 4, 2, 2); }
+  }
+  var RING = [[1, 0], [0.7, 0.7], [0, 1], [-0.7, 0.7], [-1, 0], [-0.7, -0.7], [0, -1], [0.7, -0.7]];
+  function embers(cx, cy, radius, size, alpha, color) {
+    g.globalAlpha = alpha; g.fillStyle = color;
+    for (var i = 0; i < RING.length; i++) {
+      g.fillRect(Math.round(cx + RING[i][0] * radius - size / 2), Math.round(cy + RING[i][1] * radius - size / 2), size, size);
+    }
+    g.globalAlpha = 1;
+  }
+  // Death: a short held "hurt" frame, then the body breaks into embers and the flame leaves as smoke.
+  function drawDeath() {
+    if (fx.t < P.hurtTime) { if (!hero.ready || !drawHero('hurt', 0, fx.x, fx.y, fx.facing, 1)) drawBody(fx.x, fx.y, pl.h, fx.facing, C.hurt, C.flameOut); return; }
+    var p = (fx.t - P.hurtTime) / (P.dieTime - P.hurtTime);
+    var out = 1 - (1 - p) * (1 - p);
+    var cx = fx.x + 4, cy = fx.y + 5;
+    embers(cx, cy, 3 + out * 17, p < 0.5 ? 3 : 2, 1 - p * p, p < 0.3 ? HERO.burst[0] : HERO.burst[1]);
+    g.globalAlpha = (1 - p) * 0.8; g.fillStyle = C.smoke;
+    g.fillRect(cx - 1, Math.round(fx.y - 4 - p * 12), 2, 2);
+    g.fillRect(cx + (p > 0.5 ? 1 : -2), Math.round(fx.y - 9 - p * 12), 1, 1);
+    g.globalAlpha = 1;
+  }
+  // Respawn: embers gather at the start point, the body rises from the ground, and the flame lights last.
+  function drawSpawn() {
+    var p = fx.t / P.spawnTime;
+    var cx = fx.x + 4, cy = fx.y + 5;
+    if (p < 0.6) { var q = p / 0.6; embers(cx, cy, (1 - q * q) * 20, 2, 0.3 + q * 0.7, HERO.burst[1]); }
+    if (hero.ready) { if (p >= 0.3) drawHero('spawn', (p - 0.3) / 0.7 * (HERO.anims.spawn.n / HERO.anims.spawn.fps), fx.x, fx.y, 1, 0); return; }
+    if (p >= 0.4) {
+      var r = Math.min(1, (p - 0.4) / 0.4);
+      var grow = 1 + 2.2 * Math.pow(r - 1, 3) + 1.2 * Math.pow(r - 1, 2); // eases past full height, then settles
+      drawBody(fx.x, fx.y, Math.max(1, Math.round(pl.h * grow)), 1, C.body, p > 0.85 ? C.flame : null);
+    }
+  }
+
+  function clock(t) {
+    var m = Math.floor(t / 60), s = Math.floor(t % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function drawHud() {
+    var u = hud.width / LW;
+    function t(str, x, y, size, color, align) {
+      h.font = 'bold ' + (size * u) + 'px Menlo, Consolas, "DejaVu Sans Mono", monospace';
+      h.textAlign = align || 'left'; h.fillStyle = color; h.fillText(str, x * u, y * u);
+    }
+    h.clearRect(0, 0, hud.width, hud.height);
+    h.fillStyle = 'rgba(10,13,28,0.84)';
+    h.fillRect(0, 0, hud.width, Math.round(TOP_H * u)); h.fillRect(0, hud.height - Math.round(BOT_H * u), hud.width, Math.round(BOT_H * u));
+    var title = (room.name || '').toUpperCase();
+    if (title.length > 18) title = title.substring(0, 18);
+    t(testMode || demo.on ? title : run.count + '  ' + title, 4, 7.5, 7, C.text);
+    t('FALLS ' + run.deaths + '   ' + clock(run.time), 266, 7.5, 7, C.text, 'right');
+    t(testMode ? 'TEST   Esc returns to the builder' : demo.on ? 'DEMO   Any button to play   Click to fill the screen'
+      : (usedPad ? 'Controller connected   Click three times to set up buttons' : 'Arrows move   C jump   X dash   hold Z to climb'),
+      135, 473, 6.5, C.dim, 'center');
+    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, lowest ' + fps.low, 135, 7.5, 7, C.flame, 'center');
+    if (check >= 2) drawCheck(u, t);
+    if (wiz.on) {
+      h.fillStyle = 'rgba(11,16,32,0.94)'; h.fillRect(20 * u, 170 * u, 230 * u, 120 * u);
+      t('CONTROLLER SETUP', 135, 196, 14, C.flame, 'center');
+      t((wiz.i + 1) + ' of ' + WIZ.length, 135, 212, 7, C.dim, 'center');
+      t(wiz.armed ? WIZ[wiz.i][1] : 'Let go of everything', 135, 240, 11, wiz.armed ? C.text : C.dim, 'center');
+      t(wiz.i < 3 ? 'Any button you like' : 'Use the d-pad or the stick', 135, 258, 7, C.dim, 'center');
+      t('Click the mouse to cancel', 135, 278, 6.5, C.dim, 'center');
+    }
+    if (run.won) {
+      h.fillStyle = 'rgba(11,16,32,0.86)'; h.fillRect(30 * u, 190 * u, 210 * u, 90 * u);
+      t('ROOM CLEAR', 135, 222, 18, C.teal, 'center');
+      t(clock(run.time) + '   ' + run.deaths + (run.deaths === 1 ? ' fall' : ' falls'), 135, 244, 10, C.text, 'center');
+      t(demo.on ? 'Demo restarts in a moment' : 'Press jump to play again', 135, 264, 7, C.dim, 'center');
+    }
+  }
+
+  // Screen check: shows what the display is doing, marks the picture's edges, and can lay the tile grid on top.
+  function drawCheck(u, t) {
+    var i, px = Math.max(1, Math.round(u));
+    if (check === 3) {
+      for (i = 1; i < cols; i++) { h.fillStyle = i % 5 === 0 ? 'rgba(255,183,74,0.55)' : 'rgba(255,255,255,0.14)'; h.fillRect(Math.round(i * T * u), 0, 1, hud.height); }
+      for (i = 1; i < rows; i++) { h.fillStyle = i % 5 === 0 ? 'rgba(255,183,74,0.55)' : 'rgba(255,255,255,0.14)'; h.fillRect(0, Math.round(i * T * u), hud.width, 1); }
+    }
+    h.fillStyle = C.flame;
+    h.fillRect(0, 0, hud.width, px); h.fillRect(0, hud.height - px, hud.width, px);
+    h.fillRect(0, 0, px, hud.height); h.fillRect(hud.width - px, 0, px, hud.height);
+    var L = 12 * u, w = 3 * u;
+    h.fillRect(0, 0, L, w); h.fillRect(0, 0, w, L);
+    h.fillRect(hud.width - L, 0, L, w); h.fillRect(hud.width - w, 0, w, L);
+    h.fillRect(0, hud.height - w, L, w); h.fillRect(0, hud.height - L, w, L);
+    h.fillRect(hud.width - L, hud.height - w, L, w); h.fillRect(hud.width - w, hud.height - L, w, L);
+    h.fillStyle = 'rgba(11,16,32,0.88)'; h.fillRect(6 * u, 14 * u, 216 * u, 66 * u);
+    t('SCREEN CHECK' + (check === 3 ? '  grid ' + cols + ' x ' + rows : ''), 10, 23, 6, C.flame);
+    t('Window ' + view.physW + ' x ' + view.physH + ' px', 10, 33, 7, C.text);
+    t('Scale ' + (view.whole ? view.scale + 'x' : view.scale.toFixed(2) + 'x') + ', pixels square: ' + (view.whole ? 'yes' : 'no'), 10, 43, 7, C.text);
+    t(fps.secs < 2 ? 'Measuring speed' : fps.now + ' fps now, lowest ' + fps.low, 10, 53, 7, C.text);
+    t('Controller: ' + padInfo, 10, 63, 7, C.text);
+    t('Next clicks: grid, then controller setup', 10, 73, 6, C.dim);
+  }
+
+  // ---- main loop: fixed 60 steps a second so it plays the same on any refresh rate ----
+  var last = 0, acc = 0, manual = false;
+  function frame(now) {
+    if (!manual) {
+      var dt = last ? (now - last) / 1000 : STEP;
+      last = now;
+      acc += Math.min(dt, 0.1);
+      fps.frames++; fps.acc += dt;
+      if (fps.acc >= 1) {
+        fps.now = Math.round(fps.frames / fps.acc); fps.secs++;
+        if (fps.secs === 2 || (fps.secs > 2 && fps.now < fps.low)) fps.low = fps.now;
+        fps.frames = 0; fps.acc = 0;
+      }
+      var inp = readInput();
+      if (wiz.on) { wizTick(); acc = 0; render(); window.requestAnimationFrame(frame); return; }
+      if (inp.x || inp.y || inp.jump || inp.dash || inp.grab) {
+        demo.idle = 0;
+        if (demo.on) { demo.on = false; resetRun(); }
+      } else if (!demo.on && !testMode) {
+        demo.idle += Math.min(dt, 0.1);
+        if (demo.idle >= DEMO_IDLE || location.hash === '#demo') startDemo();
+      }
+      while (acc >= STEP) { step(demo.on ? demoInput() : inp); acc -= STEP; }
+    }
+    render();
+    window.requestAnimationFrame(frame);
+  }
+
+  try { useLive(JSON.parse(localStorage.getItem(LIVE_KEY))); } catch (e) {}
+  resetRun();
+  if (!embedded) fetchLive();
+
+  // The room builder runs this same game in a frame and hands it the room being edited.
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.type !== 'climber-room') return;
+    try { buildRoom(d.room); } catch (err) { window.parent.postMessage({ type: 'climber-error', message: String(err.message) }, '*'); return; }
+    testMode = true; demo.on = false; demo.idle = 0; resetRun(); lastSig = ''; window.focus();
+  });
+  if (embedded) window.parent.postMessage({ type: 'climber-ready' }, '*');
+  layout();
+  window.requestAnimationFrame(frame);
+
+  // Hook for the level builder's validator and for automated checks.
+  window.__climber = {
+    manual: function (on) { manual = on; },
+    step: function (inp, n) { for (var i = 0; i < (n || 1); i++) step(inp); return this.state(); },
+    state: function () {
+      return { x: pl.x, y: pl.y, vx: Math.round(pl.vx), vy: Math.round(pl.vy), state: pl.state, ground: pl.onGround,
+               dashes: pl.dashes, stamina: Math.round(pl.stamina), dead: pl.dead, deaths: run.deaths, won: run.won };
+    },
+    reset: resetRun, kill: die,
+    demoStart: function () { startDemo(); }, demoStep: function (n) { for (var i = 0; i < n; i++) step(demoInput()); return this.state(); },
+    chainProbe: function () { // plays room one as a normal run with the demo's inputs, to prove the exit leads to room two
+      demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false;
+      var n = 0, none = { x: 0, y: 0, jump: false, dash: false, grab: false };
+      while (run.count === 1 && n < 3000) { step(demoInput()); n++; }
+      for (var i = 0; i < 40; i++) step(none);
+      return { steps: n, count: run.count, room: room.name, falls: run.deaths, x: pl.x, y: pl.y, pool: pool.length };
+    }, load: function (data) { testMode = true; buildRoom(data); resetRun(); },
+    demoRun: function (n) { startDemo(); for (var i = 0; i < n && !run.won; i++) step(demoInput()); return { steps: i, won: run.won, deaths: run.deaths, stage: demo.stage }; }
+  };
+})();
+</script>
+</body>
+</html>

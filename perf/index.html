@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Climber Speed Lab</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b1020; color: #eef1fa; overflow: hidden;
+    font: bold 2.2vh Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+  #stage { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
+  #stage canvas { position: absolute; left: 0; top: 0; }
+  #panel { position: absolute; left: 4%; right: 4%; top: 3%; background: rgba(11,16,32,0.92); padding: 2vh; z-index: 5; }
+  h1 { margin: 0 0 1vh; font-size: 3vh; color: #ffb74a; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 0.6vh 1vh 0.6vh 0; border-top: 1px solid #2a3560; }
+  td.n { text-align: right; white-space: nowrap; }
+  tr.now td { color: #ffb74a; } tr.best td { color: #5fd6b3; }
+  p { margin: 1.2vh 0 0; color: #9aa6cc; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="panel">
+  <h1>SPEED LAB</h1>
+  <table id="rows"></table>
+  <p id="note">Running. Leave it alone for about 40 seconds.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var LW = 270, LH = 480, SECS = 5;
+  var stage = document.getElementById('stage');
+  var dpr = window.devicePixelRatio || 1;
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var scale = Math.min(vw / LW, vh / LH), cssW = LW * scale, cssH = LH * scale;
+
+  // a stand-in for the game picture: static room plus one moving square
+  var bg = document.createElement('canvas'); bg.width = LW; bg.height = LH;
+  (function () {
+    var b = bg.getContext('2d'); b.fillStyle = '#141a33'; b.fillRect(0, 0, LW, LH);
+    b.fillStyle = '#36416e';
+    for (var i = 0; i < 12; i++) b.fillRect((i * 53) % 220, 40 + i * 36, 60, 10);
+    b.fillRect(0, 0, 10, LH); b.fillRect(260, 0, 10, LH); b.fillRect(0, 460, LW, 20);
+  })();
+  function paint(g, t, k) {
+    g.drawImage(bg, 0, 0, LW * k, LH * k);
+    g.fillStyle = '#ffe9b8';
+    g.fillRect(Math.round(20 + (Math.sin(t / 700) + 1) * 110) * k, Math.round(200 + Math.cos(t / 900) * 150) * k, 8 * k, 10 * k);
+  }
+  function lowCanvas(opts) {
+    var c = document.createElement('canvas'); c.width = LW; c.height = LH;
+    c.style.imageRendering = 'pixelated';
+    c.style.width = cssW + 'px'; c.style.height = cssH + 'px';
+    stage.appendChild(c);
+    return { c: c, g: c.getContext('2d', opts || {}) };
+  }
+  function overlay(w, h, top) {
+    var c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h);
+    c.style.width = cssW + 'px'; c.style.height = (cssW * h / w) + 'px'; c.style.top = top + 'px';
+    var x = c.getContext('2d'); x.fillStyle = '#eef1fa'; x.font = 'bold ' + (h > 200 ? 28 : 20) + 'px monospace';
+    x.fillText('FIRST LIGHT        FALLS 0   0:13', 16, 30);
+    stage.appendChild(c);
+  }
+
+  function staticRoom() { var a = lowCanvas({ alpha: false }); a.g.drawImage(bg, 0, 0); return a; }
+  function spritePos(t) { return [20 + (Math.sin(t / 700) + 1) * 110, 200 + Math.cos(t / 900) * 150]; }
+  function sprite() {
+    var d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:0;top:0;background:#ffe9b8;width:' + (8 * scale) + 'px;height:' + (10 * scale) + 'px';
+    stage.appendChild(d); return d;
+  }
+  function chunked(strips) {
+    var CW = 45, CH = 48, list = [], prev = [], buf = document.createElement('canvas'); buf.width = LW; buf.height = LH;
+    var bg2 = buf.getContext('2d');
+    for (var cy = 0; cy < LH / CH; cy++) for (var cx = 0; cx < LW / CW; cx++) {
+      var c = document.createElement('canvas'); c.width = CW; c.height = CH;
+      c.style.cssText = 'image-rendering:pixelated;left:' + (cx * CW * scale) + 'px;top:' + (cy * CH * scale) + 'px;width:' + (CW * scale) + 'px;height:' + (CH * scale) + 'px';
+      stage.appendChild(c);
+      var g = c.getContext('2d', { alpha: false }); g.drawImage(bg, cx * CW, cy * CH, CW, CH, 0, 0, CW, CH);
+      list.push({ g: g, x: cx * CW, y: cy * CH });
+    }
+    var strip = null, sctx = null, lastSec = -1;
+    if (strips) {
+      strip = document.createElement('canvas'); strip.width = 1080; strip.height = 48;
+      strip.style.cssText = 'left:0;top:0;width:' + cssW + 'px;height:' + (cssW * 48 / 1080) + 'px';
+      stage.appendChild(strip); sctx = strip.getContext('2d');
+    }
+    return function (t) {
+      paint(bg2, t, 1);
+      var p = spritePos(t), now = [];
+      for (var i = 0; i < list.length; i++) {
+        var k = list[i];
+        if (p[0] + 9 > k.x && p[0] - 1 < k.x + CW && p[1] + 11 > k.y && p[1] - 1 < k.y + CH) now.push(i);
+      }
+      var all = now.concat(prev);
+      for (i = 0; i < all.length; i++) { k = list[all[i]]; k.g.drawImage(buf, k.x, k.y, CW, CH, 0, 0, CW, CH); }
+      prev = now;
+      if (sctx && Math.floor(t / 1000) !== lastSec) {
+        lastSec = Math.floor(t / 1000);
+        sctx.clearRect(0, 0, 1080, 48); sctx.fillStyle = '#eef1fa'; sctx.font = 'bold 28px monospace';
+        sctx.fillText('FIRST LIGHT        FALLS 0   0:' + (lastSec % 60), 16, 34);
+      }
+    };
+  }
+
+  var TESTS = [
+    ['Empty loop (screen limit)', function () { return function () {}; }],
+    ['Whole picture redrawn (old way)', function () { var a = lowCanvas(); return function (t) { paint(a.g, t, 1); }; }],
+    ['Still room + sprite (transform)', function () {
+      staticRoom(); var d = sprite(); d.style.willChange = 'transform';
+      return function (t) { var p = spritePos(t); d.style.transform = 'translate(' + Math.round(p[0]) * scale + 'px,' + Math.round(p[1]) * scale + 'px)'; };
+    }],
+    ['Still room + sprite (left, top)', function () {
+      staticRoom(); var d = sprite();
+      return function (t) { var p = spritePos(t); d.style.left = Math.round(p[0]) * scale + 'px'; d.style.top = Math.round(p[1]) * scale + 'px'; };
+    }],
+    ['Pieces, only changed ones (new way)', function () { return chunked(false); }],
+    ['Pieces + text strip', function () { return chunked(true); }],
+    ['Whole picture, quarter of screen', function () {
+      var a = lowCanvas({ alpha: false }); a.c.style.width = (cssW / 2) + 'px'; a.c.style.height = (cssH / 2) + 'px';
+      return function (t) { paint(a.g, t, 1); };
+    }],
+    ['Whole picture at 30 a second', function () {
+      var a = lowCanvas({ alpha: false }), n = 0;
+      return function (t) { if (++n % 2 === 0) paint(a.g, t, 1); };
+    }]
+  ];
+
+  var rows = document.getElementById('rows'), cells = [], results = [];
+  TESTS.forEach(function (t, i) {
+    var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
+    a.textContent = (i + 1) + '. ' + t[0]; b.className = 'n'; b.textContent = 'waiting';
+    tr.appendChild(a); tr.appendChild(b); rows.appendChild(tr); cells.push({ tr: tr, td: b });
+  });
+
+  function run(i) {
+    if (i >= TESTS.length) { finish(); return; }
+    stage.textContent = '';
+    cells[i].tr.className = 'now'; cells[i].td.textContent = 'running';
+    var tick = TESTS[i][1](), start = 0, last = 0, frames = 0, worst = 0;
+    function loop(now) {
+      if (!start) { start = now; last = now; }
+      else { frames++; if (frames > 20 && now - last > worst) worst = now - last; last = now; }
+      tick(now);
+      if (now - start < SECS * 1000) { window.requestAnimationFrame(loop); return; }
+      var fps = Math.round(frames * 1000 / (now - start));
+      results.push(fps);
+      cells[i].tr.className = ''; cells[i].td.textContent = fps + ' fps, worst ' + Math.round(worst) + ' ms';
+      run(i + 1);
+    }
+    window.requestAnimationFrame(loop);
+  }
+  function finish() {
+    stage.textContent = '';
+    var best = 1;
+    for (var i = 2; i < 6; i++) if (results[i] > results[best] + 1) best = i;
+    cells[best].tr.className = 'best';
+    document.getElementById('note').textContent = 'Done. Screen ' + Math.round(vw * dpr) + ' x ' + Math.round(vh * dpr) + ' px. Take a photo of this table. Click to run again.';
+    window.addEventListener('mousedown', function () { location.reload(); });
+  }
+  run(0);
+})();
+</script>
+</body>
+</html>

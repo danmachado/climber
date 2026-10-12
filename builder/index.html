@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Climber Room Builder</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #131a33; --line: #2a3560; --text: #eef1fa; --dim: #9aa6cc;
+    --accent: #ffb74a; --ok: #5fd6b3; --bad: #ff8f7d; --field: #0e1429;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; height: 100%; }
+  aside { width: 280px; flex: none; background: var(--panel); border-right: 1px solid var(--line);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  h1 { font: 700 15px/1 Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; }
+  h2 { font: 700 11px/1 Menlo, Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
+  label { display: block; font-size: 12px; color: var(--dim); }
+  input[type=text], input[type=password], select, textarea { width: 100%; margin-top: 4px; padding: 7px 8px; background: var(--field); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+  .two { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+  #paint { width: 300px; border-right: 0; border-left: 1px solid var(--line); }
+  #palette { display: flex; flex-direction: column; gap: 12px; }
+  #palette .group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #palette h2 { grid-column: 1 / -1; margin: 0; }
+  #palette button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; font-size: 12px; line-height: 1.15; text-align: center; }
+  #palette canvas { width: 40px; height: 40px; flex: none; image-rendering: pixelated; border-radius: 2px; }
+  #palette kbd { position: absolute; top: 4px; right: 5px; font: 10px Menlo, monospace; color: var(--dim); }
+  @media (max-width: 1100px) { #app { flex-wrap: wrap; overflow-y: auto; } #paint { width: 100%; border-left: 0; border-top: 1px solid var(--line); order: 3; } }
+  button { padding: 7px 10px; background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+    font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button[aria-pressed=true] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  button.primary { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 700; padding: 10px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  details { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  summary { cursor: pointer; font: 700 11px/1.6 Menlo, Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .gen { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .gen .primary { padding: 7px 10px; }
+  label.tick { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+  textarea { height: 64px; resize: none; font: 11px/1.4 Menlo, Consolas, monospace; }
+  #pub { display: flex; flex-direction: column; gap: 8px; }
+  #pub > div { display: flex; flex-direction: column; gap: 8px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0; }
+  #checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+  #checks li { display: flex; gap: 8px; align-items: baseline; }
+  #checks .mark { font: 700 11px Menlo, monospace; width: 34px; flex: none; }
+  #checks .pass .mark { color: var(--ok); } #checks .fail .mark { color: var(--bad); }
+  #status { min-height: 18px; font-size: 12px; color: var(--accent); margin: 0; }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; }
+  #board { position: relative; border: 1px solid var(--line); background: #0a0d1c; }
+  #grid { display: block; cursor: crosshair; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #0b1020; }
+  #coords { font: 12px Menlo, Consolas, monospace; color: var(--dim); margin: 0; height: 16px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1>Room Builder</h1>
+    <div class="two">
+      <label>Room name <input type="text" id="name" maxlength="40"></label>
+      <label>Difficulty
+        <select id="diff"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+      </label>
+    </div>
+    <details id="auto">
+      <summary>Auto-build a room</summary>
+      <div class="gen">
+        <label>Difficulty
+          <select id="g-diff"><option value="1">1 Gentle</option><option value="2" selected>2 Easy</option><option value="3">3 Medium</option><option value="4">4 Hard</option><option value="5">5 Brutal</option></select></label>
+        <label>How many obstacles
+          <select id="g-obs"><option value="0">Few</option><option value="1" selected>Some</option><option value="2">Lots</option></select></label>
+        <label>Main challenge
+          <select id="g-style"><option value="mixed">A mix</option><option value="jump">Jumping</option><option value="dash">Dashing</option><option value="climb">Climbing</option></select></label>
+        <label>Spikes
+          <select id="g-spikes"><option value="0">None</option><option value="1" selected>Some</option><option value="2">Lots</option></select></label>
+        <label class="tick"><input type="checkbox" id="g-refills" checked> Add dash refills</label>
+        <div class="row"><button id="g-go" class="primary">Build room</button><button id="g-again">Another one</button></div>
+      </div>
+    </details>
+    <div>
+      <h2>Checks</h2>
+      <ul id="checks"></ul>
+    </div>
+    <div>
+      <h2>File</h2>
+      <div class="row"><button id="export">Export JSON</button><button id="import">Import JSON</button></div>
+      <div class="row" style="margin-top:6px"><button id="copy">Copy JSON</button><button id="new">New room</button></div>
+      <input type="file" id="file" accept=".json,application/json" hidden>
+    </div>
+    <div id="pub">
+      <h2>Publish</h2>
+      <div id="pub-out">
+        <label>Email <input type="text" id="p-email" autocomplete="username"></label>
+        <label>Password <input type="password" id="p-pass" autocomplete="current-password"></label>
+        <button id="p-in">Sign in</button>
+      </div>
+      <div id="pub-in" hidden>
+        <p class="hint" id="p-who"></p>
+        <div id="p-setup" hidden>
+          <p class="hint">This login is not the publisher yet. Run this once in the Supabase SQL editor, then check again.</p>
+          <textarea id="p-sql" readonly></textarea>
+          <button id="p-recheck">Check again</button>
+        </div>
+        <div id="p-main" hidden>
+          <p class="hint" id="p-state"></p>
+          <div class="row"><button id="p-save">Save draft</button><button id="p-publish" class="primary" style="padding:7px 10px">Publish</button></div>
+          <label>My rooms <select id="p-rooms"></select></label>
+          <div class="row"><button id="p-open">Open</button><button id="p-unpub">Unpublish</button></div>
+          <label>Saved versions <select id="p-vers"></select></label>
+          <button id="p-roll">Make this version live</button>
+        </div>
+        <button id="p-signout">Sign out</button>
+      </div>
+    </div>
+    <p id="status" role="status"></p>
+  </aside>
+  <main>
+    <div id="board"><canvas id="grid"></canvas><iframe id="game" title="Play test" hidden></iframe></div>
+    <p id="coords"></p>
+  </main>
+  <aside id="paint">
+    <h1>Paint</h1>
+    <div id="palette"></div>
+    <div class="row"><button id="undo">Undo</button><button id="redo">Redo</button></div>
+    <button id="play" class="primary">Play test</button>
+    <p class="hint">Drag to paint. Right-drag erases. Hold Shift and drag to fill a box. The letter or number on each tile is its shortcut key.</p>
+    <p class="hint">Platforms: paint a run of Platform tiles, then a line of Track tiles beside it (or above or below it). The platform shuttles along the track.</p>
+  </aside>
+</div>
+
+<script type="application/json" id="starter">{"format":1,"id":"starter-01","name":"First Light","difficulty":1,"grid":{"cols":27,"rows":48,"tile":10},"legend":{".":"empty","#":"solid","^":"spike_up","v":"spike_down","<":"spike_left",">":"spike_right","S":"start","E":"exit","o":"dash_refill"},"tiles":["###########################","#.........................#","#.........................#","#.........................#","#....................EEE..#","#....................EEE..#","#........##.....###########","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##>....##........#","#........##>....##........#","#........##>....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#........##.....##........#","#.........................#","#.........................#","#.........................#","#..........#######........#","#.........................#","#.........................#","#.........................#","#............o............#","#......................####","#.........................#","#....####..........########","#....####.................#","#....####.................#","#....####^^^^^^^^^^.......#","#....##############.......#","#....####.................#","#....####.................#","#....####.................#","#....####.................#","#.........................#","#.........................#","################..........#","#.........................#","#...................#######","#...................#######","#...................#######","#......###..........#######","#..S...###....^^^^..#######","###########################","###########################"],"entities":[]}</script>
+<script>
+(function () {
+  'use strict';
+  var COLS = 27, ROWS = 48, T = 10, DRAFT_KEY = 'climber.builder.draft.v1';
+  var C = { bg: '#0a0d1c', spike: '#e9edf7',
+            body: '#ffe9b8', eye: '#0a0d1c', flame: '#ffb74a', teal: '#5fd6b3', tealDim: '#2b6f66' };
+  var GROUPS = [
+    ['Terrain', [['#', 'Solid', '1'], ['I', 'Ice', '2'], ['C', 'Crumble', '3']]],
+    ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
+    ['Moving', [['=', 'Platform', '8'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
+    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Dash refill', 'R']]],
+    ['Tools', [['.', 'Erase', 'X']]]
+  ];
+  var TILES = [];
+  GROUPS.forEach(function (g) { g[1].forEach(function (t) { TILES.push(t); }); });
+  var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
+                 'S': 'start', 'E': 'exit', 'o': 'dash_refill',
+                 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- where published rooms live (this key is the public, read-only kind and is safe to ship) ----
+  var BACKEND = window.CLIMBER_BACKEND || {
+    url: 'https://idgdoglrbegjorqekadr.supabase.co',
+    key: 'sb_publishable_5CPsQIpba-pLQFGgiQzdQw_PiJOsvuR'
+  };
+
+
+  // ---- shared tile art (used by the game and the builder so both always match) ----
+  // Built the way Celeste-style tilesets are: one flat dark fill inside every wall, a one-pixel highlight on the
+  // exposed edge (light on top, dark underneath, as if lit from above), a few random variants of each edge tile
+  // so repeats do not show, and a ring of sparse "infill" detail just inside the edge. Each terrain type is its
+  // own tileset with the same layout, so new looks can be swapped in without touching the rules.
+  var TILESETS = {
+    brick: { face: '#4a5ad0', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#161c4a', core: '#10142c', infill: '#1b2254' },
+    ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
+  };
+  var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
+  function tileHash(c, r) { var h = (c * 374761393 + r * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+  // solidAt(c, r) says whether a neighbouring cell is part of a wall (anything off the map counts as wall)
+  function drawSolid(b, x, y, kind, solidAt, c, r) {
+    var S = TILESETS[kind] || TILESETS.brick, v = tileHash(c, r);
+    var up = !solidAt(c, r - 1), dn = !solidAt(c, r + 1), lf = !solidAt(c - 1, r), rt = !solidAt(c + 1, r);
+    var edge = up || dn || lf || rt || !solidAt(c - 1, r - 1) || !solidAt(c + 1, r - 1) || !solidAt(c - 1, r + 1) || !solidAt(c + 1, r + 1);
+    if (!edge) {
+      b.fillStyle = S.core; b.fillRect(x, y, 10, 10);
+      var near = false;
+      for (var dy = -2; dy <= 2 && !near; dy++) for (var dx = -2; dx <= 2; dx++) if (!solidAt(c + dx, r + dy)) { near = true; break; }
+      if (near && v > 0.15) { // infill ring: a fragment or two of the edge pattern, in a colour close to the fill
+        b.fillStyle = S.infill;
+        var k = Math.floor(v * 4);
+        if (k === 0) { b.fillRect(x + 1, y + 1, 5, 3); b.fillRect(x + 6, y + 6, 3, 3); }
+        else if (k === 1) { b.fillRect(x + 4, y + 1, 5, 3); }
+        else if (k === 2) { b.fillRect(x + 1, y + 5, 4, 4); b.fillRect(x + 7, y + 2, 2, 2); }
+        else { b.fillRect(x + 2, y + 2, 6, 3); b.fillRect(x + 1, y + 7, 3, 2); }
+      }
+      return;
+    }
+    if (kind === 'ice') {
+      b.fillStyle = S.face; b.fillRect(x, y, 10, 10);
+      b.fillStyle = S.line;
+      if (v < 0.34) { b.fillRect(x + 2, y + 7, 3, 1); b.fillRect(x + 6, y + 4, 2, 1); }
+      else if (v < 0.67) { b.fillRect(x + 5, y + 6, 4, 1); b.fillRect(x + 1, y + 3, 2, 1); }
+      else { b.fillRect(x + 3, y + 5, 2, 1); b.fillRect(x + 7, y + 8, 2, 1); }
+      b.fillStyle = S.hi;                                   // a glint, in one of three places
+      var gx = v < 0.34 ? 2 : (v < 0.67 ? 5 : 3);
+      b.fillRect(x + gx + 1, y + 2, 1, 1); b.fillRect(x + gx, y + 3, 1, 1);
+    } else {
+      b.fillStyle = S.line; b.fillRect(x, y, 10, 10);       // mortar, then two courses of brick with the joints shifted per variant
+      b.fillStyle = S.face;
+      var j1 = v < 0.34 ? 9 : (v < 0.67 ? 6 : 3), j2 = v < 0.34 ? 4 : (v < 0.67 ? 2 : 7);
+      b.fillRect(x, y, j1, 4); if (j1 < 9) b.fillRect(x + j1 + 1, y, 9 - j1, 4);
+      b.fillRect(x, y + 5, j2, 4); b.fillRect(x + j2 + 1, y + 5, 9 - j2, 4);
+    }
+    // one-pixel edge light: bright on top, dimmer on the sides, dark underneath
+    if (lf) { b.fillStyle = S.side; b.fillRect(x, y, 1, 10); }
+    if (rt) { b.fillStyle = S.side; b.fillRect(x + 9, y, 1, 10); }
+    if (dn) { b.fillStyle = S.lo; b.fillRect(x, y + 9, 10, 1); }
+    if (up) { b.fillStyle = S.hi; b.fillRect(x, y, 10, 1); }
+  }
+  // Crumbling block: every tile has its own outline and cracks so it reads as loose.
+  function drawCrumble(b, x, y, c, r) {
+    var v = tileHash(c, r);
+    b.fillStyle = '#5a3516'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#c98f4a'; b.fillRect(x + 1, y + 1, 8, 8);
+    b.fillStyle = '#f0c27a'; b.fillRect(x + 1, y + 1, 8, 1);
+    b.fillStyle = '#8f5f2a'; b.fillRect(x + 1, y + 8, 8, 1);
+    b.fillStyle = '#5a3516';
+    if (v < 0.5) { b.fillRect(x + 3, y + 2, 1, 2); b.fillRect(x + 4, y + 4, 1, 2); b.fillRect(x + 6, y + 6, 1, 2); }
+    else { b.fillRect(x + 6, y + 2, 1, 2); b.fillRect(x + 5, y + 4, 1, 2); b.fillRect(x + 3, y + 5, 1, 3); }
+  }
+  // Moving platform: one tile of a plank; left and right say whether it continues on that side.
+  function drawPlank(b, x, y, left, right) {
+    b.fillStyle = '#3a4258'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#9aa5bb'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 7);
+    b.fillStyle = '#e6ebf5'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
+    b.fillStyle = '#5c667d'; b.fillRect(x + (left ? 0 : 1), y + 7, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
+    b.fillStyle = '#3a4258'; b.fillRect(x + 4, y + 4, 2, 2);
+  }
+  function drawTrack(b, x, y, vertical) {
+    b.fillStyle = '#2f3a6b';
+    if (vertical) { b.fillRect(x + 4, y + 1, 2, 3); b.fillRect(x + 4, y + 6, 2, 3); }
+    else { b.fillRect(x + 1, y + 4, 3, 2); b.fillRect(x + 6, y + 4, 3, 2); }
+  }
+
+
+  // ---- hero sprite sheet: 16 x 16 frames, one row per animation, facing right (Eyeless human adventurer, thicker left head, rounded right head, full blue-shirt shoulder and short shaded shoes) ----
+  var HERO = {"enabled": false, "frame": 16, "dashColor": [255, 241, 193], "spentColor": [138, 72, 44], "tired": [[[99, 145, 215], [53, 90, 157]], [[241, 198, 154], [200, 148, 104]]], "trail": [[244, 122, 32], [241, 198, 154]], "burst": ["#ffe9b8", "#ffb74a"], "anims": {"idle": {"row": 0, "n": 4, "fps": 4, "loop": true}, "run": {"row": 1, "n": 6, "fps": 12, "loop": true}, "jump_up": {"row": 2, "n": 2, "fps": 16, "loop": false}, "fall": {"row": 3, "n": 2, "fps": 16, "loop": false}, "land": {"row": 4, "n": 2, "fps": 12, "loop": false}, "dash_side": {"row": 5, "n": 2, "fps": 16, "loop": false}, "dash_up": {"row": 6, "n": 2, "fps": 16, "loop": false}, "dash_down": {"row": 7, "n": 2, "fps": 16, "loop": false}, "dash_diag_up": {"row": 8, "n": 2, "fps": 16, "loop": false}, "dash_diag_down": {"row": 9, "n": 2, "fps": 16, "loop": false}, "wall_hold": {"row": 10, "n": 2, "fps": 4, "loop": true}, "climb": {"row": 11, "n": 4, "fps": 8, "loop": true}, "wall_slide": {"row": 12, "n": 2, "fps": 8, "loop": true}, "hurt": {"row": 13, "n": 1, "fps": 16, "loop": false}, "spawn": {"row": 14, "n": 5, "fps": 12, "loop": false}, "exit": {"row": 15, "n": 4, "fps": 12, "loop": false}}, "src": "data:image/png;base64,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"};
+
+
+  // ---- auto-builder: turns a few settings into a random room ----
+  // Rooms are stacked floors. Each floor is crossed in one direction past a run of obstacles, and ends at a way
+  // up to the next floor. Difficulty sets how big each hazard is and how little safe ground sits between them;
+  // the obstacle and spike settings set how many there are and how many of them can kill you.
+  function generateRoom(opts, seed) {
+    var COLS = 27, ROWS = 48, D = Math.max(1, Math.min(5, opts.difficulty | 0)), SP = opts.spikes, s = seed >>> 0;
+    function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+    function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+    function rr(p) { return ri(p[0], p[1]); }
+    function pick(w) { var k, sum = 0, r; for (k in w) sum += w[k]; if (sum <= 0) return null; r = rnd() * sum; for (k in w) { r -= w[k]; if (r < 0) return k; } return null; }
+    var g = [], r, c;
+    for (r = 0; r < ROWS; r++) { g.push([]); for (c = 0; c < COLS; c++) g[r].push((r === 0 || r >= ROWS - 2 || c === 0 || c === COLS - 1) ? '#' : '.'); }
+    function col(t, d) { return d > 0 ? 1 + t : 25 - t; }
+    function put(t, d, row, ch) { var x = col(t, d); if (x >= 1 && x <= 25 && row >= 1 && row <= 45) g[row][x] = ch; }
+    function box(t0, t1, r0, r1, d, ch) { for (var q = r0; q <= r1; q++) for (var t = t0; t <= t1; t++) put(t, d, q, ch); }
+
+    // what each difficulty means, from 1 Gentle to 5 Brutal
+    var TUNE = {
+      gap:    [[4, 5], [3, 4], [3, 4], [3, 3], [3, 3]][D - 1],            // safe ground between obstacles, in tiles
+      spikeW: [[2, 2], [2, 3], [3, 4], [4, 5], [5, 6]][D - 1],            // spike patch you can clear with a jump
+      wideW:  [null, [6, 7], [7, 8], [8, 9], [9, 10]][D - 1],             // spike gap that needs a jump and a dash
+      crownW: [null, null, [2, 2], [2, 3], [3, 3]][D - 1],                // raised block with spikes on top
+      wallH:  [[4, 4], [4, 4], [4, 5], [4, 5], [5, 5]][D - 1]             // wall to climb over
+    };
+    var style = opts.style || 'mixed';
+    var target = [1, 2, 9][opts.obstacles];
+    var plan = [], y = 46, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', floor = 0;
+    var stats = { floors: 0, obstacles: 0, spikes: 0 };
+    g[45][col(2, d)] = 'S';
+
+    while (true) {
+      var maxHf = y - 8, top = maxHf < 6, headroom = top ? y - 1 : maxHf - 1;
+      var conn = null;
+      if (!top) {
+        conn = { type: pick({
+          steps: [5, 3, 2, 1, 0.5][D - 1] * (style === 'jump' ? 2 : 1),
+          open: 2 * (style === 'dash' ? 2 : 1),
+          curtain: maxHf >= 7 ? [1, 2, 3, 4, 5][D - 1] * 0.8 * (style === 'climb' ? 2 : 1) : 0
+        }) };
+        conn.W = conn.type === 'steps' ? 7 : (conn.type === 'curtain' ? ri(3, 5) : ri(3, 4));
+      }
+      var s0 = floor === 0 ? 6 : Wprev + (prevType === 'open' ? 5 : 3);
+      var e0 = top ? 18 : (conn.type === 'steps' ? 15 : (conn.type === 'curtain' ? 25 - conn.W - 4 : 25 - conn.W - 2));
+
+      // obstacles along the floor
+      var obs = [], cur = s0 + (D <= 2 ? ri(0, 1) : 0), minHf = 6, lastGap = 9, spiked = 0;
+      while (obs.length < target) {
+        var room = e0 - cur;
+        var canWall = (top || conn.type !== 'steps') && headroom >= 7;
+        var canDrop = canWall && SP > 0 && D >= 4 && headroom >= 8;
+        var w = {
+          spikes: SP > 0 && room >= 3 ? (style === 'jump' ? 5 : 3) * (SP > 1 ? 2 : 1) : 0,
+          wide: SP > 0 && TUNE.wideW && room >= TUNE.wideW[0] + 2 ? (style === 'dash' ? 8 : 2) * (D >= 4 ? 1.5 : 1) : 0,
+          crown: SP > 0 && TUNE.crownW && room >= TUNE.crownW[0] + 1 ? 2 : 0,
+          block: room >= 3 ? (SP > 1 ? 0 : (SP === 1 ? 1 : 3)) * (style === 'jump' ? 1.5 : 1) : 0,
+          wall: canWall && room >= 3 ? (style === 'climb' ? 6 : 2) * (SP > 1 ? 0.3 : 1) : 0,
+          wallspikes: canDrop && room >= 5 ? (style === 'climb' ? 6 : 2) : 0
+        };
+        // "Some" spikes means every floor has at least one; "Lots" removed the harmless options above
+        if (SP === 1 && !spiked && (w.spikes || w.wide || w.crown || w.wallspikes)) { w.block = 0; w.wall = 0; }
+        // a spiked block needs a run-up, so it gets extra clear ground in front or is swapped for plain spikes
+        var runup = obs.length ? Math.max(0, 5 - lastGap) : (floor === 0 ? 0 : 2);
+        if (room - runup < (TUNE.crownW ? TUNE.crownW[0] : 99) + 1) w.crown = 0;
+        var type = pick(w);
+        if (!type) break;
+        if (type === 'crown') { cur += runup; room -= runup; }
+        var o = { type: type, t0: cur }, after = rr(TUNE.gap);
+        if (type === 'spikes') { o.w = Math.min(rr(TUNE.spikeW), room - 1, lastGap <= 3 ? 5 : 6); } // the last tile before the way up stays clear
+        else if (type === 'wide') { o.w = Math.min(rr(TUNE.wideW), room - 2); after = Math.max(6, after); } // a dash carries you further, so more room to land
+        else if (type === 'crown') { o.w = Math.min(rr(TUNE.crownW), room - 1); }
+        else if (type === 'block') { o.w = 2; o.h = 2; }
+        else if (type === 'wall') { o.w = 2; o.h = Math.min(rr(TUNE.wallH), headroom - 3); minHf = Math.max(minHf, o.h + 4); after = 5; }
+        else { o.h = 4; o.sw = Math.min(D >= 5 ? ri(3, 4) : ri(2, 3), room - 3); o.w = 2 + o.sw; minHf = Math.max(minHf, 9); }
+        if (type !== 'block' && type !== 'wall') spiked++;
+        obs.push(o);
+        cur += o.w + after; lastGap = after;
+      }
+
+      // height of this floor
+      var Hf = 0, yN = 0;
+      if (!top) {
+        if (conn.type === 'steps') Hf = 6;
+        else {
+          var lo = Math.max(minHf, conn.type === 'curtain' ? 7 : 6), hi = Math.max(lo, Math.min(9, maxHf));
+          if (conn.type === 'open' && style === 'dash' && lo <= 7 && hi >= 7) Hf = 7;
+          else if (D >= 4) Hf = lo;                       // tight floors, so more of them fit
+          else if (D <= 2) Hf = ri(Math.min(hi, Math.max(lo, 7)), hi);
+          else Hf = ri(lo, hi);
+        }
+        yN = y - Hf;
+      }
+
+      // draw obstacles
+      for (var i = 0; i < obs.length; i++) {
+        var ob = obs[i], e = ob.t0 + ob.w - 1;
+        if (ob.type === 'spikes' || ob.type === 'wide') {
+          box(ob.t0, e, y - 1, y - 1, d, '^'); stats.spikes += ob.w;
+          if (ob.type === 'wide' && opts.refills) put(ob.t0 + Math.floor(ob.w / 2), d, y - 4, 'o');
+        } else if (ob.type === 'crown') {
+          box(ob.t0, e, y - 1, y - 1, d, '#'); box(ob.t0, e, y - 2, y - 2, d, '^'); stats.spikes += ob.w;
+        } else if (ob.type === 'wallspikes') {
+          box(ob.t0, ob.t0 + 1, y - ob.h, y - 1, d, '#'); box(ob.t0 + 2, e, y - 1, y - 1, d, '^'); stats.spikes += ob.sw;
+        } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
+      }
+      stats.floors++; stats.obstacles += obs.length;
+
+      if (top) {
+        box(21, 22, y - 2, y - 1, d, 'E');
+        plan.push({ y: y, d: d, obs: obs, conn: null });
+        break;
+      }
+
+      // next floor slab, with an opening by the far wall
+      box(0, 24 - conn.W, yN, yN, d, '#');
+      if (conn.type === 'curtain') {
+        box(25 - conn.W - 2, 25 - conn.W - 1, yN + 1, y - 3, d, '#');
+        // spikes on the outer wall take away the easy wall jumps; the hanging wall's inner face is still climbable
+        if ((SP > 0 && D >= 3) || (SP > 1 && D >= 2)) {
+          var r1 = D >= 4 ? y - 5 : Math.min(y - 5, yN + 3);
+          if (r1 >= yN + 2) { box(24, 24, yN + 2, r1, d, d > 0 ? '<' : '>'); stats.spikes += r1 - yN - 1; }
+        }
+      } else if (conn.type === 'steps') {
+        box(22, 24, y - 2, y - 1, d, '#');
+        box(18, 20, y - 4, y - 4, d, '#');
+      } else if (opts.refills && Hf >= 8) put(23, d, y - 5, 'o');
+      conn.Hf = Hf;
+      plan.push({ y: y, d: d, obs: obs, conn: conn });
+      y = yN; d = -d; Wprev = conn.W; prevType = conn.type; floor++;
+    }
+
+    return {
+      plan: plan, stats: stats,
+      room: { format: 1, id: 'auto-' + seed, name: 'Auto ' + seed, difficulty: D, grid: { cols: COLS, rows: ROWS, tile: 10 },
+              tiles: g.map(function (row) { return row.join(''); }), entities: [] }
+    };
+  }
+
+
+  var heroImg = new Image(); heroImg.onload = function () { if (tiles) draw(); }; if (HERO.enabled) heroImg.src = HERO.src;
+  var room, tiles, brush = '#', undoStack = [], redoStack = [], cleared = false, playing = false;
+
+  // ---- room data ----
+  function blankTiles() {
+    var g = [], r, c;
+    for (r = 0; r < ROWS; r++) { g.push([]); for (c = 0; c < COLS; c++) g[r].push((r === 0 || r >= ROWS - 2 || c === 0 || c === COLS - 1) ? '#' : '.'); }
+    g[ROWS - 3][3] = 'S';
+    g[4][22] = 'E'; g[5][22] = 'E'; g[4][23] = 'E'; g[5][23] = 'E';
+    for (c = 19; c < COLS - 1; c++) g[6][c] = '#';
+    return g;
+  }
+  function slug(s) { return (s || 'room').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'room'; }
+  function toJSON() {
+    return { format: 1, id: room.id || slug(room.name), name: room.name, difficulty: room.difficulty,
+             grid: { cols: COLS, rows: ROWS, tile: T }, legend: LEGEND,
+             tiles: tiles.map(function (r) { return r.join(''); }), entities: room.entities || [] };
+  }
+  function fromJSON(d) {
+    if (!d || d.format !== 1) throw new Error('This is not a format 1 room file.');
+    if (!d.grid || d.grid.cols !== COLS || d.grid.rows !== ROWS || d.grid.tile !== T) throw new Error('Room must be ' + COLS + ' by ' + ROWS + ' tiles of ' + T + ' px.');
+    if (!d.tiles || d.tiles.length !== ROWS) throw new Error('Room has the wrong number of rows.');
+    var g = d.tiles.map(function (row, r) {
+      if (row.length !== COLS) throw new Error('Row ' + r + ' is the wrong width.');
+      return row.split('').map(function (ch) { if (!LEGEND[ch]) throw new Error('Unknown tile "' + ch + '" in row ' + r + '.'); return ch; });
+    });
+    room = { id: d.id || '', name: d.name || 'Untitled', difficulty: Math.min(5, Math.max(1, d.difficulty | 0 || 1)), entities: d.entities || [] };
+    tiles = g;
+  }
+  function snapshot() { return tiles.map(function (r) { return r.join(''); }).join('\n'); }
+  function restore(s) { tiles = s.split('\n').map(function (r) { return r.split(''); }); }
+  function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(toJSON())); } catch (e) {} }
+  function say(msg) { $('status').textContent = msg || ''; }
+
+  // ---- editing ----
+  function setCell(c, r, ch) {
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS || tiles[r][c] === ch) return;
+    if (ch === 'S') for (var y = 0; y < ROWS; y++) for (var x = 0; x < COLS; x++) if (tiles[y][x] === 'S') tiles[y][x] = '.';
+    tiles[r][c] = ch;
+  }
+  function changed() { cleared = false; saveDraft(); refresh(); }
+  function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 200) undoStack.shift(); redoStack = []; }
+  function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); changed(); }
+  function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); changed(); }
+
+  // ---- drawing (same look as the game) ----
+  function spike(b, tx, ty, ch) {
+    var teeth = [1, 3, 5, 3, 1, 1, 3, 5, 3, 1];
+    b.fillStyle = C.spike;
+    for (var i = 0; i < T; i++) {
+      var n = teeth[i];
+      if (ch === '^') b.fillRect(tx + i, ty + T - n, 1, n);
+      else if (ch === 'v') b.fillRect(tx + i, ty, 1, n);
+      else if (ch === '>') b.fillRect(tx, ty + i, n, 1);
+      else b.fillRect(tx + T - n, ty + i, n, 1);
+    }
+  }
+  function wallAt(c, r) { return r < 0 || r >= ROWS || c < 0 || c >= COLS || tiles[r][c] === '#' || tiles[r][c] === 'I'; }
+  function alone() { return false; }
+  function drawTile(b, ch, x, y, c, r, icon) {
+    if (ch === '#' || ch === 'I') drawSolid(b, x, y, SOLID_KIND[ch], icon ? alone : wallAt, c, r);
+    else if (ch === 'C') drawCrumble(b, x, y, c, r);
+    else if (ch === '=') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === '=', !icon && c < COLS - 1 && tiles[r][c + 1] === '=');
+    else if (ch === '-' || ch === '|') drawTrack(b, x, y, ch === '|');
+    else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') spike(b, x, y, ch);
+    else if (ch === 'E') { b.fillStyle = C.teal; b.fillRect(x, y, T, T); b.fillStyle = C.tealDim; b.fillRect(x + 2, y + 2, T - 4, T - 4); }
+    else if (ch === 'o') { b.fillStyle = C.teal; b.fillRect(x + 4, y + 1, 2, 8); b.fillRect(x + 2, y + 3, 6, 4); }
+    else if (ch === 'S' && heroImg.complete && heroImg.naturalWidth) b.drawImage(heroImg, 0, 0, 16, 16, x - 3, y - 6, 16, 16);
+    else if (ch === 'S') {
+      b.fillStyle = C.body; b.fillRect(x + 1, y, 8, 10);
+      b.fillStyle = C.eye; b.fillRect(x + 5, y + 3, 1, 2); b.fillRect(x + 7, y + 3, 1, 2);
+      b.fillStyle = C.flame; b.fillRect(x + 3, y - 2, 4, 2); b.fillRect(x + 4, y - 4, 2, 2);
+    }
+  }
+
+  var canvas = $('grid'), ctx = canvas.getContext('2d'), zoom = 1, hover = null, box = null;
+  function fit() {
+    var availH = window.innerHeight - 60, availW = window.innerWidth - 280 - (window.innerWidth > 1100 ? 300 : 0) - 30;
+    zoom = Math.max(1, Math.floor(Math.min(availH / (ROWS * T), availW / (COLS * T)) * 2) / 2);
+    var dpr = window.devicePixelRatio || 1;
+    canvas.style.width = (COLS * T * zoom) + 'px'; canvas.style.height = (ROWS * T * zoom) + 'px';
+    canvas.width = Math.round(COLS * T * zoom * dpr); canvas.height = Math.round(ROWS * T * zoom * dpr);
+    draw();
+  }
+  function draw() {
+    var k = canvas.width / (COLS * T), r, c, px = 1 / k;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, COLS * T, ROWS * T);
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
+      var ch = tiles[r][c];
+      if (ch !== '.') drawTile(ctx, ch, c * T, r * T, c, r, false);
+    }
+    for (c = 1; c < COLS; c++) { ctx.fillStyle = c % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(c * T, 0, px, ROWS * T); }
+    for (r = 1; r < ROWS; r++) { ctx.fillStyle = r % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(0, r * T, COLS * T, px); }
+    var hi = box || (hover ? { c0: hover.c, r0: hover.r, c1: hover.c, r1: hover.r } : null);
+    if (hi) {
+      var x = Math.min(hi.c0, hi.c1) * T, y = Math.min(hi.r0, hi.r1) * T;
+      var w = (Math.abs(hi.c1 - hi.c0) + 1) * T, hh = (Math.abs(hi.r1 - hi.r0) + 1) * T;
+      ctx.strokeStyle = C.flame; ctx.lineWidth = 2 * px; ctx.strokeRect(x + px, y + px, w - 2 * px, hh - 2 * px);
+    }
+  }
+
+  // ---- checks ----
+  function runChecks() {
+    var starts = 0, exits = 0, grounded = false, r, c;
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
+      if (tiles[r][c] === 'S') { starts++; grounded = r < ROWS - 1 && tiles[r + 1][c] === '#'; }
+      if (tiles[r][c] === 'E') exits++;
+    }
+    return [
+      { ok: starts === 1, text: starts === 1 ? 'One start' : (starts ? 'Only one start is allowed' : 'Add a start') },
+      { ok: starts === 1 && grounded, text: 'Start stands on solid ground' },
+      { ok: exits > 0, text: exits ? 'Has an exit' : 'Add an exit' },
+      { ok: cleared, text: cleared ? 'Beaten in play test' : 'Not beaten since the last change' }
+    ];
+  }
+  function refresh() {
+    var list = runChecks(), ul = $('checks');
+    ul.textContent = '';
+    list.forEach(function (k) {
+      var li = document.createElement('li'); li.className = k.ok ? 'pass' : 'fail';
+      var m = document.createElement('span'); m.className = 'mark'; m.textContent = k.ok ? 'OK' : 'FIX';
+      var t = document.createElement('span'); t.textContent = k.text;
+      li.appendChild(m); li.appendChild(t); ul.appendChild(li);
+    });
+    $('undo').disabled = !undoStack.length; $('redo').disabled = !redoStack.length;
+    draw();
+  }
+
+  // ---- pointer ----
+  function cellAt(e) {
+    var b = canvas.getBoundingClientRect();
+    return { c: Math.floor((e.clientX - b.left) / (T * zoom)), r: Math.floor((e.clientY - b.top) / (T * zoom)) };
+  }
+  var stroke = null;
+  function line(a, b, ch) { // fill every cell between two pointer positions so fast drags leave no gaps
+    var n = Math.max(Math.abs(b.c - a.c), Math.abs(b.r - a.r), 1);
+    for (var i = 0; i <= n; i++) setCell(Math.round(a.c + (b.c - a.c) * i / n), Math.round(a.r + (b.r - a.r) * i / n), ch);
+  }
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  canvas.addEventListener('pointerdown', function (e) {
+    if (playing) return;
+    canvas.setPointerCapture(e.pointerId);
+    var p = cellAt(e);
+    stroke = { ch: e.button === 2 ? '.' : brush, rect: e.shiftKey, before: snapshot(), dirty: false };
+    if (stroke.rect) box = { c0: p.c, r0: p.r, c1: p.c, r1: p.r };
+    else { setCell(p.c, p.r, stroke.ch); stroke.last = p; }
+    draw();
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    var p = cellAt(e);
+    hover = (p.c >= 0 && p.r >= 0 && p.c < COLS && p.r < ROWS) ? p : null;
+    $('coords').textContent = hover ? 'column ' + p.c + ', row ' + p.r : '';
+    if (stroke) { if (stroke.rect) { box.c1 = Math.max(0, Math.min(COLS - 1, p.c)); box.r1 = Math.max(0, Math.min(ROWS - 1, p.r)); } else { line(stroke.last, p, stroke.ch); stroke.last = p; } }
+    draw();
+  });
+  function endStroke() {
+    if (!stroke) return;
+    if (stroke.rect && box) {
+      for (var r = Math.min(box.r0, box.r1); r <= Math.max(box.r0, box.r1); r++)
+        for (var c = Math.min(box.c0, box.c1); c <= Math.max(box.c0, box.c1); c++) setCell(c, r, stroke.ch);
+    }
+    box = null;
+    if (snapshot() !== stroke.before) { undoStack.push(stroke.before); redoStack = []; stroke = null; changed(); }
+    else { stroke = null; draw(); }
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+  canvas.addEventListener('pointerleave', function () { hover = null; if (!stroke) { $('coords').textContent = ''; draw(); } });
+
+  // ---- palette ----
+  function buildPalette() {
+    GROUPS.forEach(function (grp) {
+      var box = document.createElement('div'); box.className = 'group';
+      if (grp[1].length === 4) box.style.gridTemplateColumns = 'repeat(4, 1fr)';
+      var h = document.createElement('h2'); h.textContent = grp[0]; box.appendChild(h);
+      grp[1].forEach(function (t) {
+        var b = document.createElement('button'); b.type = 'button'; b.dataset.ch = t[0]; b.title = t[1] + ' (' + t[2] + ')';
+        var ic = document.createElement('canvas'); ic.width = 20; ic.height = 20;
+        var x = ic.getContext('2d'); x.fillStyle = C.bg; x.fillRect(0, 0, 20, 20);
+        if (t[0] !== '.') { x.setTransform(1.6, 0, 0, 1.6, 2, t[0] === 'S' ? 4 : 2); drawTile(x, t[0], 0, 0, 0, 0, true); }
+        var name = document.createElement('span'); name.textContent = t[1];
+        var k = document.createElement('kbd'); k.textContent = t[2];
+        b.appendChild(ic); b.appendChild(name); b.appendChild(k);
+        b.addEventListener('click', function () { pick(t[0]); });
+        box.appendChild(b);
+      });
+      $('palette').appendChild(box);
+    });
+  }
+  function pick(ch) {
+    brush = ch;
+    Array.prototype.forEach.call($('palette').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.ch === ch ? 'true' : 'false'); });
+  }
+
+  // ---- play test: the real game runs in a frame and is handed this room ----
+  var frame = $('game');
+  function startPlay() {
+    var list = runChecks();
+    if (!list[0].ok) { say('Place exactly one start before testing.'); return; }
+    playing = true; say('Playing. Press Esc to return to editing.');
+    $('play').textContent = 'Back to editing';
+    frame.hidden = false; frame.src = '../index.html';
+  }
+  function stopPlay() {
+    playing = false; frame.hidden = true; frame.src = 'about:blank';
+    $('play').textContent = 'Play test';
+    if ($('status').textContent.indexOf('Playing') === 0) say('');
+  }
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || !playing || e.source !== frame.contentWindow) return;
+    if (d.type === 'climber-ready') { frame.contentWindow.postMessage({ type: 'climber-room', room: toJSON() }, '*'); frame.focus(); }
+    else if (d.type === 'climber-result' && d.won) { cleared = true; say('Beaten in ' + d.time.toFixed(1) + ' s with ' + d.deaths + (d.deaths === 1 ? ' fall.' : ' falls.')); refresh(); }
+    else if (d.type === 'climber-exit') stopPlay();
+    else if (d.type === 'climber-error') { stopPlay(); say(d.message); }
+  });
+
+  // ---- file ----
+  function exportFile() {
+    var data = toJSON(), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+    a.download = data.id + '.json'; document.body.appendChild(a); a.click(); a.remove();
+    var fails = runChecks().filter(function (k) { return !k.ok; }).length;
+    say('Exported ' + data.id + '.json' + (fails ? ' as a draft. ' + fails + ' check' + (fails === 1 ? '' : 's') + ' still to fix.' : '.'));
+  }
+  function load(d, note) {
+    fromJSON(d); undoStack = []; redoStack = []; cleared = false;
+    $('name').value = room.name; $('diff').value = String(room.difficulty);
+    saveDraft(); refresh(); say(note || '');
+  }
+
+  $('play').addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); });
+  $('undo').addEventListener('click', undo);
+  $('redo').addEventListener('click', redo);
+  $('export').addEventListener('click', exportFile);
+  $('import').addEventListener('click', function () { $('file').click(); });
+  $('copy').addEventListener('click', function () {
+    var text = JSON.stringify(toJSON(), null, 1);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { say('Copied.'); }, function () { say('Copy was blocked by the browser. Use Export instead.'); });
+    else say('Copy is not available here. Use Export instead.');
+  });
+  var newArmed = false;
+  $('new').addEventListener('click', function () {
+    if (!newArmed) { newArmed = true; $('new').textContent = 'Click again to clear'; setTimeout(function () { newArmed = false; $('new').textContent = 'New room'; }, 3000); return; }
+    newArmed = false; $('new').textContent = 'New room';
+    pushUndo(); setDb(null); tiles = blankTiles(); room = { id: '', name: 'Untitled', difficulty: 1, entities: [] };
+    $('name').value = room.name; $('diff').value = '1'; changed(); say('New room. Undo brings the old one back.');
+  });
+  $('file').addEventListener('change', function () {
+    var f = this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { try { load(JSON.parse(rd.result), 'Loaded ' + f.name + '.'); setDb(null); } catch (err) { say('Could not load: ' + err.message); } };
+    rd.readAsText(f); this.value = '';
+  });
+  var lastSeed = 0;
+  function autoBuild(seed) {
+    lastSeed = seed;
+    var out = generateRoom({ difficulty: +$('g-diff').value, obstacles: +$('g-obs').value, style: $('g-style').value,
+                             spikes: +$('g-spikes').value, refills: $('g-refills').checked }, seed);
+    pushUndo(); setDb(null);
+    tiles = out.room.tiles.map(function (r) { return r.split(''); });
+    room = { id: out.room.id, name: out.room.name, difficulty: out.room.difficulty, entities: [] };
+    $('name').value = room.name; $('diff').value = String(room.difficulty);
+    changed(); say('Built room ' + seed + ': ' + out.stats.floors + ' floors, ' + out.stats.obstacles + ' obstacles, ' + out.stats.spikes + ' spike tiles. Undo brings back what you had.');
+  }
+  $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
+  $('g-again').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
+  $('name').addEventListener('input', function () { room.name = this.value; room.id = slug(this.value); saveDraft(); });
+  $('diff').addEventListener('change', function () { room.difficulty = +this.value; saveDraft(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape' && playing) { stopPlay(); return; }
+    if (playing) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var key = e.key.toUpperCase();
+    for (var i = 0; i < TILES.length; i++) if (TILES[i][2] === key) { pick(TILES[i][0]); break; }
+  });
+  window.addEventListener('resize', fit);
+
+  // ---- publishing: drafts stay private, Publish makes a room live, and any saved version can be made live again ----
+  var SKEY = 'climber.builder.session.v1', DBKEY = 'climber.builder.room.v1';
+  var session = null, dbId = null, myRooms = [], myVers = [];
+  try { session = JSON.parse(localStorage.getItem(SKEY)); dbId = localStorage.getItem(DBKEY) || null; } catch (e) {}
+  function keep() { try { if (session) localStorage.setItem(SKEY, JSON.stringify(session)); else localStorage.removeItem(SKEY); } catch (e) {} }
+  function setDb(id) {
+    dbId = id || null;
+    try { if (dbId) localStorage.setItem(DBKEY, dbId); else localStorage.removeItem(DBKEY); } catch (e) {}
+    $('p-state').textContent = dbId ? 'This room is saved online. Saving adds a new version.' : 'This room is not saved online yet.';
+  }
+  function signIn(body, grant) {
+    return fetch(BACKEND.url + '/auth/v1/token?grant_type=' + grant, { method: 'POST', headers: { apikey: BACKEND.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) {
+        if (!r.ok) throw new Error(j.msg || j.error_description || j.message || 'Sign in failed.');
+        session = { access_token: j.access_token, refresh_token: j.refresh_token, user: { id: j.user.id, email: j.user.email } }; keep();
+      }); });
+  }
+  function api(path, opt, retried) {
+    opt = opt || {};
+    var headers = { apikey: BACKEND.key, 'Content-Type': 'application/json' };
+    if (session) headers.Authorization = 'Bearer ' + session.access_token;
+    if (opt.method && opt.method !== 'GET') headers.Prefer = 'return=representation';
+    return fetch(BACKEND.url + '/rest/v1/' + path, { method: opt.method || 'GET', headers: headers, body: opt.body ? JSON.stringify(opt.body) : undefined })
+      .then(function (r) {
+        if (r.status === 401 && session && !retried) {
+          return signIn({ refresh_token: session.refresh_token }, 'refresh_token')
+            .then(function () { return api(path, opt, true); }, function () { session = null; keep(); showPub(); throw new Error('Your sign in ran out. Sign in again.'); });
+        }
+        return r.text().then(function (t) {
+          var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+          if (!r.ok) throw new Error((j && (j.message || j.msg)) || 'Request failed (' + r.status + ').');
+          return j;
+        });
+      });
+  }
+  function fail(e) { say(e.message || String(e)); }
+  function showPub() {
+    $('pub-out').hidden = !!session; $('pub-in').hidden = !session;
+    if (!session) return;
+    $('p-who').textContent = 'Signed in as ' + session.user.email;
+    api('admins?select=user_id').then(function (rows) {
+      var ok = rows && rows.length > 0;
+      $('p-setup').hidden = ok; $('p-main').hidden = !ok;
+      if (!ok) $('p-sql').value = "insert into admins (user_id)\nvalues ('" + session.user.id + "');";
+      else { setDb(dbId); return listRooms(); }
+    }).catch(fail);
+  }
+  function fillSelect(el, items, label, keepValue) {
+    el.textContent = '';
+    items.forEach(function (it) { var o = document.createElement('option'); o.value = it.id; o.textContent = label(it); el.appendChild(o); });
+    if (!items.length) { var o = document.createElement('option'); o.value = ''; o.textContent = 'None yet'; el.appendChild(o); }
+    if (keepValue) el.value = keepValue;
+    if (!el.value && items.length) el.value = items[0].id;
+  }
+  function listRooms() {
+    return api('rooms?select=id,name,difficulty,published_version_id,updated_at&order=updated_at.desc').then(function (rows) {
+      myRooms = rows || [];
+      fillSelect($('p-rooms'), myRooms, function (r) { return r.name + (r.published_version_id ? '  (live)' : '  (draft)'); }, dbId || $('p-rooms').value);
+      return listVers();
+    });
+  }
+  function pickedRoom() { var id = $('p-rooms').value; return myRooms.filter(function (r) { return r.id === id; })[0] || null; }
+  function listVers() {
+    var r = pickedRoom();
+    if (!r) { myVers = []; fillSelect($('p-vers'), [], null); return Promise.resolve(); }
+    return api('room_versions?select=id,created_at,validated&room_id=eq.' + r.id + '&order=created_at.desc').then(function (rows) {
+      myVers = rows || [];
+      fillSelect($('p-vers'), myVers, function (v) {
+        return new Date(v.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) +
+          (v.id === r.published_version_id ? '  (live)' : '') + (v.validated ? '' : '  (not beaten)');
+      });
+    });
+  }
+  function saveVersion(validated) {
+    var data = toJSON(), row = { name: room.name || 'Untitled', difficulty: room.difficulty };
+    var makeRoom = function () { return api('rooms', { method: 'POST', body: row }).then(function (rows) { setDb(rows[0].id); }); };
+    var first = !dbId ? makeRoom() : api('rooms?id=eq.' + dbId, { method: 'PATCH', body: { name: row.name, difficulty: row.difficulty, updated_at: new Date().toISOString() } })
+      .then(function (rows) { if (!rows || !rows.length) return makeRoom(); });
+    return first.then(function () {
+      return api('room_versions', { method: 'POST', body: { room_id: dbId, format_version: 1, data: data, validated: !!validated } });
+    }).then(function (rows) { return rows[0].id; });
+  }
+  $('p-in').addEventListener('click', function () {
+    say('Signing in.');
+    signIn({ email: $('p-email').value.trim(), password: $('p-pass').value }, 'password').then(function () { $('p-pass').value = ''; say(''); showPub(); }, fail);
+  });
+  $('p-signout').addEventListener('click', function () { session = null; keep(); showPub(); say('Signed out.'); });
+  $('p-recheck').addEventListener('click', showPub);
+  $('p-rooms').addEventListener('change', function () { listVers().catch(fail); });
+  $('p-save').addEventListener('click', function () {
+    saveVersion(cleared).then(function () { say('Saved as a draft. Players do not see drafts.'); return listRooms(); }).catch(fail);
+  });
+  $('p-publish').addEventListener('click', function () {
+    if (runChecks().some(function (k) { return !k.ok; })) { say('Not published. Every check must pass, including beating the room in play test.'); return; }
+    saveVersion(true).then(function (vid) { return api('rooms?id=eq.' + dbId, { method: 'PATCH', body: { published_version_id: vid } }); })
+      .then(function () { say('Published. The game picks it up the next time it starts.'); return listRooms(); }).catch(fail);
+  });
+  $('p-unpub').addEventListener('click', function () {
+    var r = pickedRoom(); if (!r) return;
+    api('rooms?id=eq.' + r.id, { method: 'PATCH', body: { published_version_id: null } })
+      .then(function () { say('Unpublished "' + r.name + '". It is a draft again.'); return listRooms(); }).catch(fail);
+  });
+  $('p-open').addEventListener('click', function () {
+    var r = pickedRoom(), vid = $('p-vers').value; if (!r || !vid) return;
+    api('room_versions?select=data&id=eq.' + vid).then(function (rows) {
+      var d = rows[0].data; d.name = r.name; d.difficulty = r.difficulty;
+      var before = snapshot(); load(d, 'Opened "' + r.name + '".'); undoStack = [before]; setDb(r.id); refresh();
+    }).catch(fail);
+  });
+  $('p-roll').addEventListener('click', function () {
+    var r = pickedRoom(), vid = $('p-vers').value, v = myVers.filter(function (x) { return x.id === vid; })[0];
+    if (!r || !v) return;
+    if (!v.validated) { say('That version was never beaten in play test, so it cannot go live.'); return; }
+    api('rooms?id=eq.' + r.id, { method: 'PATCH', body: { published_version_id: vid } })
+      .then(function () { say('That version of "' + r.name + '" is now live.'); return listRooms(); }).catch(fail);
+  });
+  showPub();
+
+  // ---- start: last draft if there is one, otherwise the starter room ----
+  buildPalette(); pick('#');
+  var draft = null;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch (e) {}
+  try { load(draft || JSON.parse($('starter').textContent), draft ? 'Picked up your last draft.' : ''); }
+  catch (e) { load(JSON.parse($('starter').textContent), ''); }
+  fit();
+})();
+</script>
+</body>
+</html>
