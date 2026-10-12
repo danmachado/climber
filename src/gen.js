@@ -14,7 +14,9 @@
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
     var SHAPE = opts.shape !== false;
     var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces
-    if (WORLD && WORLD !== 2 && EL.ice) { EL = Object.assign({}, EL); EL.ice = false; }   // and never borrows another world's (ice is Icehouse only)                                                    // organic shaping on by default
+    var OWN = { ice: 2, firepits: 3, fireballs: 3 }, own;                                 // pieces that belong to one world
+    if (WORLD) for (own in OWN) if (EL[own] && OWN[own] !== WORLD) { EL = Object.assign({}, EL); EL[own] = false; }
+    var HZ = SP > 0 ? SP : (EL.firepits ? 1 : 0);                                        // floor hazards: spikes, or flames in the Furnace                                                    // organic shaping on by default
     function likes(st) { return styles.length && styles.length < 3 && styles.indexOf(st) >= 0; }
     function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
     function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
@@ -40,7 +42,7 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = 46, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, fire: 0, fireballs: 0 };
     g[45][col(2, d)] = 'S';
 
     while (true) {
@@ -72,8 +74,8 @@
         var canWall = (top || conn.type !== 'steps') && headroom >= 7;
         var canDrop = canWall && SP > 0 && D >= 4 && headroom >= 8;
         var w = {
-          spikes: SP > 0 && room >= 3 ? (likes('jump') ? 5 : 3) * (SP > 1 ? 2 : 1) : 0,
-          wide: SP > 0 && TUNE.wideW && room >= TUNE.wideW[0] + 2 ? (likes('dash') ? 8 : 2) * (D >= 4 ? 1.5 : 1) : 0,
+          spikes: HZ > 0 && room >= 3 ? (likes('jump') ? 5 : 3) * (SP > 1 ? 2 : 1) : 0,
+          wide: HZ > 0 && TUNE.wideW && room >= TUNE.wideW[0] + 2 ? (likes('dash') ? 8 : 2) * (D >= 4 ? 1.5 : 1) : 0,
           crown: SP > 0 && TUNE.crownW && room >= TUNE.crownW[0] + 1 ? 2 : 0,
           block: room >= 3 ? (SP > 1 ? 0 : (SP === 1 ? 1 : 3)) * (likes('jump') ? 1.5 : 1) : 0,
           wall: canWall && room >= 3 ? (likes('climb') ? 6 : 2) * (SP > 1 ? 0.3 : 1) : 0,
@@ -81,10 +83,11 @@
           icespikes: EL.ice && SP > 0 && room >= TUNE.iceL[0] + 3 ? 3 * ICY : 0,                    // slide in, jump the spikes at the end
           iceblock: EL.ice && SP < 2 && room >= TUNE.iceL[0] + 3 ? (SP ? 1 : 3) * ICY : 0,           // slide into a block to hop
           bridge: EL.crumble && floor > 0 && room >= 4 ? 3 : 0,                                // crumbling stretch of floor
-          ferry: EL.movers && (SP > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0     // ride a platform across a gap
+          ferry: EL.movers && (HZ > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0,    // ride a platform across a gap
+          fireball: EL.fireballs && room >= 2 && headroom >= 6 ? 4 : 0                       // time a run under a fireball on a track
         };
         // "Some" spikes means every floor has at least one; "Lots" removed the harmless options above
-        if (SP === 1 && !spiked && (w.spikes || w.wide || w.crown || w.wallspikes || w.icespikes)) { w.block = 0; w.wall = 0; w.iceblock = 0; }
+        if (HZ === 1 && SP < 2 && !spiked && (w.spikes || w.wide || w.crown || w.wallspikes || w.icespikes)) { w.block = 0; w.wall = 0; w.iceblock = 0; }
         // a spiked block needs a run-up, so it gets extra clear ground in front or is swapped for plain spikes
         var runup = obs.length ? Math.max(0, 5 - lastGap) : (floor === 0 ? 0 : 2);
         if (room - runup < (TUNE.crownW ? TUNE.crownW[0] : 99) + 1) w.crown = 0;
@@ -99,10 +102,13 @@
         else if (type === 'icespikes') { o.L = Math.min(rr(TUNE.iceL), room - 3); o.sw = Math.min(rr(TUNE.spikeW), 4, room - o.L - 1); o.w = o.L + o.sw; }
         else if (type === 'iceblock') { o.L = Math.min(rr(TUNE.iceL), room - 3); o.w = o.L + 2; o.h = 2; }
         else if (type === 'bridge') { o.w = Math.min(rr(TUNE.bridgeW), room - 1); }
-        else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = SP === 0; after = Math.max(3, after); }
+        else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = HZ === 0; after = Math.max(3, after); }
+        else if (type === 'fireball') { o.w = 1; after = Math.max(3, after); }
         else if (type === 'wall') { o.w = 2; o.h = Math.min(rr(TUNE.wallH), headroom - 3); minHf = Math.max(minHf, o.h + 4); after = 5; }
         else { o.h = 4; o.sw = Math.min(D >= 5 ? ri(3, 4) : ri(2, 3), room - 3); o.w = 2 + o.sw; minHf = Math.max(minHf, 9); }
         if (type !== 'block' && type !== 'wall' && type !== 'iceblock' && type !== 'bridge' && !(type === 'ferry' && o.pit)) spiked++;
+        // in the Furnace most floor hazards are flames
+        if (EL.firepits && (type === 'spikes' || type === 'wide' || type === 'ferry')) o.fire = SP === 0 || rnd() < 0.75;
         obs.push(o);
         cur += o.w + after; lastGap = after;
       }
@@ -129,7 +135,7 @@
       for (var i = 0; i < obs.length; i++) {
         var ob = obs[i], e = ob.t0 + ob.w - 1;
         if (ob.type === 'spikes' || ob.type === 'wide') {
-          box(ob.t0, e, y - 1, y - 1, d, '^'); stats.spikes += ob.w;
+          box(ob.t0, e, y - 1, y - 1, d, ob.fire ? 'F' : '^'); stats[ob.fire ? 'fire' : 'spikes'] += ob.w;
           if (ob.type === 'wide' && EL.refills) put(ob.t0 + Math.floor(ob.w / 2), d, y - 4, 'o');
         } else if (ob.type === 'crown') {
           box(ob.t0, e, y - 1, y - 1, d, '#'); box(ob.t0, e, y - 2, y - 2, d, '^'); stats.spikes += ob.w;
@@ -142,8 +148,10 @@
         } else if (ob.type === 'bridge') {
           box(ob.t0, e, y, y, d, 'C'); stats.crumble += ob.w;
         } else if (ob.type === 'ferry') {
-          if (ob.pit) box(ob.t0, e, y, y, d, '.'); else { box(ob.t0, e, y - 1, y - 1, d, '^'); stats.spikes += ob.w; }
+          if (ob.pit) box(ob.t0, e, y, y, d, '.'); else { box(ob.t0, e, y - 1, y - 1, d, ob.fire ? 'F' : '^'); stats[ob.fire ? 'fire' : 'spikes'] += ob.w; }
           box(ob.t0, e, y - 2, y - 2, d, '-'); box(ob.t0, ob.t0 + ob.pl - 1, y - 2, y - 2, d, '='); stats.platforms++;
+        } else if (ob.type === 'fireball') {
+          box(ob.t0, ob.t0, y - 5, y - 1, d, '|'); put(ob.t0, d, y - 5, '*'); stats.fireballs++;
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
       }
       stats.floors++; stats.obstacles += obs.length;
@@ -152,7 +160,7 @@
       var need = [], t;
       for (t = 0; t <= 24; t++) need.push(t < off ? 2 : (t < s0 + 1 ? 6 : 5));
       for (i = 0; i < obs.length; i++) {
-        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' ? 6 : 5));
+        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' ? 6 : 5));
         for (t = Math.max(0, q.t0 - 3); t <= Math.min(24, q.t0 + q.w + 2); t++) need[t] = Math.max(need[t], n);
       }
 

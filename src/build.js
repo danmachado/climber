@@ -25,6 +25,18 @@ var SET2 = [
   ['Whiteout',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, movers: true } }, 5407],
   ['Deep Freeze', { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, ice: true, refills: true, crumble: true, movers: true } }, 5408]
 ];
+// World 3 placeholders: flames and fireballs.
+var HOT = { spikes: true, firepits: true, fireballs: true, refills: true };
+var SET3 = [
+  ['Pilot Light', { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { firepits: true, refills: true } }, 6101],
+  ['Cinders',     { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: { firepits: true, fireballs: true, refills: true } }, 6102],
+  ['Flashpoint',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: HOT }, 6203],
+  ['Bellows',     { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: HOT }, 6204],
+  ['Slag Run',    { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, refills: true, movers: true } }, 6305],
+  ['Backdraft',   { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: HOT }, 6306],
+  ['Crucible',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true } }, 6407],
+  ['Meltdown',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true, movers: true } }, 6408]
+];
 first.world = 1; first.level = 1;
 var starters = [first], plans = [null];
 SET.forEach(function (s, i) {
@@ -43,6 +55,13 @@ SET2.forEach(function (s, i) {
 var PAR_MARGIN = 1.4, times = {};
 try { times = JSON.parse(fs.readFileSync(d + '/starter-times.json', 'utf8')); } catch (e) {}
 first.par = 29;
+starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] * PAR_MARGIN); });
+SET3.forEach(function (s, i) {
+  s[1].world = 3;
+  var out = generateRoom(s[1], s[2]);
+  out.room.id = 'fire-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
+  starters.push(out.room); plans.push(out.plan);
+});
 starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] * PAR_MARGIN); });
 fs.writeFileSync(d + '/starter-plans.json', JSON.stringify({ rooms: starters, plans: plans }));
 

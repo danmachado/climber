@@ -37,6 +37,18 @@ const fs = require('fs');
             until(() => ({ x: d }), () => past(o.t0 + o.w - 1, 2), 400);
             continue;
           }
+          if (o.type === 'fireball') {          // wait beside the track, run under while the fireball is up at the top
+            where = 'floor ' + fi + ' fireball t' + o.t0;
+            const fx0 = col(o.t0, d) * 10, topY = (y - 5) * 10;
+            const ball = () => s.fireballs.filter(f => f.x === fx0 && f.y >= topY && f.y <= (y - 1) * 10)[0];
+            until(() => ({}), () => s.ground, 200);
+            if (dist(o.t0) < 11) until(() => ({ x: -d }), () => dist(o.t0) >= 12, 200);
+            until(() => ({ x: d }), () => dist(o.t0) <= 14);
+            for (let k = 0; k < 8; k++) step({});
+            until(() => ({}), () => { const f = ball(); return f && f.y <= topY + 8 && (f.dir < 0 || f.wait > 0 || f.y === topY); }, 900);
+            until(() => ({ x: d }), () => past(o.t0, 3), 200);
+            continue;
+          }
           if (o.type === 'ferry') {
             where = 'floor ' + fi + ' ferry w' + o.w;
             const rowY = (y - 2) * 10, cA = col(o.t0, d), cB = col(o.t0 + o.pl - 1, d), cE = col(o.t0 + o.w - 1, d), cE2 = col(o.t0 + o.w - o.pl, d);
@@ -125,8 +137,8 @@ const fs = require('fs');
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
-      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 2 + 1,
-                     elements: { spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
+      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1,
+                     elements: { firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }

@@ -112,6 +112,8 @@
           <div class="chips" id="g-els">
             <button type="button" data-v="spikes" aria-pressed="true">Spikes</button>
             <button type="button" data-v="ice" aria-pressed="true">Ice</button>
+            <button type="button" data-v="firepits" aria-pressed="true">Fire</button>
+            <button type="button" data-v="fireballs" aria-pressed="true">Fireballs</button>
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="refills" aria-pressed="true">Stamina pickups</button>
@@ -180,7 +182,7 @@
     <div class="row"><button id="undo">Undo</button><button id="redo">Redo</button></div>
     <button id="play" class="primary">Play test</button>
     <p class="hint">Drag to paint. Right-drag erases. Hold Shift and drag to fill a box. The letter or number on each tile is its shortcut key.</p>
-    <p class="hint">Platforms: paint a run of Platform tiles, then a line of Track tiles beside it (or above or below it). The platform shuttles along the track.</p>
+    <p class="hint">Platforms: paint a run of Platform tiles, then a line of Track tiles beside it (or above or below it). The platform shuttles along the track. Fireballs use tracks the same way: one Fireball tile on a line of Track tiles.</p>
   </aside>
 </div>
 
@@ -194,6 +196,7 @@
   var GROUPS = [
     ['Terrain', [['#', 'Solid', '1'], ['I', 'Ice', '2'], ['C', 'Crumble', '3']]],
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
+    ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y']]],
     ['Moving', [['=', 'Platform', '8'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
@@ -203,7 +206,7 @@
   GROUPS.forEach(function (g) { g[1].forEach(function (t) { TILES.push(t); }); });
   var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
                  'S': 'start', 'E': 'exit', 'o': 'dash_refill',
-                 'b': 'backdrop', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
+                 'b': 'backdrop', 'F': 'fire', '*': 'fireball', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
   var $ = function (id) { return document.getElementById(id); };
 
 /*SHARED_CONFIG*/
@@ -285,6 +288,8 @@
   function drawTile(b, ch, x, y, c, r, icon) {
     if (ch === '#' || ch === 'I') drawSolid(b, x, y, SOLID_KIND[ch], icon ? alone : wallAt, c, r);
     else if (ch === 'C') drawCrumble(b, x, y, c, r);
+    else if (ch === 'F') drawFlame(b, x, y, (c + r) % 2);
+    else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === '=', !icon && c < COLS - 1 && tiles[r][c + 1] === '=');
     else if (ch === '-' || ch === '|') drawTrack(b, x, y, ch === '|');
@@ -532,6 +537,7 @@
     syncMeta();
     $('name').value = room.name; $('diff').value = String(room.difficulty);
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
+    if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
     if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms'));
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }

@@ -6,6 +6,7 @@
   var TILESETS = {
     brick: { face: '#4a5ad0', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#161c4a', core: '#10142c', infill: '#1b2254' },
     frost: { face: '#587a9e', hi: '#f4fcff', side: '#86a9c9', lo: '#2a4361', line: '#172a41', core: '#0b1826', infill: '#14283c' },
+    ember: { face: '#8c3b2c', hi: '#ffb48c', side: '#b9573e', lo: '#4c1c15', line: '#2b0f0c', core: '#180a09', infill: '#2c1311' },
     ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
   };
   var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
@@ -92,4 +93,20 @@
     if (!sameAt(c, r - 1)) b.fillRect(x, y, 10, 1);
     if (!sameAt(c - 1, r)) b.fillRect(x, y, 1, 10);
     if (!sameAt(c + 1, r)) b.fillRect(x + 9, y, 1, 10);
+  }
+  // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
+  function drawFlame(b, x, y, f) {
+    b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);
+    b.fillStyle = '#e2491f';
+    if (f) { b.fillRect(x + 1, y + 4, 8, 4); b.fillRect(x + 2, y + 2, 3, 2); b.fillRect(x + 6, y + 3, 2, 1); b.fillRect(x + 3, y, 1, 2); }
+    else { b.fillRect(x + 1, y + 4, 8, 4); b.fillRect(x + 5, y + 2, 3, 2); b.fillRect(x + 2, y + 3, 2, 1); b.fillRect(x + 6, y, 1, 2); }
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + 2, y + 5, 6, 3); b.fillRect(x + (f ? 3 : 5), y + 4, 2, 1);
+    b.fillStyle = '#ffe08a'; b.fillRect(x + 3, y + 6, 4, 2);
+  }
+  // Fireball: a moving flame that travels along a track. dir is the way it is heading, so the tail trails behind.
+  function drawFireball(b, x, y, f, dx, dy) {
+    b.fillStyle = '#e2491f'; b.fillRect(x + 2, y + 1, 6, 8); b.fillRect(x + 1, y + 2, 8, 6);
+    b.fillRect(x + 4 - dx * 4, y + 4 - dy * 4, 2, 2); if (f) b.fillRect(x + 4 - dx * 6 + (dy ? 2 : 0), y + 4 - dy * 6 + (dx ? 2 : 0), 1, 1);
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + 2, y + 2, 6, 6);
+    b.fillStyle = '#ffe08a'; b.fillRect(x + 3 + (f ? 1 : 0), y + 3, 3, 3);
   }
