@@ -340,8 +340,8 @@
 
   // Screen shake: a short, small nudge of the whole picture on impacts. It moves the finished picture rather than
   // redrawing it, so it costs the frame nothing extra. size is in game pixels, time in seconds.
-  var shake = { t: 0, size: 0, n: 0, last: '' };
-  function addShake(size, time) { if (size >= shake.size || shake.t <= 0) { shake.size = size; shake.t = time; } }
+  var shake = { t: 0, size: 0, n: 0, last: '', pull: 0, len: 0 };
+  function addShake(size, time, pull) { if (size >= shake.size || shake.t <= 0) { shake.size = size; shake.t = shake.len = time; shake.pull = pull || 0; } }
   function moveX(amount) {
     pl.rx += amount;
     var move = Math.round(pl.rx);
@@ -405,7 +405,7 @@
   }
   function die() {
     if (pl.dead) return;
-    pl.dead = true; run.deaths++; addShake(2.5, 0.2);
+    pl.dead = true; run.deaths++; addShake(1.5, 0.12);
     fx = { mode: 'die', t: 0, x: pl.x, y: Math.min(pl.y, rows * T - pl.h), facing: pl.facing };
   }
 
@@ -490,7 +490,7 @@
       var grabDir = inp.x || pl.facing;
       if (inp.grab && pl.stamina > 0 && pl.vy >= 0 && pl.forceMove <= 0 && touching(grabDir, 2) &&
           surface(grabDir > 0 ? pl.x + pl.w : pl.x - 2, pl.y, 2, pl.h) !== 'ice') {
-        addShake(1, 0.08);                         // catching a wall
+        addShake(1.5, 0.14, grabDir);              // catching a wall: one soft pull toward it, no rattle
         pl.state = 'climb'; pl.climbDir = grabDir; pl.facing = grabDir; pl.vx = 0; pl.vy *= 0.2;
         if (!touching(grabDir, 1)) pl.x += grabDir;
       } else {
@@ -876,6 +876,7 @@
       shake.n++;
       var k = view.scale / (window.devicePixelRatio || 1), a = shake.size * Math.min(1, shake.t / 0.1);
       var dx = Math.round(a * (shake.n % 2 ? 1 : -1) * k), dy = Math.round(a * 0.6 * (shake.n % 4 < 2 ? 1 : -1) * k);
+      if (shake.pull) { dx = Math.round(shake.pull * shake.size * (shake.t / shake.len) * k); dy = 0; }   // slides in, eases back
       v = 'translate(' + dx + 'px,' + dy + 'px)';
     }
     if (v !== shake.last) { shake.last = v; stage.style.transform = v; }
