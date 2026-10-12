@@ -1,0 +1,2370 @@
+{
+  "version": 17,
+  "design": "User-created mustached hero with brown hair, white shirt, brass buckle, brown trousers and dark shoe soles",
+  "frame": {
+    "w": 16,
+    "h": 16
+  },
+  "exportScale": 32,
+  "anchor": {
+    "x": 8,
+    "y": 16
+  },
+  "hitbox": {
+    "w": 8,
+    "h": 10,
+    "anchor": "bottom-center",
+    "x": 4,
+    "y": 6
+  },
+  "facing": "right",
+  "flipForLeft": true,
+  "palette": {
+    "h": {
+      "name": "Hair, trousers and shoes",
+      "hex": "#663931"
+    },
+    "m": {
+      "name": "Mustache and warm hair detail",
+      "hex": "#8F563B"
+    },
+    "s": {
+      "name": "Light skin",
+      "hex": "#EEC39A"
+    },
+    "k": {
+      "name": "Eyes, belt and shoe soles",
+      "hex": "#000000"
+    },
+    "t": {
+      "name": "Skin shadow",
+      "hex": "#EABD8B"
+    },
+    "w": {
+      "name": "White shirt",
+      "hex": "#FFFFFF"
+    },
+    "g": {
+      "name": "Shirt shadow",
+      "hex": "#E0E0E0"
+    },
+    "d": {
+      "name": "Dash indicator — brass belt buckle",
+      "hex": "#8A6F30"
+    }
+  },
+  "dashIndicator": {
+    "feature": "Brass belt buckle",
+    "symbol": "d",
+    "hex": "#8A6F30",
+    "recolor": "Exact RGB match; this color is used only on the belt buckle"
+  },
+  "sheet": {
+    "layout": "horizontal strip per state",
+    "margin": 0,
+    "spacing": 0,
+    "nativeFrame": [
+      16,
+      16
+    ],
+    "enlargedFrame": [
+      512,
+      512
+    ]
+  },
+  "spriteSheet": {
+    "native": "hero-sprite-sheet-16px.png",
+    "enlarged": "hero-sprite-sheet-32x.png",
+    "nativeSize": [
+      96,
+      256
+    ],
+    "enlargedSize": [
+      3072,
+      8192
+    ],
+    "columns": 6,
+    "rows": 16,
+    "layout": "one state per row; unused cells transparent",
+    "rowOrder": [
+      "idle",
+      "run",
+      "jump_up",
+      "fall",
+      "land",
+      "dash_side",
+      "dash_up",
+      "dash_down",
+      "dash_diag_up",
+      "dash_diag_down",
+      "wall_hold",
+      "climb",
+      "wall_slide",
+      "hurt",
+      "spawn",
+      "exit"
+    ]
+  },
+  "frameCount": 44,
+  "animations": [
+    {
+      "name": "idle",
+      "frameCount": 4,
+      "fps": 4,
+      "loop": true,
+      "intent": "Rest and stay alert",
+      "action": "Small breath with planted shoes; a brief blink.",
+      "phases": [
+        "rest",
+        "breath",
+        "blink",
+        "settle"
+      ],
+      "direction": null,
+      "playback": "loop",
+      "frameDurationsMs": [
+        1100,
+        900,
+        90,
+        610
+      ],
+      "native": "native/hero-idle.png",
+      "enlarged": "enlarged/hero-idle-32x.png",
+      "preview": "previews/idle.gif",
+      "atlasRow": 0,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 32,
+          "y": 0,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 48,
+          "y": 0,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 64,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 2048,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 2,
+          "right": 13,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 1,
+          "bottom": 15
+        }
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "torsoDeformation": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Planted feet, a gentle breathing lift, and one brief blink every 2.7 seconds."
+    },
+    {
+      "name": "run",
+      "frameCount": 6,
+      "fps": 12,
+      "loop": true,
+      "intent": "Travel on the ground",
+      "action": "Two small vertical bounces; shoes shuffle beneath the body and two arms swing forward and back.",
+      "phases": [
+        "contact",
+        "passing",
+        "hop",
+        "opposite contact",
+        "opposite passing",
+        "opposite hop"
+      ],
+      "direction": null,
+      "playback": "loop",
+      "frameDurationsMs": [
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333
+      ],
+      "native": "native/hero-run.png",
+      "enlarged": "enlarged/hero-run-32x.png",
+      "preview": "previews/run.gif",
+      "atlasRow": 1,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 32,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 48,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 64,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 80,
+          "y": 16,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 96,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 3072,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 0,
+          "bottom": 14
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 0,
+          "bottom": 14
+        }
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        1
+      ],
+      "liftedFrames": [
+        2,
+        5
+      ],
+      "handRects": [
+        [
+          {
+            "x": 3,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 9,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 4,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 3,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 9,
+            "y": 9,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 3,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 9,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 4,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 3,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 9,
+            "y": 9,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Two bouncy steps per loop, compact shoe-only footwork, and two arms swinging across and behind the shirt."
+    },
+    {
+      "name": "jump_up",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Push off and rise",
+      "action": "Lengthen the torso slightly; lift the head, bend the arms and tuck one shoe.",
+      "phases": [
+        "push off",
+        "rise"
+      ],
+      "direction": null,
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-jump_up.png",
+      "enlarged": "enlarged/hero-jump_up-32x.png",
+      "preview": "previews/jump_up.gif",
+      "atlasRow": 2,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 32,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 32,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 3,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 8,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 3,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 7,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            7,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 6,
+          "width": 7
+        },
+        {
+          "rows": [
+            7,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 6,
+          "width": 7
+        }
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Torso stretches one pixel taller than idle, with a leading bent arm and a compact lifted foot; head shape stays intact."
+    },
+    {
+      "name": "fall",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Prepare for impact",
+      "action": "Bring two hands forward and progressively tuck the body.",
+      "phases": [
+        "prepare",
+        "brace"
+      ],
+      "direction": null,
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-fall.png",
+      "enlarged": "enlarged/hero-fall-32x.png",
+      "preview": "previews/fall.gif",
+      "atlasRow": 3,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 48,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 48,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 4,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 13,
+          "top": 3,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 6,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 10,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 5,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            9,
+            12
+          ],
+          "span": [
+            4,
+            12
+          ],
+          "height": 4,
+          "width": 9
+        },
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 3,
+          "width": 11
+        }
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Tucks the knees and lowers the center of mass, with two bent arms held forward to brace for the landing."
+    },
+    {
+      "name": "land",
+      "frameCount": 2,
+      "fps": 12,
+      "loop": false,
+      "intent": "Absorb the impact",
+      "action": "Widen and compress the torso, close the eyes briefly, then recover with shoes planted.",
+      "phases": [
+        "impact squash",
+        "recover"
+      ],
+      "direction": null,
+      "playback": "once",
+      "frameDurationsMs": [
+        83.33333333333333,
+        83.33333333333333
+      ],
+      "native": "native/hero-land.png",
+      "enlarged": "enlarged/hero-land-32x.png",
+      "preview": "previews/land.gif",
+      "atlasRow": 4,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 64,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 4,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        }
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 5,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 4,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            11,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 2,
+          "width": 11
+        },
+        {
+          "rows": [
+            9,
+            12
+          ],
+          "span": [
+            4,
+            12
+          ],
+          "height": 4,
+          "width": 9
+        }
+      ],
+      "next": "idle",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "The torso squashes from five rows to two and widens on impact, then recovers to four rows before idle; shoes stay planted."
+    },
+    {
+      "name": "dash_side",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Burst horizontally",
+      "action": "lunge",
+      "phases": [
+        "coil",
+        "release"
+      ],
+      "direction": [
+        1,
+        0
+      ],
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-dash_side.png",
+      "enlarged": "enlarged/hero-dash_side-32x.png",
+      "preview": "previews/dash_side.gif",
+      "atlasRow": 5,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 80,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 4,
+          "right": 14,
+          "top": 3,
+          "bottom": 15
+        },
+        {
+          "left": 0,
+          "right": 15,
+          "top": 3,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 6,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 1,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            4,
+            14
+          ],
+          "height": 3,
+          "width": 11
+        },
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 3,
+          "width": 11
+        }
+      ],
+      "next": "gameplay",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Coil into a compact stance, then release into a horizontal lunge: fist leads, rear arm folds back, and short feet trail."
+    },
+    {
+      "name": "dash_up",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Burst upward",
+      "action": "reach and rise",
+      "phases": [
+        "coil",
+        "release"
+      ],
+      "direction": [
+        0,
+        -1
+      ],
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-dash_up.png",
+      "enlarged": "enlarged/hero-dash_up-32x.png",
+      "preview": "previews/dash_up.gif",
+      "atlasRow": 6,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 96,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 3,
+          "bottom": 15
+        },
+        {
+          "left": 4,
+          "right": 14,
+          "top": 0,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 5,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 13,
+            "y": 0,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 5,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 3,
+          "width": 11
+        },
+        {
+          "rows": [
+            7,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 6,
+          "width": 7
+        }
+      ],
+      "next": "gameplay",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Compress first, then reach upward with one leading fist, a narrow stretched torso, and compact trailing feet."
+    },
+    {
+      "name": "dash_down",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Burst downward",
+      "action": "tuck and drive down",
+      "phases": [
+        "coil",
+        "release"
+      ],
+      "direction": [
+        0,
+        1
+      ],
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-dash_down.png",
+      "enlarged": "enlarged/hero-dash_down-32x.png",
+      "preview": "previews/dash_down.gif",
+      "atlasRow": 7,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 112,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 3,
+          "bottom": 14
+        },
+        {
+          "left": 3,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 5,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 3,
+            "y": 8,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 8,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 3,
+          "width": 11
+        },
+        {
+          "rows": [
+            7,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 6,
+          "width": 7
+        }
+      ],
+      "next": "gameplay",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Tuck the feet in, then drive both soles downward as the torso lengthens and the arms and hair trail upward."
+    },
+    {
+      "name": "dash_diag_up",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Burst diagonally upward",
+      "action": "spring upward diagonally",
+      "phases": [
+        "coil",
+        "release"
+      ],
+      "direction": [
+        1,
+        -1
+      ],
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-dash_diag_up.png",
+      "enlarged": "enlarged/hero-dash_diag_up-32x.png",
+      "preview": "previews/dash_diag_up.gif",
+      "atlasRow": 8,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 128,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 128,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 3,
+          "bottom": 15
+        },
+        {
+          "left": 0,
+          "right": 15,
+          "top": 0,
+          "bottom": 14
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 5,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 2,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 2,
+            "y": 8,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 3,
+          "width": 11
+        },
+        {
+          "rows": [
+            7,
+            10
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 4,
+          "width": 11
+        }
+      ],
+      "next": "gameplay",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Coil, then spring diagonally upward: leading fist high, waist low and behind, with two short shoes kicking back."
+    },
+    {
+      "name": "dash_diag_down",
+      "frameCount": 2,
+      "fps": null,
+      "loop": false,
+      "intent": "Burst diagonally downward",
+      "action": "curl and dive diagonally",
+      "phases": [
+        "coil",
+        "release"
+      ],
+      "direction": [
+        1,
+        1
+      ],
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        60,
+        null
+      ],
+      "native": "native/hero-dash_diag_down.png",
+      "enlarged": "enlarged/hero-dash_diag_down-32x.png",
+      "preview": "previews/dash_diag_down.gif",
+      "atlasRow": 9,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 144,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 144,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 4,
+          "right": 14,
+          "top": 3,
+          "bottom": 15
+        },
+        {
+          "left": 1,
+          "right": 15,
+          "top": 4,
+          "bottom": 14
+        }
+      ],
+      "ground": false,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 6,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 2,
+            "y": 9,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 13,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            4,
+            14
+          ],
+          "height": 3,
+          "width": 11
+        },
+        {
+          "rows": [
+            8,
+            12
+          ],
+          "span": [
+            3,
+            14
+          ],
+          "height": 5,
+          "width": 12
+        }
+      ],
+      "next": "gameplay",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Curl inward, then dive downward-right: head and fist lead, feet kick high behind, and the torso follows the diagonal."
+    },
+    {
+      "name": "wall_hold",
+      "frameCount": 2,
+      "fps": 4,
+      "loop": true,
+      "intent": "Hang from the wall",
+      "action": "support weight",
+      "phases": [
+        "support weight",
+        "weight settles"
+      ],
+      "direction": null,
+      "playback": "loop",
+      "frameDurationsMs": [
+        250,
+        250
+      ],
+      "native": "native/hero-wall_hold.png",
+      "enlarged": "enlarged/hero-wall_hold-32x.png",
+      "preview": "previews/wall_hold.gif",
+      "atlasRow": 10,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 160,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 160,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 5,
+          "right": 15,
+          "top": 1,
+          "bottom": 14
+        },
+        {
+          "left": 5,
+          "right": 15,
+          "top": 2,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": true,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 14,
+            "y": 5,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 5,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            8,
+            11
+          ],
+          "span": [
+            6,
+            13
+          ],
+          "height": 4,
+          "width": 8
+        },
+        {
+          "rows": [
+            9,
+            12
+          ],
+          "span": [
+            6,
+            13
+          ],
+          "height": 4,
+          "width": 8
+        }
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Keep both hands and the bracing shoe fixed at the wall while the hips and dangling foot settle under his weight."
+    },
+    {
+      "name": "climb",
+      "frameCount": 4,
+      "fps": 8,
+      "loop": true,
+      "intent": "Pull up the wall",
+      "action": "Alternate two grip heights and short shoe pushes; the body rises between reaches.",
+      "phases": [
+        "grip",
+        "pull",
+        "reach",
+        "plant"
+      ],
+      "direction": null,
+      "playback": "loop",
+      "frameDurationsMs": [
+        125,
+        125,
+        125,
+        125
+      ],
+      "native": "native/hero-climb.png",
+      "enlarged": "enlarged/hero-climb-32x.png",
+      "preview": "previews/climb.gif",
+      "atlasRow": 11,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 176,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 176,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 32,
+          "y": 176,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 48,
+          "y": 176,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 64,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 2048,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 5,
+          "right": 15,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 5,
+          "right": 15,
+          "top": 0,
+          "bottom": 14
+        },
+        {
+          "left": 5,
+          "right": 15,
+          "top": 0,
+          "bottom": 14
+        },
+        {
+          "left": 5,
+          "right": 15,
+          "top": 1,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": true,
+      "visualLiftPx": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 14,
+            "y": 5,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 3,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 9,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 4,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 8,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 4,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "next": null,
+      "reversible": true,
+      "occludedFrames": [],
+      "description": "Two arms alternate high and low wall grips while short shoe pushes lift the body; reverse to descend."
+    },
+    {
+      "name": "wall_slide",
+      "frameCount": 2,
+      "fps": 8,
+      "loop": true,
+      "intent": "Brake a descent",
+      "action": "brake the descent",
+      "phases": [
+        "lean away and brake",
+        "slip and brake"
+      ],
+      "direction": null,
+      "playback": "loop",
+      "frameDurationsMs": [
+        125,
+        125
+      ],
+      "native": "native/hero-wall_slide.png",
+      "enlarged": "enlarged/hero-wall_slide-32x.png",
+      "preview": "previews/wall_slide.gif",
+      "atlasRow": 12,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 192,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 192,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 32,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 1024,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 4,
+          "right": 15,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 4,
+          "right": 15,
+          "top": 3,
+          "bottom": 15
+        }
+      ],
+      "ground": false,
+      "wallContact": true,
+      "visualLiftPx": [
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 14,
+            "y": 6,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 14,
+            "y": 6,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 14,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            9,
+            12
+          ],
+          "span": [
+            5,
+            13
+          ],
+          "height": 4,
+          "width": 9
+        },
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            5,
+            13
+          ],
+          "height": 3,
+          "width": 9
+        }
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Lean away from the wall and brake with two palms; the torso lowers and the wall-side shoe scrapes without an upward climbing step."
+    },
+    {
+      "name": "hurt",
+      "frameCount": 1,
+      "fps": null,
+      "loop": false,
+      "intent": "React to a hit",
+      "action": "recoil",
+      "phases": [
+        "recoil"
+      ],
+      "direction": null,
+      "playback": "hold-last-frame",
+      "frameDurationsMs": [
+        null
+      ],
+      "native": "native/hero-hurt.png",
+      "enlarged": "enlarged/hero-hurt-32x.png",
+      "preview": "previews/hurt.gif",
+      "atlasRow": 13,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 208,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 16,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 512,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 2,
+          "right": 12,
+          "top": 3,
+          "bottom": 15
+        }
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 2,
+            "y": 9,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 10,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            10,
+            12
+          ],
+          "span": [
+            3,
+            12
+          ],
+          "height": 3,
+          "width": 10
+        }
+      ],
+      "next": null,
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Freeze on a compressed recoil, closed eyes and two protective hands; the hair lags the knockback."
+    },
+    {
+      "name": "spawn",
+      "frameCount": 5,
+      "fps": 12,
+      "loop": false,
+      "intent": "Arrive and become ready",
+      "action": "spring upright",
+      "phases": [
+        "compressed start",
+        "rise",
+        "small overshoot",
+        "settle",
+        "ready"
+      ],
+      "direction": null,
+      "playback": "once",
+      "frameDurationsMs": [
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333,
+        83.33333333333333
+      ],
+      "native": "native/hero-spawn.png",
+      "enlarged": "enlarged/hero-spawn-32x.png",
+      "preview": "previews/spawn.gif",
+      "atlasRow": 14,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 224,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 224,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 32,
+          "y": 224,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 48,
+          "y": 224,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 64,
+          "y": 224,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 80,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 2560,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 13,
+          "top": 4,
+          "bottom": 15
+        },
+        {
+          "left": 3,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 0,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 2,
+          "right": 13,
+          "top": 1,
+          "bottom": 15
+        }
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 5,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 4,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 2,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 2,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        [
+          {
+            "x": 2,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ]
+      ],
+      "torsoDeformation": [
+        {
+          "rows": [
+            11,
+            12
+          ],
+          "span": [
+            3,
+            13
+          ],
+          "height": 2,
+          "width": 11
+        },
+        {
+          "rows": [
+            9,
+            12
+          ],
+          "span": [
+            4,
+            12
+          ],
+          "height": 4,
+          "width": 9
+        },
+        {
+          "rows": [
+            7,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 6,
+          "width": 7
+        },
+        {
+          "rows": [
+            8,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 5,
+          "width": 7
+        },
+        {
+          "rows": [
+            8,
+            12
+          ],
+          "span": [
+            5,
+            11
+          ],
+          "height": 5,
+          "width": 7
+        }
+      ],
+      "next": "idle",
+      "reversible": false,
+      "occludedFrames": [],
+      "description": "Spring up from the compressed landing shape, overshoot slightly taller, then settle into the exact original standing pose."
+    },
+    {
+      "name": "exit",
+      "frameCount": 4,
+      "fps": 10,
+      "loop": false,
+      "intent": "Step into a doorway",
+      "action": "step through doorway",
+      "phases": [
+        "contact step",
+        "passing step",
+        "doorway occlusion",
+        "hidden"
+      ],
+      "direction": null,
+      "playback": "once",
+      "frameDurationsMs": [
+        100,
+        100,
+        100,
+        100
+      ],
+      "native": "native/hero-exit.png",
+      "enlarged": "enlarged/hero-exit-32x.png",
+      "preview": "previews/exit.gif",
+      "atlasRow": 15,
+      "atlasFrameRects": [
+        {
+          "x": 0,
+          "y": 240,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 16,
+          "y": 240,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 32,
+          "y": 240,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "x": 48,
+          "y": 240,
+          "w": 16,
+          "h": 16
+        }
+      ],
+      "nativeSize": {
+        "w": 64,
+        "h": 16
+      },
+      "enlargedSize": {
+        "w": 2048,
+        "h": 512
+      },
+      "frameBounds": [
+        {
+          "left": 3,
+          "right": 12,
+          "top": 2,
+          "bottom": 15
+        },
+        {
+          "left": 4,
+          "right": 13,
+          "top": 1,
+          "bottom": 15
+        },
+        {
+          "left": 5,
+          "right": 9,
+          "top": 2,
+          "bottom": 14
+        },
+        null
+      ],
+      "ground": true,
+      "wallContact": false,
+      "visualLiftPx": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "liftedFrames": [],
+      "handRects": [
+        [
+          {
+            "x": 3,
+            "y": 12,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "x": 9,
+            "y": 11,
+            "w": 2,
+            "h": 2
+          }
+        ],
+        null,
+        null,
+        null
+      ],
+      "torsoDeformation": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "next": "hidden",
+      "reversible": false,
+      "occludedFrames": [
+        2,
+        3
+      ],
+      "description": "A compact contact step, a passing step toward the right doorway, partial occlusion, then hidden."
+    }
+  ],
+  "source": "source-original.png",
+  "actionDefinitions": "animation-actions.md",
+  "retainedStates": [
+    "idle",
+    "run",
+    "jump_up",
+    "fall",
+    "land",
+    "climb"
+  ],
+  "updatedStates": [
+    "dash_side",
+    "dash_up",
+    "dash_down",
+    "dash_diag_up",
+    "dash_diag_down",
+    "wall_hold",
+    "wall_slide",
+    "hurt",
+    "spawn",
+    "exit"
+  ],
+  "notes": [
+    "All 16 states and 44 frames use Dan’s original design and exact eight-color palette.",
+    "First idle and last spawn frames match the original 16×16 source pixel for pixel.",
+    "Idle has a 90 ms blink every 2.7 seconds; use custom frameDurationsMs.",
+    "Run has two vertical bounces, compact shoe steps, and two arms swinging across and behind the shirt.",
+    "Run frames 2 and 5 have a one-pixel visual hop; anchor and hitbox remain fixed.",
+    "Idle, run, jump_up, fall, land and climb retain the approved v16 pixels.",
+    "Wall hold sags with fixed grips and bracing shoe; wall slide leans away and brakes; climb retains its alternating pulls.",
+    "Every authored action with hand metadata has exactly two hands and no stray arm.",
+    "Jump stretches the torso one pixel; fall tucks and braces; land squashes and widens the torso before recovery.",
+    "Landing shoes remain planted; visual stretch and squash do not move the hitbox.",
+    "Five directional dashes use a compressed 60 ms coil then a dramatic held directional release, without baked-in trails or input delay.",
+    "Recoil compresses; spawn springs from the landing squash; exit takes deliberate compact steps at 10 fps.",
+    "The focused action study slows dash launch to 120 ms and includes standing and braced comparison poses; exported dash strips remain two frames.",
+    "The #8A6F30 brass buckle is the reserved dash-indicator color. Exit occludes it.",
+    "Ground poses reach row 15, except the two hopped run frames at row 14; right-wall poses reach x=15.",
+    "Previews repeat for review; use loop, playback and next-state settings in the game."
+  ]
+}

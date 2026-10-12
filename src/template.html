@@ -1070,7 +1070,7 @@
     else name = Math.abs(pl.vx) > 12 ? 'run' : 'idle';
     if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += dt;
     var a = HERO.anims[name], t = reverse ? (a.n / a.fps) - (hero.t % (a.n / a.fps)) - 0.001 : hero.t;
-    drawHero(name, t, pl.x, pl.y, facing, (pl.dashes > 0 ? 0 : 1) | (pl.stamina < P.tiredBelow ? 2 : 0));
+    drawHero(name, t, pl.x + tremble(), pl.y, facing, (pl.dashes > 0 ? 0 : 1) | (shaky() ? 2 : 0));
   }
 
   // Body is drawn from the feet up so it can grow in during a respawn.
