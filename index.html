@@ -636,6 +636,7 @@
     for (i = 0; i < exits.length; i++) if (overlap(exits[i], pl.x, pl.y, pl.w, pl.h)) {
       if (!testMode && !demo.on) { fx = { mode: 'exit', t: 0, x: pl.x, y: pl.y, facing: pl.facing }; return; }
       run.won = true;
+      if (demo.on) { var dp = parOf(room); run.result = { stars: 1 + (run.deaths <= STAR_FALLS ? 1 : 0) + (run.time <= dp ? 1 : 0), par: dp, next: false, pick: -1, py: 0, demo: true }; }
       if (embedded) window.parent.postMessage({ type: 'climber-result', won: true, time: run.time, deaths: run.deaths }, '*');
       return;
     }
@@ -1223,14 +1224,15 @@
     }
   }
   function drawClear(u) {
-    var rs = run.result, th = themeOf(room), INK = '#101426', btns = clearButtons(), top = 92, hh = 194 + btns.length * 32, i;
+    var rs = run.result, th = themeOf(room), INK = '#101426', btns = rs.demo ? [] : clearButtons(), top = rs.demo ? 130 : 92, hh = rs.demo ? 214 : 194 + btns.length * 32, i;
     function box(x, y, w, hgt, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round((x + w) * u) - Math.round(x * u), Math.round((y + hgt) * u) - Math.round(y * u)); }
     function dots(y) { for (var x = 51; x < 220; x += 6) box(x, y, 3, 2, INK); }
     hits = [];
     box(0, 0, LW, LH, 'rgba(7,9,20,0.72)');
     box(35, top + 5, 200, hh, INK);                                            // hard shadow
     box(35, top, 200, hh, th.accent);
-    pxText('LEVEL ' + (lvl.w + 1) + '-' + (lvl.i + 1), 135, top + 14, 2, INK, 'center');
+    pxText(rs.demo ? (room.level > 0 ? 'LEVEL ' + worldOf(room) + '-' + room.level : 'LEVEL') : 'LEVEL ' + (lvl.w + 1) + '-' + (lvl.i + 1), 135, top + 14, 2, INK, 'center');
+    if (rs.demo) { dots(top + 184); pxText('DEMO - PRESS ANY BUTTON', 135, top + 194, 1, INK, 'center'); }
     pxText('CLEAR', 135, top + 36, 5, INK, 'center');
     dots(top + 80);
     for (i = 0; i < 3; i++) pxStar(135 - 68 + i * 48, top + 90, 3, INK, i < rs.stars ? INK : null);
