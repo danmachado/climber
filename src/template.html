@@ -591,14 +591,18 @@
       }
     }
     for (var code in keys) if (keys[code]) { any = true; see.push('key ' + code); if (!hit) hit = { t: 'k', i: +code }; }
-    wiz.see = see.length ? 'seeing ' + see.slice(0, 3).join(', ') : 'seeing nothing pressed';
+    wiz.see = see.length ? 'seeing ' + see.slice(0, 3).join(', ') : (wiz.warn || 'seeing nothing pressed');
     if (!wiz.armed) { // wait for everything to be let go, then note where the sticks rest
       if (any || moved) { wiz.quiet = 0; if (!any) for (k = 0; k < ps.length; k++) wiz.rest[ps[k].index] = Array.prototype.slice.call(ps[k].axes); }
       else if (++wiz.quiet > 12) wiz.armed = true;
       return;
     }
     if (!hit) return;
-    wiz.map[WIZ[wiz.i][0]] = hit;
+    for (var nm in wiz.map) {                       // one button cannot do two jobs
+      var o = wiz.map[nm];
+      if (o.t === hit.t && o.i === hit.i && o.p === hit.p && (hit.t !== 'a' || o.dir === hit.dir)) { wiz.warn = 'That one is already ' + nm.toUpperCase() + '. Pick another.'; wiz.armed = false; wiz.quiet = 0; return; }
+    }
+    wiz.map[WIZ[wiz.i][0]] = hit; wiz.warn = '';
     wiz.i++; wiz.armed = false; wiz.quiet = 0;
     if (wiz.i >= WIZ.length) {
       padMap[wiz.id] = wiz.map;
@@ -1188,7 +1192,9 @@
   // These are still pictures: drawn once when something changes, then left alone, so they cost the frame nothing.
   var hits = [], navPrev = { x: 0, y: 0, jump: false, dash: false, back: false };
   var MENU = [['MAP', 'Climb through the worlds, level by level', function () { sel.w = Math.min(sel.w, levels.length - 1); toMap(); }],
-              ['ENDLESS', 'Every level you have unlocked, shuffled', startEndless]];
+              ['ENDLESS', 'Every level you have unlocked, shuffled', startEndless],
+              ['CONTROLLER', 'Set up or redo the controller buttons', function () { var gp = firstPad(); if (gp) startWiz(gp); else { padNote = 'No controller seen. Press a button on it, then try again.'; lastSig = ''; } }]];
+  var padNote = '';
   function nodePos(k) { var row = Math.floor(k / 3), p = k % 3; return { x: 55 + (row % 2 ? 2 - p : p) * 80, y: 392 - row * 76, row: row }; }
   function screenInput(inp) {
     var p = navPrev, dx = inp.x && !p.x ? inp.x : 0, dy = inp.y && !p.y ? inp.y : 0;
@@ -1229,12 +1235,12 @@
       box(127, 88, 16, 8, C.flame); box(131, 80, 8, 8, C.flame);
       t('CLIMBER', 135, 186, 30, C.flame, 'center');
       for (i = 0; i < MENU.length; i++) {
-        var on = i === sel.menu, y = 236 + i * 44;
+        var on = i === sel.menu, y = 232 + i * 40;
         box(55, y - 20, 160, 34, on ? C.flame : '#131a33');
         t(MENU[i][0], 135, y + 3, 15, on ? '#1a1205' : C.dim, 'center');
         hits.push({ x: 55, y: y - 20, w: 160, h: 34, fn: (function (k) { return function () { sel.menu = k; MENU[k][2](); }; })(i) });
       }
-      t(MENU[sel.menu][1], 135, 330, 7, C.text, 'center');
+      t(sel.menu === 2 && padNote ? padNote : MENU[sel.menu][1], 135, 346, 7, C.text, 'center');
       t(usedPad ? 'Up and down to choose   Jump to start' : 'Arrows choose   C or Space starts   or click', 135, 468, 6.5, C.dim, 'center');
     } else {
       var w = sel.w, wd = WORLDS[w], th = THEMES[wd.theme], list = levels[w], open = worldOpen(w), got = 0;

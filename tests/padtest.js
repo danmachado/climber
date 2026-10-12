@@ -17,6 +17,7 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(300);
   console.log('setup started by itself:', await p.evaluate(() => !!document.querySelector('canvas')) && true);
   await press(B(1, true), B(1, false));                       // jump: button on the second device
+  await press(B(1, true), B(1, false));                       // same button again for dash: must be refused
   await p.waitForTimeout(450); await p.keyboard.down('Enter'); await p.waitForTimeout(150); await p.keyboard.up('Enter');   // dash: arrives as a key
   await press(B(5, true), B(5, false));                       // grab
   await press(A(1, -1), A(1, 0)); await press(A(1, 1), A(1, 0)); await press(A(0, -1), A(0, 0)); await press(A(0, 1), A(0, 0));
