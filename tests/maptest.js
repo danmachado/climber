@@ -20,7 +20,8 @@ const { chromium } = require('playwright');
   v = await p.evaluate(() => { const G = window.__climber; G.manual(true); const r = G.levelProbe(); G.manual(false); return r; });
   console.log('1-1 result', JSON.stringify(v.result), 'time', v.time.toFixed(1), 'saved', JSON.stringify(v.prog));
   await shot('map-3-clear');
-  await p.keyboard.press('KeyX', { delay: 80 }); await p.waitForTimeout(200); v = await V(); console.log('dash -> map', v.scene, 'sel', v.sel.i);
+  for (const k of ['ArrowDown', 'ArrowDown', 'KeyC']) { await p.keyboard.press(k, { delay: 80 }); await p.waitForTimeout(120); }
+  v = await V(); console.log('MAP button -> map', v.scene, 'sel', v.sel.i);
   await shot('map-4-progress');
   await p.keyboard.press('KeyC', { delay: 80 }); await p.waitForTimeout(300); v = await V(); console.log('start 1-2', v.scene, v.room, JSON.stringify(v.lvl));
   await p.keyboard.press('Escape', { delay: 80 }); await p.waitForTimeout(200); v = await V(); console.log('esc -> ', v.scene);

@@ -156,8 +156,8 @@
     { id: 2, name: 'Icehouse',  theme: 'frost' }
   ];
   var THEMES = {
-    brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a' },
-    frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff' }
+    brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a', accentLo: '#c47f24' },
+    frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4' }
   };
   function worldOf(room) { var n = (room && room.world) | 0; return WORLDS[n - 1] ? n : 1; }
   function themeOf(room) { return THEMES[WORLDS[worldOf(room) - 1].theme] || THEMES.brick; }
@@ -423,7 +423,7 @@
     prog[room.id] = { stars: Math.max(stars, old ? old.stars : 0), time: old ? Math.min(old.time, run.time) : run.time, falls: old ? Math.min(old.falls, run.deaths) : run.deaths };
     try { localStorage.setItem(PROG_KEY, JSON.stringify(prog)); } catch (e) {}
     dataVer++;
-    run.won = true; run.result = { stars: stars, par: par, next: lvl.i + 1 < levels[lvl.w].length };
+    run.won = true; run.result = { stars: stars, par: par, next: lvl.i + 1 < levels[lvl.w].length, pick: 0, py: 0 };
   }
   function toMenu() { scene = 'menu'; demo.idle = 0; lastSig = ''; }
   function toMap() {
@@ -438,7 +438,12 @@
     resetRun(); pl.prevJump = pl.prevDash = true; allDirty = true; lastSig = '';
   }
   function startEndless() { mode = 'endless'; scene = 'play'; resetRun(); pl.prevJump = pl.prevDash = true; allDirty = true; lastSig = ''; }
-  function leavePlay() { if (mode === 'map') { sel.w = lvl.w; sel.i = lvl.i; toMap(); } else toMenu(); }
+  function clearButtons() {
+    var list = [['RETRY', function () { startLevel(lvl.w, lvl.i); }], ['MAP', function () { afterLevel(false); }]];
+    if (run.result && run.result.next) list.unshift(['NEXT LEVEL', function () { afterLevel(true); }]);
+    return list;
+  }
+  function leavePlay() { if (run.won && run.result && staged()) { afterLevel(false); return; } if (mode === 'map') { sel.w = lvl.w; sel.i = lvl.i; toMap(); } else toMenu(); }
   function afterLevel(goOn) {
     var w = lvl.w, i = lvl.i;
     if (goOn && i + 1 < levels[w].length) { startLevel(w, i + 1); return; }
@@ -524,7 +529,12 @@
     pl.prevJump = inp.jump; pl.prevDash = inp.dash;
 
     if (run.won) {
-      if (staged()) { if (jumpPressed) afterLevel(true); else if (dashPressed) afterLevel(false); }
+      if (staged()) {                              // the level clear panel: up and down choose a button, jump presses it
+        var rs = run.result, dy = inp.y && !rs.py ? inp.y : 0, n = clearButtons().length;
+        rs.py = inp.y;
+        if (dy) rs.pick = (rs.pick + dy + n) % n;
+        if (jumpPressed) clearButtons()[rs.pick][1]();
+      }
       else if (jumpPressed) resetRun();
       return;
     }
@@ -905,6 +915,11 @@
       for (var k = 0; k < hits.length; k++) { var hb = hits[k]; if (mx >= hb.x && mx < hb.x + hb.w && my >= hb.y && my < hb.y + hb.h) { hb.fn(); return; } }
       return;
     }
+    if (run.won && run.result && staged()) {       // the level clear buttons work with the mouse too
+      var cb = stage.getBoundingClientRect(), cx = (e.clientX - cb.left) / cb.width * LW, cy = (e.clientY - cb.top) / cb.height * LH;
+      for (var q = 0; q < hits.length; q++) { var hq = hits[q]; if (cx >= hq.x && cx < hq.x + hq.w && cy >= hq.y && cy < hq.y + hq.h) { hq.fn(); return; } }
+      return;
+    }
     check = (check + 1) % 5;
     if (check === 4) { check = 0; var gp = firstPad(); if (gp) startWiz(gp); }
   });
@@ -999,7 +1014,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x, pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
+    var sig = [mode, run.result ? run.result.pick : 0, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
     flush();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
   }
@@ -1154,13 +1169,7 @@
       t('Click the mouse to cancel', 135, 278, 6.5, C.dim, 'center');
     }
     if (run.won && run.result) {
-      var rs = run.result;
-      h.fillStyle = 'rgba(11,16,32,0.9)'; h.fillRect(25 * u, 170 * u, 220 * u, 132 * u);
-      t('LEVEL CLEAR', 135, 198, 18, C.teal, 'center');
-      for (var si = 0; si < 3; si++) star(h, u, 105 + si * 30, 222, 11, si < rs.stars ? C.flame : '#2a3560');
-      t('TIME ' + secs(run.time) + '   PAR ' + secs(rs.par), 135, 252, 8, run.time <= rs.par ? C.text : C.dim, 'center');
-      t(run.deaths + (run.deaths === 1 ? ' FALL' : ' FALLS') + '   ' + STAR_FALLS + ' OR FEWER FOR A STAR', 135, 266, 7, run.deaths <= STAR_FALLS ? C.text : C.dim, 'center');
-      t((rs.next ? 'Jump: next level' : 'Jump: back to the map') + '      Dash: map', 135, 288, 7, C.dim, 'center');
+      drawClear(u);
     } else if (run.won) {
       h.fillStyle = 'rgba(11,16,32,0.86)'; h.fillRect(30 * u, 190 * u, 210 * u, 90 * u);
       t('ROOM CLEAR', 135, 222, 18, C.teal, 'center');
@@ -1170,6 +1179,73 @@
   }
 
   function secs(v) { return v.toFixed(1) + 's'; }
+
+  // ---- pixel lettering and the level clear panel ----
+  // An original 5 x 7 bitmap alphabet, drawn as solid squares so it stays sharp at any screen size.
+  var FONT = {
+    A: '01110100011000111111100011000110001', B: '11110100011000111110100011000111110', C: '01111100001000010000100001000001111',
+    D: '11110100011000110001100011000111110', E: '11111100001000011110100001000011111', F: '11111100001000011110100001000010000',
+    G: '01111100001000010011100011000101111', H: '10001100011000111111100011000110001', I: '11111001000010000100001000010011111',
+    J: '00111000010000100001000011000101110', K: '10001100101010011000101001001010001', L: '10000100001000010000100001000011111',
+    M: '10001110111010110101100011000110001', N: '10001110011010110011100011000110001', O: '01110100011000110001100011000101110',
+    P: '11110100011000111110100001000010000', Q: '01110100011000110001101011001001101', R: '11110100011000111110101001001010001',
+    S: '01111100001000001110000010000111110', T: '11111001000010000100001000010000100', U: '10001100011000110001100011000101110',
+    V: '10001100011000110001100010101000100', W: '10001100011000110101101011101110001', X: '10001100010101000100010101000110001',
+    Y: '10001100010101000100001000010000100', Z: '11111000010001000100010001000011111',
+    0: '01110100011001110101110011000101110', 1: '00100011000010000100001000010001110', 2: '01110100010000100010001000100011111',
+    3: '11110000010000101110000010000111110', 4: '00010001100101010010111110001000010', 5: '11111100001111000001000010000111110',
+    6: '01110100001000011110100011000101110', 7: '11111000010001000100010000100001000', 8: '01110100011000101110100011000101110',
+    9: '01110100011000101111000010000101110', '.': '00000000000000000000000000110001100', '-': '00000000000000011111000000000000000',
+    ':': '00000011000110000000011000110000000', '/': '00001000010001000100010001000010000'
+  };
+  function pxText(str, x, y, sc, color, align) {       // x, y in game pixels; sc = size of one font pixel
+    var u = hud.width / LW, w = (str.length * 6 - 1) * sc, x0 = align === 'center' ? x - w / 2 : (align === 'right' ? x - w : x);
+    h.fillStyle = color;
+    for (var i = 0; i < str.length; i++) {
+      var gl = FONT[str.charAt(i)];
+      if (gl) for (var k = 0; k < 35; k++) if (gl.charAt(k) === '1') {
+        var ax = Math.round((x0 + (i * 6 + k % 5) * sc) * u), ay = Math.round((y + Math.floor(k / 5) * sc) * u);
+        h.fillRect(ax, ay, Math.round((x0 + (i * 6 + k % 5 + 1) * sc) * u) - ax, Math.round((y + (Math.floor(k / 5) + 1) * sc) * u) - ay);
+      }
+    }
+  }
+  var STAR = ['......#......', '......#......', '.....###.....', '.....###.....', '#############', '.###########.', '..#########..',
+              '...#######...', '...#######...', '..####.####..', '..###...###..', '.###.....###.', '.#.........#.'];
+  function pxStar(x, y, sc, ink, fill) {               // fill = null draws just the outline (a star not earned)
+    var u = hud.width / LW, r, c;
+    function on(cc, rr) { return rr >= 0 && rr < 13 && cc >= 0 && cc < 13 && STAR[rr].charAt(cc) === '#'; }
+    for (r = 0; r < 13; r++) for (c = 0; c < 13; c++) if (on(c, r)) {
+      var edge = !on(c - 1, r) || !on(c + 1, r) || !on(c, r - 1) || !on(c, r + 1);
+      if (!edge && !fill) continue;
+      h.fillStyle = edge ? ink : fill;
+      var ax = Math.round((x + c * sc) * u), ay = Math.round((y + r * sc) * u);
+      h.fillRect(ax, ay, Math.round((x + (c + 1) * sc) * u) - ax, Math.round((y + (r + 1) * sc) * u) - ay);
+    }
+  }
+  function drawClear(u) {
+    var rs = run.result, th = themeOf(room), INK = '#101426', btns = clearButtons(), top = 92, hh = 194 + btns.length * 32, i;
+    function box(x, y, w, hgt, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round((x + w) * u) - Math.round(x * u), Math.round((y + hgt) * u) - Math.round(y * u)); }
+    function dots(y) { for (var x = 51; x < 220; x += 6) box(x, y, 3, 2, INK); }
+    hits = [];
+    box(0, 0, LW, LH, 'rgba(7,9,20,0.72)');
+    box(35, top + 5, 200, hh, INK);                                            // hard shadow
+    box(35, top, 200, hh, th.accent);
+    pxText('LEVEL ' + (lvl.w + 1) + '-' + (lvl.i + 1), 135, top + 14, 2, INK, 'center');
+    pxText('CLEAR', 135, top + 36, 5, INK, 'center');
+    dots(top + 80);
+    for (i = 0; i < 3; i++) pxStar(135 - 68 + i * 48, top + 90, 3, INK, i < rs.stars ? INK : null);
+    dots(top + 136);
+    var cols = [['TIME', run.time.toFixed(1)], ['PAR', rs.par.toFixed(1)], ['FALLS', String(run.deaths)]];
+    for (i = 0; i < 3; i++) { pxText(cols[i][0], 75 + i * 60, top + 146, 1, INK, 'center'); pxText(cols[i][1], 75 + i * 60, top + 158, 2, INK, 'center'); }
+    for (i = 0; i < btns.length; i++) {
+      var by = top + 186 + i * 32, on = i === rs.pick;
+      box(55, by, 160, 26, INK);
+      if (!on) { box(57, by + 2, 156, 20, th.accent); box(57, by + 22, 156, 2, th.accentLo); }
+      pxText(btns[i][0], 135, by + 6, 2, on ? th.accent : INK, 'center');
+      if (on) { box(63, by + 10, 6, 6, th.accent); box(201, by + 10, 6, 6, th.accent); }
+      hits.push({ x: 55, y: by, w: 160, h: 26, fn: btns[i][1] });
+    }
+  }
   function star(b, u, cx, cy, rad, color) {
     b.fillStyle = color; b.beginPath();
     for (var k = 0; k < 10; k++) { var a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? rad * 0.45 : rad; b[k ? 'lineTo' : 'moveTo']((cx + Math.cos(a) * rr) * u, (cy + Math.sin(a) * rr) * u); }
