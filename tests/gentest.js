@@ -125,7 +125,7 @@ const fs = require('fs');
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
-      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp),
+      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 2 + 1,
                      elements: { spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;

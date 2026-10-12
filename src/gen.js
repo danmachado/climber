@@ -12,7 +12,8 @@
     var EL = opts.elements || { spikes: opts.spikes > 0, refills: !!opts.refills };      // which pieces may be used
     var SP = EL.spikes ? Math.max(1, opts.spikes | 0) : 0;                               // 0 none, 1 some, 2 lots
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
-    var SHAPE = opts.shape !== false;                                                    // organic shaping on by default
+    var SHAPE = opts.shape !== false;
+    var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces                                                    // organic shaping on by default
     function likes(st) { return styles.length && styles.length < 3 && styles.indexOf(st) >= 0; }
     function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
     function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
@@ -76,8 +77,8 @@
           block: room >= 3 ? (SP > 1 ? 0 : (SP === 1 ? 1 : 3)) * (likes('jump') ? 1.5 : 1) : 0,
           wall: canWall && room >= 3 ? (likes('climb') ? 6 : 2) * (SP > 1 ? 0.3 : 1) : 0,
           wallspikes: canDrop && room >= 5 ? (likes('climb') ? 6 : 2) : 0,
-          icespikes: EL.ice && SP > 0 && room >= TUNE.iceL[0] + 3 ? 3 : 0,                    // slide in, jump the spikes at the end
-          iceblock: EL.ice && SP < 2 && room >= TUNE.iceL[0] + 3 ? (SP ? 1 : 3) : 0,           // slide into a block to hop
+          icespikes: EL.ice && SP > 0 && room >= TUNE.iceL[0] + 3 ? 3 * ICY : 0,                    // slide in, jump the spikes at the end
+          iceblock: EL.ice && SP < 2 && room >= TUNE.iceL[0] + 3 ? (SP ? 1 : 3) * ICY : 0,           // slide into a block to hop
           bridge: EL.crumble && floor > 0 && room >= 4 ? 3 : 0,                                // crumbling stretch of floor
           ferry: EL.movers && (SP > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0     // ride a platform across a gap
         };
@@ -224,7 +225,7 @@
 
     return {
       plan: plan, stats: stats,
-      room: { format: 1, id: 'auto-' + seed, name: 'Auto ' + seed, difficulty: D, grid: { cols: COLS, rows: ROWS, tile: 10 },
+      room: { format: 1, id: 'auto-' + seed, name: 'Auto ' + seed, difficulty: D, world: WORLD || 1, grid: { cols: COLS, rows: ROWS, tile: 10 },
               tiles: g.map(function (row) { return row.join(''); }), entities: [] }
     };
   }

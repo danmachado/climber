@@ -5,12 +5,17 @@
   // own tileset with the same layout, so new looks can be swapped in without touching the rules.
   var TILESETS = {
     brick: { face: '#4a5ad0', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#161c4a', core: '#10142c', infill: '#1b2254' },
+    frost: { face: '#587a9e', hi: '#f4fcff', side: '#86a9c9', lo: '#2a4361', line: '#172a41', core: '#0b1826', infill: '#14283c' },
     ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
   };
   var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
+  // The world theme swaps the look of plain walls and the backdrop; ice always looks like ice.
+  var TILE_THEME = { tiles: 'brick', back: ['#171e47', '#0f1432', '#262f68'] };
+  function setTileTheme(th) { TILE_THEME = th; }
   function tileHash(c, r) { var h = (c * 374761393 + r * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   // solidAt(c, r) says whether a neighbouring cell is part of a wall (anything off the map counts as wall)
   function drawSolid(b, x, y, kind, solidAt, c, r) {
+    if (kind !== 'ice') kind = TILE_THEME.tiles;
     var S = TILESETS[kind] || TILESETS.brick, v = tileHash(c, r);
     var up = !solidAt(c, r - 1), dn = !solidAt(c, r + 1), lf = !solidAt(c - 1, r), rt = !solidAt(c + 1, r);
     var edge = up || dn || lf || rt || !solidAt(c - 1, r - 1) || !solidAt(c + 1, r - 1) || !solidAt(c - 1, r + 1) || !solidAt(c + 1, r + 1);
@@ -78,12 +83,12 @@
   // sameAt(c, r) says whether a neighbouring cell is backdrop or wall, so only the ragged outer edge gets a rim.
   function drawBack(b, x, y, sameAt, c, r) {
     var v = tileHash(c + 31, r + 17);
-    b.fillStyle = '#171e47'; b.fillRect(x, y, 10, 10);
-    b.fillStyle = '#0f1432';
+    b.fillStyle = TILE_THEME.back[0]; b.fillRect(x, y, 10, 10);
+    b.fillStyle = TILE_THEME.back[1];
     var j1 = v < 0.34 ? 7 : (v < 0.67 ? 3 : 5), j2 = v < 0.34 ? 2 : (v < 0.67 ? 8 : 6);
     b.fillRect(x, y + 4, 10, 1); b.fillRect(x, y + 9, 10, 1);
     b.fillRect(x + j1, y, 1, 4); b.fillRect(x + j2, y + 5, 1, 4);
-    b.fillStyle = '#262f68';
+    b.fillStyle = TILE_THEME.back[2];
     if (!sameAt(c, r - 1)) b.fillRect(x, y, 10, 1);
     if (!sameAt(c - 1, r)) b.fillRect(x, y, 1, 10);
     if (!sameAt(c + 1, r)) b.fillRect(x + 9, y, 1, 10);

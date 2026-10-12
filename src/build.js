@@ -1,5 +1,5 @@
 var fs = require('fs'), d = __dirname;
-var tilesJs = fs.readFileSync(d + '/shared-tiles.js', 'utf8'), gen = fs.readFileSync(d + '/gen.js', 'utf8'), cfg = fs.readFileSync(d + '/shared-config.js', 'utf8'), heroJs = fs.readFileSync(d + '/shared-hero.js', 'utf8');
+var tilesJs = fs.readFileSync(d + '/shared-tiles.js', 'utf8'), gen = fs.readFileSync(d + '/gen.js', 'utf8'), cfg = fs.readFileSync(d + '/shared-config.js', 'utf8'), heroJs = fs.readFileSync(d + '/shared-hero.js', 'utf8'), worldsJs = fs.readFileSync(d + '/shared-worlds.js', 'utf8');
 var generateRoom = new Function(gen + '\nreturn generateRoom;')();
 
 // Built-in starter set: the hand-made first room plus generated rooms (each one is cleared by the auto-player in tests).
@@ -13,17 +13,36 @@ var SET = [
   ['Updraft',     { difficulty: 3, obstacles: 1, style: 'climb', spikes: 1, refills: true }, 4306],
   ['High Wire',   { difficulty: 4, obstacles: 2, style: 'mixed', spikes: 2, refills: true }, 4407]
 ];
+// World 2 placeholders: ice-heavy rooms from the auto-builder, until hand-made levels are published.
+var ALL = { spikes: true, ice: true, refills: true };
+var SET2 = [
+  ['Cold Snap',   { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: ALL }, 5101],
+  ['Glaze',       { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: ALL }, 5102],
+  ['Slipstream',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: ALL }, 5203],
+  ['Rime',        { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: ALL }, 5204],
+  ['Black Ice',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, crumble: true } }, 5305],
+  ['Hard Frost',  { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: ALL }, 5306],
+  ['Whiteout',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, movers: true } }, 5407],
+  ['Deep Freeze', { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, ice: true, refills: true, crumble: true, movers: true } }, 5408]
+];
+first.world = 1; first.level = 1;
 var starters = [first], plans = [null];
 SET.forEach(function (s, i) {
   var out = generateRoom(s[1], s[2]);
-  out.room.id = 'starter-0' + (i + 2); out.room.name = s[0];
+  out.room.id = 'starter-0' + (i + 2); out.room.name = s[0]; out.room.world = 1; out.room.level = i + 2;
+  starters.push(out.room); plans.push(out.plan);
+});
+SET2.forEach(function (s, i) {
+  s[1].world = 2;
+  var out = generateRoom(s[1], s[2]);
+  out.room.id = 'ice-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
   starters.push(out.room); plans.push(out.plan);
 });
 fs.writeFileSync(d + '/starter-plans.json', JSON.stringify({ rooms: starters, plans: plans }));
 
 var one = JSON.stringify(first), all = JSON.stringify(starters);
 function fill(t, rooms) {
-  return t.split('/*ROOM_JSON*/').join(rooms).split('/*SHARED_TILES*/').join(tilesJs).split('/*GEN*/').join(gen).split('/*SHARED_CONFIG*/').join(cfg).split('/*SHARED_HERO*/').join(heroJs);
+  return t.split('/*ROOM_JSON*/').join(rooms).split('/*SHARED_TILES*/').join(tilesJs).split('/*GEN*/').join(gen).split('/*SHARED_CONFIG*/').join(cfg).split('/*SHARED_HERO*/').join(heroJs).split('/*SHARED_WORLDS*/').join(worldsJs);
 }
 fs.writeFileSync(d + '/../index.html', fill(fs.readFileSync(d + '/template.html', 'utf8'), all.slice(1, -1)));
 fs.mkdirSync(d + '/../builder', { recursive: true });
