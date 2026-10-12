@@ -21,7 +21,7 @@ const { chromium } = require('playwright');
   // play test: the real game gets the room, the demo script beats it, the builder hears about it
   await p.click('#play');
   await p.waitForTimeout(1200);
-  const fr = p.frames().find(f => f.url().endsWith('/game/index.html'));
+  const fr = p.frames().find(f => f.url().endsWith('/climber/index.html'));
   console.log('game frame loaded:', !!fr, fr ? await fr.evaluate(() => ({ s: window.__climber.state().x })) : '');
   console.log('demo in frame:', JSON.stringify(await fr.evaluate(() => { window.__climber.manual(true); const r = window.__climber.demoRun(3000); window.__climber.manual(false); return r; })));
   await p.waitForTimeout(300);
