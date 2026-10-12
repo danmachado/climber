@@ -1265,7 +1265,7 @@
       for (var i = 0; i < 40; i++) step(none);
       return { steps: n, count: run.count, room: room.name, falls: run.deaths, x: pl.x, y: pl.y, pool: pool.length };
     }, load: function (data) { testMode = true; scene = 'play'; buildRoom(data); resetRun(); },
-    demoRun: function (n) { startDemo(); for (var i = 0; i < n && !run.won; i++) step(demoInput()); return { steps: i, won: run.won, deaths: run.deaths, stage: demo.stage }; }
+    demoRun: function (n) { startDemo(); demo.room = starters[0]; demo.rec = null; resetRun(); for (var i = 0; i < n && !run.won; i++) step(demoInput()); return { steps: i, won: run.won, deaths: run.deaths, stage: demo.stage }; }
   };
 })();
 </script>
