@@ -1391,7 +1391,13 @@
     pxText((wiz.i + 1) + ' OF ' + WIZ.length, 135, 92, 1, C.dim, 'center');
     drawPad(u, 200, wiz.armed ? lit : null, null);
     pxText(wiz.armed ? 'PRESS' : 'LET GO OF EVERYTHING', 135, 286, 2, wiz.armed ? C.text : C.dim, 'center');
-    if (wiz.armed) pxText(step[1].toUpperCase(), 135, 308, 2, C.flame, 'center');
+    // say it the way the buttons are printed: 8BitDo and Nintendo pads put B at the bottom and A on the right
+    var nin = /8bitdo|nintendo|pro controller|switch/i.test(wiz.id), LET = nin ? { fb: 'B', fr: 'A', fl: 'Y', ft: 'X', l1: 'L', r1: 'R', l2: nin ? 'L2' : 'LT', r2: 'R2' } : { fb: 'A', fr: 'B', fl: 'X', ft: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT' };
+    var FACE = { fb: 'BOTTOM', fr: 'RIGHT', fl: 'LEFT', ft: 'TOP' };
+    if (wiz.armed) {
+      if (FACE[step[0]]) { pxText('THE ' + LET[step[0]] + ' BUTTON', 135, 308, 2, C.flame, 'center'); pxText('THE ' + FACE[step[0]] + ' ONE OF THE FOUR ON THE RIGHT', 135, 326, 1, C.text, 'center'); }
+      else pxText(step[1].toUpperCase() + (LET[step[0]] ? ' - ' + LET[step[0]] : ''), 135, 308, 2, C.flame, 'center');
+    }
     pxText(wiz.see.toUpperCase().substring(0, 42), 135, 340, 1, C.dim, 'center');
     pxText('IT IS THE ONE LIT UP IN THE PICTURE', 135, 356, 1, C.dim, 'center');
     pxText('CLICK THE MOUSE OR PRESS ESC TO CANCEL', 135, 440, 1, C.dim, 'center');
