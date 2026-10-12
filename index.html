@@ -456,6 +456,10 @@
   function hit(x, y) { return collide(x, y, pl.w, pl.h); }
   function touching(dir, dist) { return hit(pl.x + dir * dist, pl.y); }
 
+  // Screen shake: a short, small nudge of the whole picture on impacts. It moves the finished picture rather than
+  // redrawing it, so it costs the frame nothing extra. size is in game pixels, time in seconds.
+  var shake = { t: 0, size: 0, n: 0, last: '' };
+  function addShake(size, time) { if (size >= shake.size || shake.t <= 0) { shake.size = size; shake.t = time; } }
   function moveX(amount) {
     pl.rx += amount;
     var move = Math.round(pl.rx);
@@ -471,7 +475,7 @@
           else if (!hit(pl.x + s, pl.y + i)) { pl.y += i; fixed = true; }
         }
       }
-      if (!fixed) { pl.vx = 0; pl.rx = 0; return; }
+      if (!fixed) { if (pl.state === 'dash') addShake(2, 0.14); pl.vx = 0; pl.rx = 0; return; }   // a dash slamming into a wall
     }
   }
   function moveY(amount) {
@@ -519,7 +523,7 @@
   }
   function die() {
     if (pl.dead) return;
-    pl.dead = true; run.deaths++;
+    pl.dead = true; run.deaths++; addShake(2.5, 0.2);
     fx = { mode: 'die', t: 0, x: pl.x, y: Math.min(pl.y, rows * T - pl.h), facing: pl.facing };
   }
 
@@ -553,7 +557,10 @@
     stepMovers(dt); stepCrumbles(dt);
     if (pl.dead) return;
     pl.dashCooldown -= dt;
+    var wasGround = pl.onGround;
     pl.onGround = pl.vy >= 0 && hit(pl.x, pl.y + 1);
+    if (pl.onGround && !wasGround && pl.fallV > 190) addShake(pl.fallV > 250 ? 2 : 1.5, 0.12);   // a hard landing
+    if (shake.t > 0) shake.t -= dt;
     pl.floor = pl.onGround ? surface(pl.x, pl.y + pl.h, pl.w, 1) : '';
     if (pl.onGround) touchCrumble(pl.x, pl.y + pl.h, pl.w, 1);
     if (pl.onGround) {
@@ -599,6 +606,7 @@
       var grabDir = inp.x || pl.facing;
       if (inp.grab && pl.stamina > 0 && pl.vy >= 0 && pl.forceMove <= 0 && touching(grabDir, 2) &&
           surface(grabDir > 0 ? pl.x + pl.w : pl.x - 2, pl.y, 2, pl.h) !== 'ice') {
+        addShake(1, 0.08);                         // catching a wall
         pl.state = 'climb'; pl.climbDir = grabDir; pl.facing = grabDir; pl.vx = 0; pl.vy *= 0.2;
         if (!touching(grabDir, 1)) pl.x += grabDir;
       } else {
@@ -623,6 +631,7 @@
       }
     }
 
+    pl.fallV = pl.vy;
     moveX(pl.vx * dt);
     moveY(pl.vy * dt);
 
@@ -973,8 +982,23 @@
     }
   }
 
+  // Tired arms: when the meter is nearly empty and you are off the ground, the hero (and the meter) tremble.
+  var TREMBLE = 0.3, tick = 0;
+  function shaky() { return scene === 'play' && !pl.dead && !run.won && !pl.onGround && pl.stamina < P.stamina * TREMBLE; }
+  function tremble() { return shaky() && Math.floor(tick / 3) % 2 ? 1 : 0; }
+  function applyShake() {
+    var v = '';
+    if (scene === 'play' && shake.t > 0 && !run.won) {
+      shake.n++;
+      var k = view.scale / (window.devicePixelRatio || 1), a = shake.size * Math.min(1, shake.t / 0.1);
+      var dx = Math.round(a * (shake.n % 2 ? 1 : -1) * k), dy = Math.round(a * 0.6 * (shake.n % 4 < 2 ? 1 : -1) * k);
+      v = 'translate(' + dx + 'px,' + dy + 'px)';
+    }
+    if (v !== shake.last) { shake.last = v; stage.style.transform = v; }
+  }
   function render() {
     var i;
+    tick++; applyShake();
     if (scene !== 'play') {
       var ssig = [scene, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
@@ -1015,8 +1039,8 @@
     else if (fx.mode === 'die') drawDeath();
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
-    else drawBody(pl.x, pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
+    else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
+    var sig = [mode, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
     flush();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
   }
@@ -1164,7 +1188,7 @@
     var segs = Math.max(0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001)), canDash = pl.stamina >= P.dashCost;
     for (var sg = 0; sg < 10 && check !== 1; sg++) {
       h.fillStyle = sg < segs ? (canDash ? C.flame : C.hurt) : '#232c55';
-      h.fillRect(Math.round((106 + sg * 6) * u), Math.round(3 * u), Math.round(5 * u), Math.round(6 * u));
+      h.fillRect(Math.round((106 + sg * 6 + (shaky() && sg % 2 === Math.floor(tick / 6) % 2 ? 1 : 0)) * u), Math.round(3 * u), Math.round(5 * u), Math.round(6 * u));
     }
     if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, low ' + fps.low, 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
