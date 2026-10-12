@@ -291,7 +291,7 @@
   function resetRun() {
     run = { deaths: 0, time: 0, won: false, count: 1, result: null };
     if (!testMode) {
-      if (demo.on) { if (room !== starters[0]) buildRoom(starters[0]); }
+      if (demo.on) buildRoom(demo.room || starters[0]);
       else if (mode === 'map' && levels[lvl.w] && levels[lvl.w][lvl.i]) buildRoom(levels[lvl.w][lvl.i]);
       else { queue = []; buildRoom(nextFromQueue()); }
     }
@@ -614,12 +614,29 @@
   // ---- demo: the game plays the starter room by itself when nobody is at the controls ----
   var demo = { on: false, stage: 1, f: 0, t0: 0, back: false, winT: 0, idle: 0 };
   var DEMO_IDLE = 15;
-  function startDemo() { scene = 'play'; allDirty = true; lastSig = ''; demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun(); }
+  // Recorded runs of the built-in levels (the auto-player's inputs, saved by tests/gentest.js 0). The game steps at a
+  // fixed rate, so playing the same inputs back gives the same run. Format: [input code, frames, input code, frames, ...].
+  var DEMOS = /*DEMOS*/;
+  function pickDemo() {
+    var list = [starters[0]], i;
+    for (i = 1; i < starters.length; i++) if (DEMOS[starters[i].id]) list.push(starters[i]);
+    if (list.length > 1 && demo.room) list.splice(list.indexOf(demo.room), 1);      // never the same level twice in a row
+    demo.room = list[Math.floor(Math.random() * list.length)];
+    demo.rec = demo.room === starters[0] ? null : DEMOS[demo.room.id]; demo.rk = 0; demo.rleft = demo.rec ? demo.rec[1] : 0;
+  }
+  function startDemo() { pickDemo(); scene = 'play'; allDirty = true; lastSig = ''; demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun(); }
   function demoInput() {
     var inp = { x: 0, y: 0, jump: false, dash: false, grab: false };
     function I(o) { for (var k in o) inp[k] = o[k]; }
     function next() { demo.stage++; demo.t0 = demo.f; }
-    if (run.won) { if (++demo.winT > 150) startDemo(); return inp; }
+    if (run.won) { if (++demo.winT > 100) startDemo(); return inp; }
+    if (demo.rec) {                                // a recorded run: play the next input, move on if it ever goes wrong
+      if (pl.dead || demo.rk >= demo.rec.length) { startDemo(); return inp; }
+      var code = demo.rec[demo.rk];
+      if (--demo.rleft <= 0) { demo.rk += 2; demo.rleft = demo.rec[demo.rk + 1] || 0; }
+      inp.x = code % 3 - 1; inp.y = Math.floor(code / 3) % 3 - 1; inp.jump = !!(Math.floor(code / 9) % 2); inp.dash = !!(Math.floor(code / 18) % 2); inp.grab = code >= 36;
+      return inp;
+    }
     if (pl.dead) { demo.stage = 1; demo.back = false; demo.t0 = demo.f; return inp; }
     var x = pl.x, y = pl.y, vy = Math.round(pl.vy), ground = pl.onGround, dashes = pl.dashes;
     var sf = demo.f - demo.t0;
@@ -1030,7 +1047,7 @@
       h.fillStyle = 'rgba(11,16,32,0.86)'; h.fillRect(30 * u, 190 * u, 210 * u, 90 * u);
       t('ROOM CLEAR', 135, 222, 18, C.teal, 'center');
       t(clock(run.time) + '   ' + run.deaths + (run.deaths === 1 ? ' fall' : ' falls'), 135, 244, 10, C.text, 'center');
-      t(demo.on ? 'Demo restarts in a moment' : 'Press jump to play again', 135, 264, 7, C.dim, 'center');
+      t(demo.on ? 'Another level in a moment' : 'Press jump to play again', 135, 264, 7, C.dim, 'center');
     }
   }
 
@@ -1223,15 +1240,26 @@
     view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
     startLevel: startLevel,
+    demoAll: function () { // plays every recorded demo to the end, to prove the recordings still reach the exit
+      var out = {}, i, n;
+      for (i = 0; i < starters.length; i++) {
+        demo.room = starters[i]; demo.rec = i ? DEMOS[starters[i].id] : null; if (i && !demo.rec) { out[starters[i].name] = 'no recording'; continue; }
+        demo.rk = 0; demo.rleft = demo.rec ? demo.rec[1] : 0;
+        scene = 'play'; demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun();
+        for (n = 0; n < 4000 && !run.won && !pl.dead; n++) step(demoInput());
+        out[starters[i].name] = run.won ? 'won ' + n : (pl.dead ? 'died ' + n : 'ran out ' + n);
+      }
+      demo.on = false; return out;
+    },
     levelProbe: function () { // plays level 1-1 from the map with the demo's inputs, to prove scoring and saving
-      startLevel(0, 0); demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false;
+      startLevel(0, 0); demo.rec = null; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false;
       var n = 0; while (!run.won && n < 3000) { step(demoInput()); n++; }
       return this.view();
     },
     demoStart: function () { startDemo(); }, demoStep: function (n) { for (var i = 0; i < n; i++) step(demoInput()); return this.state(); },
     chainProbe: function () { // plays room one as a normal run with the demo's inputs, to prove the exit leads to room two
       scene = 'play'; mode = 'endless';
-      demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false;
+      demo.rec = null; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false;
       var n = 0, none = { x: 0, y: 0, jump: false, dash: false, grab: false };
       while (run.count === 1 && n < 3000) { step(demoInput()); n++; }
       for (var i = 0; i < 40; i++) step(none);

@@ -47,8 +47,10 @@ starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] *
 fs.writeFileSync(d + '/starter-plans.json', JSON.stringify({ rooms: starters, plans: plans }));
 
 var one = JSON.stringify(first), all = JSON.stringify(starters);
+var demos = '{}';
+try { demos = fs.readFileSync(d + '/starter-demos.json', 'utf8'); } catch (e) {}
 function fill(t, rooms) {
-  return t.split('/*ROOM_JSON*/').join(rooms).split('/*SHARED_TILES*/').join(tilesJs).split('/*GEN*/').join(gen).split('/*SHARED_CONFIG*/').join(cfg).split('/*SHARED_HERO*/').join(heroJs).split('/*SHARED_WORLDS*/').join(worldsJs);
+  return t.split('/*DEMOS*/').join(demos).split('/*ROOM_JSON*/').join(rooms).split('/*SHARED_TILES*/').join(tilesJs).split('/*GEN*/').join(gen).split('/*SHARED_CONFIG*/').join(cfg).split('/*SHARED_HERO*/').join(heroJs).split('/*SHARED_WORLDS*/').join(worldsJs);
 }
 fs.writeFileSync(d + '/../index.html', fill(fs.readFileSync(d + '/template.html', 'utf8'), all.slice(1, -1)));
 fs.mkdirSync(d + '/../builder', { recursive: true });
