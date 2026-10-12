@@ -2,257 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Frame Controller Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Climber controller check</title>
 <style>
-  /* Layout: one 9:16 stage, whole-number scaled. Low-res game canvas underneath, text canvas on top. */
-  html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; }
-  body { display: flex; align-items: center; justify-content: center; }
-  #stage { position: relative; background: #111831; }
-  #game, #hud { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
-  #game { image-rendering: pixelated; image-rendering: crisp-edges; }
+  html, body { margin: 0; background: #0b1020; color: #eef1fa; font: 18px/1.45 Menlo, Consolas, monospace; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20px; color: #ffb74a; letter-spacing: .08em; margin: 0 0 6px; }
+  p { margin: 0 0 14px; color: #9aa6cc; font-size: 15px; }
+  .pad { border: 1px solid #2a3560; border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; background: #131a33; }
+  .pad h2 { font-size: 16px; margin: 0 0 6px; color: #5fd6b3; word-break: break-all; }
+  .row { display: flex; gap: 10px; } .row b { flex: none; width: 110px; color: #9aa6cc; font-weight: normal; }
+  .on { color: #ffb74a; font-weight: bold; }
+  #none { color: #ff8f7d; }
+  #keys { min-height: 1.5em; }
 </style>
 </head>
 <body>
-<div id="stage">
-  <canvas id="game" width="270" height="480"></canvas>
-  <canvas id="hud"></canvas>
-</div>
+<main>
+  <h1>CONTROLLER CHECK</h1>
+  <p>This page shows exactly what the browser receives. Click the page once, then press one button at a time and watch what lights up.</p>
+  <div id="none">No controller seen yet. Press any button on it. If this never changes, the browser is not getting the controller at all.</div>
+  <div id="pads"></div>
+  <div class="pad">
+    <h2>Key presses (some controllers send buttons as keys)</h2>
+    <div class="row"><b>Held now</b><span id="keys">none</span></div>
+    <div class="row"><b>Last five</b><span id="last">none</span></div>
+  </div>
+  <div class="pad">
+    <h2>Everything seen so far</h2>
+    <div id="seen">nothing yet</div>
+  </div>
+</main>
 <script>
 (function () {
-  'use strict';
-
-  var LW = 270, LH = 480;                 // logical game resolution
-  var BOX = { x: 10, y: 292, w: 250, h: 160 };
-  var C = {
-    bg: '#111831', panel: '#18223f', tileA: '#1a2547', tileB: '#1f2c53',
-    text: '#eef1fa', dim: '#8d9ac0', accent: '#ffb74a', ok: '#5fd6b3', line: '#33416f'
-  };
-
-  var stage = document.getElementById('stage');
-  var game = document.getElementById('game');
-  var hud = document.getElementById('hud');
-  var g = game.getContext('2d');
-  var h = hud.getContext('2d');
-
-  var view = { scale: 0, whole: false, physW: 0, physH: 0, dpr: 1 };
-
-  function layout() {
-    var dpr = window.devicePixelRatio || 1;
-    var vw = window.innerWidth, vh = window.innerHeight;
-    var phys = Math.min(vw * dpr / LW, vh * dpr / LH);
-    var whole = phys >= 1;
-    var s = whole ? Math.floor(phys) : phys;
-    var cssW = LW * s / dpr, cssH = LH * s / dpr;
-    stage.style.width = cssW + 'px';
-    stage.style.height = cssH + 'px';
-    var bw = Math.max(270, Math.min(Math.round(cssW * dpr), 1080));
-    hud.width = bw;
-    hud.height = Math.round(bw * LH / LW);
-    view.scale = s; view.whole = whole; view.dpr = dpr;
-    view.physW = Math.round(vw * dpr); view.physH = Math.round(vh * dpr);
-    lastSig = '';
-  }
-
-  // Static background for the low-res canvas, drawn once.
-  var bg = document.createElement('canvas');
-  bg.width = LW; bg.height = LH;
-  (function () {
-    var b = bg.getContext('2d');
-    b.fillStyle = C.bg; b.fillRect(0, 0, LW, LH);
-    for (var ty = 0; ty < BOX.h / 8; ty++) {
-      for (var tx = 0; tx < Math.ceil(BOX.w / 8); tx++) {
-        b.fillStyle = ((tx + ty) % 2) ? C.tileA : C.tileB;
-        b.fillRect(BOX.x + tx * 8, BOX.y + ty * 8, Math.min(8, BOX.w - tx * 8), 8);
-      }
-    }
-    b.fillStyle = C.line;
-    b.fillRect(BOX.x - 1, BOX.y - 1, BOX.w + 2, 1);
-    b.fillRect(BOX.x - 1, BOX.y + BOX.h, BOX.w + 2, 1);
-    b.fillRect(BOX.x - 1, BOX.y, 1, BOX.h);
-    b.fillRect(BOX.x + BOX.w, BOX.y, 1, BOX.h);
-  })();
-
-  // ---- input state ----
-  var keys = {};
-  var seen = { move: false, jump: false, dash: false, grab: false };
-  var pad = { connected: false, id: '', mapping: '', pressed: '', axes: '', count: 0 };
-  var mouse = { clicks: 0, x: 0, y: 0 };
-  var touches = 0;
-  var input = { x: 0, y: 0, jump: false, dash: false, grab: false };
-
-  window.addEventListener('keydown', function (e) { keys[e.keyCode] = true; });
-  window.addEventListener('keyup', function (e) { keys[e.keyCode] = false; });
-  window.addEventListener('mousedown', function (e) {
-    mouse.clicks++; mouse.x = Math.round(e.clientX); mouse.y = Math.round(e.clientY);
+  var held = {}, last = [], seen = {}, seenList = [], lastHtml = '';
+  function note(s) { if (!seen[s]) { seen[s] = 1; seenList.push(s); document.getElementById('seen').textContent = seenList.join(',  '); } }
+  window.addEventListener('keydown', function (e) {
+    var name = (e.key || '?') + ' (' + e.keyCode + ')';
+    if (!held[e.keyCode]) { last.unshift(name); last = last.slice(0, 5); document.getElementById('last').textContent = last.join(',  '); note('key ' + name); }
+    held[e.keyCode] = name; e.preventDefault(); keysOut();
   });
-  window.addEventListener('touchstart', function () { touches++; }, { passive: true });
-  window.addEventListener('resize', layout);
-
-  function btn(gp, i) {
-    var b = gp.buttons[i];
-    if (!b) return false;
-    return typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5;
+  window.addEventListener('keyup', function (e) { delete held[e.keyCode]; keysOut(); });
+  function keysOut() { var k = []; for (var c in held) k.push(held[c]); var el = document.getElementById('keys'); el.textContent = k.length ? k.join(',  ') : 'none'; el.className = k.length ? 'on' : ''; }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function tick() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [], html = '', n = 0;
+    for (var i = 0; i < gps.length; i++) {
+      var gp = gps[i]; if (!gp) continue; n++;
+      var pressed = [], axes = [], j;
+      for (j = 0; j < gp.buttons.length; j++) { var b = gp.buttons[j], v = typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5; if (v) { pressed.push(j); note('pad' + gp.index + ' button ' + j); } }
+      for (j = 0; j < gp.axes.length; j++) { var a = gp.axes[j]; axes.push((Math.abs(a) > 0.5 ? '<span class="on">' : '<span>') + j + ': ' + a.toFixed(2) + '</span>'); if (Math.abs(a) > 0.6) note('pad' + gp.index + ' axis ' + j + (a > 0 ? '+' : '-')); }
+      html += '<div class="pad"><h2>Device ' + gp.index + ': ' + esc(gp.id) + '</h2>' +
+        '<div class="row"><b>Layout</b><span>' + (gp.mapping === 'standard' ? 'standard (the game knows this one)' : 'not standard (the game will ask you to set it up)') + '</span></div>' +
+        '<div class="row"><b>Has</b><span>' + gp.buttons.length + ' buttons, ' + gp.axes.length + ' axes</span></div>' +
+        '<div class="row"><b>Buttons down</b><span class="' + (pressed.length ? 'on' : '') + '">' + (pressed.length ? pressed.join(',  ') : 'none') + '</span></div>' +
+        '<div class="row"><b>Axes</b><span>' + (axes.join('&nbsp;&nbsp; ') || 'none') + '</span></div></div>';
+    }
+    if (html !== lastHtml) { lastHtml = html; document.getElementById('pads').innerHTML = html; document.getElementById('none').style.display = n ? 'none' : 'block'; }
+    window.requestAnimationFrame(tick);
   }
-
-  function readInput() {
-    var x = 0, y = 0, jump = false, dash = false, grab = false;
-    var gps = navigator.getGamepads ? navigator.getGamepads() : [];
-    var gp = null, n = 0, i;
-    for (i = 0; i < gps.length; i++) { if (gps[i]) { n++; if (!gp) gp = gps[i]; } }
-    pad.count = n;
-    pad.connected = !!gp;
-    if (gp) {
-      pad.id = gp.id || 'unknown';
-      pad.mapping = gp.mapping || 'non-standard';
-      var p = [], a = [];
-      for (i = 0; i < gp.buttons.length; i++) { if (btn(gp, i)) p.push(i); }
-      for (i = 0; i < gp.axes.length && i < 4; i++) { a.push((Math.round(gp.axes[i] * 10) / 10).toFixed(1)); }
-      pad.pressed = p.length ? p.join(' ') : 'none';
-      pad.axes = a.join('  ');
-      if (Math.abs(gp.axes[0] || 0) > 0.5) x = gp.axes[0] > 0 ? 1 : -1;
-      if (Math.abs(gp.axes[1] || 0) > 0.5) y = gp.axes[1] > 0 ? 1 : -1;
-      if (btn(gp, 14)) x = -1;
-      if (btn(gp, 15)) x = 1;
-      if (btn(gp, 12)) y = -1;
-      if (btn(gp, 13)) y = 1;
-      jump = btn(gp, 0);
-      dash = btn(gp, 2);
-      grab = btn(gp, 4) || btn(gp, 5) || btn(gp, 6) || btn(gp, 7);
-    }
-    // keyboard, for checking on a computer only
-    if (keys[37]) x = -1;
-    if (keys[39]) x = 1;
-    if (keys[38]) y = -1;
-    if (keys[40]) y = 1;
-    if (keys[67] || keys[32]) jump = true;   // C or space
-    if (keys[88]) dash = true;               // X
-    if (keys[90]) grab = true;               // Z
-    input.x = x; input.y = y; input.jump = jump; input.dash = dash; input.grab = grab;
-    if (x || y) seen.move = true;
-    if (jump) seen.jump = true;
-    if (dash) seen.dash = true;
-    if (grab) seen.grab = true;
-  }
-
-  // ---- speed ----
-  var fps = { now: 0, worst: 0, low: 0, frames: 0, acc: 0, w: 0, secs: 0 };
-
-  // ---- player square ----
-  var pl = { x: BOX.x + BOX.w / 2 - 4, y: BOX.y + BOX.h / 2 - 4 };
-
-  // ---- text canvas ----
-  var ua = navigator.userAgent || '';
-  var chrome = /Chrome\/(\d+)/.exec(ua);
-  var android = /Android (\d+)/.exec(ua);
-  var browserLine = (chrome ? 'Chrome ' + chrome[1] : 'Browser unknown') + (android ? ', Android ' + android[1] : '');
-  var lastSig = '';
-
-  function drawHud() {
-    var u = hud.width / LW;
-    function t(str, x, y, size, color, bold) {
-      h.font = (bold ? 'bold ' : '') + (size * u) + 'px Menlo, Consolas, "DejaVu Sans Mono", monospace';
-      h.fillStyle = color;
-      h.fillText(str, x * u, y * u);
-    }
-    function label(str, y) {
-      t(str, 12, y, 6, C.dim, true);
-      h.fillStyle = C.line;
-      h.fillRect(12 * u, (y + 3) * u, 246 * u, Math.max(1, u * 0.5));
-    }
-    function check(name, hint, on, y) {
-      h.fillStyle = on ? C.ok : C.panel;
-      h.fillRect(12 * u, (y - 6.5) * u, 7 * u, 7 * u);
-      if (!on) { h.strokeStyle = C.dim; h.lineWidth = Math.max(1, u * 0.6); h.strokeRect(12 * u, (y - 6.5) * u, 7 * u, 7 * u); }
-      t(name, 25, y, 7, C.text, true);
-      t(on ? 'seen' : hint, 78, y, 7, on ? C.ok : C.dim, false);
-    }
-
-    h.clearRect(0, 0, hud.width, hud.height);
-    h.textBaseline = 'alphabetic';
-
-    t('CONTROLLER TEST', 12, 24, 14, C.accent, true);
-
-    label('DISPLAY', 44);
-    t('Window ' + view.physW + ' x ' + view.physH + ' px', 12, 57, 7, C.text);
-    t('Scale ' + (view.whole ? view.scale + 'x' : view.scale.toFixed(2) + 'x') +
-      ', pixels square: ' + (view.whole ? 'yes' : 'no'), 12, 68, 7, view.whole ? C.text : C.accent);
-    t(browserLine, 12, 79, 7, C.text);
-
-    label('SPEED', 97);
-    t(fps.secs < 1 ? 'Measuring' : fps.now + ' fps now, lowest ' + fps.low + ', worst frame ' + fps.worst + ' ms',
-      12, 110, 7, C.text);
-
-    label('CONTROLLER', 128);
-    if (!navigator.getGamepads) {
-      t('This browser has no controller support', 12, 141, 7, C.accent, true);
-    } else if (!pad.connected) {
-      t('Not seen yet. Press any button on it.', 12, 141, 7, C.accent, true);
-    } else {
-      t('Connected, ' + (pad.mapping === 'standard' ? 'standard layout' : 'non-standard layout'), 12, 141, 7, C.ok, true);
-      t(pad.id.length > 56 ? pad.id.substring(0, 56) : pad.id, 12, 152, 6, C.dim);
-      t('Pressed: ' + pad.pressed, 12, 163, 7, C.text);
-      t('Sticks:  ' + pad.axes, 12, 174, 7, C.text);
-    }
-
-    label('CHECKLIST', 192);
-    check('Move', 'd-pad or left stick', seen.move, 206);
-    check('Jump', 'bottom face button (A)', seen.jump, 218);
-    check('Dash', 'left face button (X)', seen.dash, 230);
-    check('Grab', 'any shoulder or trigger', seen.grab, 242);
-
-    label('OTHER INPUT', 260);
-    t('Mouse clicks ' + mouse.clicks + (mouse.clicks ? '  (last at ' + mouse.x + ', ' + mouse.y + ')' : ''), 12, 273, 7, C.text);
-    t('Touches ' + touches, 12, 284, 7, C.text);
-
-    t('Move the square around the box', 12, 468, 7, C.dim);
-  }
-
-  function sig() {
-    return [view.scale, view.physW, view.physH, fps.now, fps.low, fps.worst, fps.secs > 0,
-      pad.connected, pad.id, pad.pressed, pad.axes,
-      seen.move, seen.jump, seen.dash, seen.grab, mouse.clicks, touches].join('|');
-  }
-
-  var last = 0;
-  function frame(now) {
-    var dt = last ? now - last : 16.7;
-    last = now;
-
-    fps.frames++; fps.acc += dt;
-    if (dt > fps.w) fps.w = dt;
-    if (fps.acc >= 1000) {
-      fps.now = Math.round(fps.frames * 1000 / fps.acc);
-      fps.worst = Math.round(fps.w);
-      fps.secs++;
-      if (fps.secs > 2 && (fps.low === 0 || fps.now < fps.low)) fps.low = fps.now;
-      if (fps.secs <= 2) fps.low = fps.now;
-      fps.frames = 0; fps.acc = 0; fps.w = 0;
-    }
-
-    readInput();
-
-    var step = 90 * Math.min(dt, 50) / 1000;
-    pl.x += input.x * step; pl.y += input.y * step;
-    if (pl.x < BOX.x) pl.x = BOX.x;
-    if (pl.y < BOX.y) pl.y = BOX.y;
-    if (pl.x > BOX.x + BOX.w - 8) pl.x = BOX.x + BOX.w - 8;
-    if (pl.y > BOX.y + BOX.h - 8) pl.y = BOX.y + BOX.h - 8;
-
-    g.drawImage(bg, 0, 0);
-    g.fillStyle = input.grab ? C.ok : C.accent;
-    var size = input.jump ? 10 : 8, off = input.jump ? -1 : 0;
-    g.fillRect(Math.round(pl.x) + off, Math.round(pl.y) + off, size, size);
-    if (input.dash) { g.fillStyle = C.text; g.fillRect(Math.round(pl.x) + 2, Math.round(pl.y) + 2, 4, 4); }
-
-    var s = sig();
-    if (s !== lastSig) { lastSig = s; drawHud(); }
-
-    window.requestAnimationFrame(frame);
-  }
-
-  layout();
-  window.requestAnimationFrame(frame);
+  if (!navigator.getGamepads) document.getElementById('none').textContent = 'This browser has no controller support at all.';
+  else window.requestAnimationFrame(tick);
 })();
 </script>
 </body>
