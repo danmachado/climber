@@ -541,6 +541,7 @@
   var embedded = window.parent !== window, testMode = false; // embedded = running inside the room builder
   window.addEventListener('keydown', function (e) {
     keys[e.keyCode] = true;
+    if (wiz.on) { if (e.keyCode === 27) wiz.on = false; e.preventDefault(); return; }
     if (e.keyCode === 27 && embedded) window.parent.postMessage({ type: 'climber-exit' }, '*');
     if (e.keyCode === 32 || (e.keyCode >= 37 && e.keyCode <= 40)) e.preventDefault();
   });
@@ -554,13 +555,18 @@
   }
   var MAP_KEY = 'climber.padmap.v1', padMap = {}, padInfo = '';
   try { padMap = JSON.parse(localStorage.getItem(MAP_KEY)) || {}; } catch (e) { padMap = {}; }
-  function firstPad() {
-    var gps = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (var i = 0; i < gps.length; i++) if (gps[i]) return gps[i];
-    return null;
+  function allPads() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [], out = [];
+    for (var i = 0; i < gps.length; i++) if (gps[i]) out.push(gps[i]);
+    return out;
   }
+  function firstPad() { return allPads()[0] || null; }
+  // A control can be bound to a button or stick on any connected pad, or to a key: some controllers show up as two
+  // devices, and some send their face buttons to the browser as key presses instead of gamepad buttons.
   function bound(gp, b) {
     if (!b) return false;
+    if (b.t === 'k') return !!keys[b.i];
+    if (b.p !== undefined && gp.index !== b.p) { var ps = allPads(); for (var k = 0; k < ps.length; k++) if (ps[k].index === b.p) gp = ps[k]; }
     if (b.t === 'b') return btn(gp, b.i);
     return ((gp.axes[b.i] || 0) - b.rest) * b.dir > 0.5;
   }
@@ -568,22 +574,28 @@
   // Controller setup: asks for each control in turn and remembers the answer for that controller.
   var WIZ = [['jump', 'Press the button for JUMP'], ['dash', 'Press the button for DASH'], ['grab', 'Press the button for GRAB'],
              ['up', 'Press UP'], ['down', 'Press DOWN'], ['left', 'Press LEFT'], ['right', 'Press RIGHT']];
-  var wiz = { on: false, i: 0, armed: false, quiet: 0, rest: [], map: {}, id: '' };
-  function startWiz(gp) { wiz = { on: true, i: 0, armed: false, quiet: 0, rest: [], map: {}, id: gp.id }; }
+  var wiz = { on: false, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: '', see: '', key: 0 };
+  function startWiz(gp) { wiz = { on: true, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: gp.id, see: '', key: 0 }; keys = {}; }
   function wizTick() {
-    var gp = firstPad(), i, any = false, hit = null;
-    if (!gp) return;
-    for (i = 0; i < gp.buttons.length; i++) if (btn(gp, i)) { any = true; if (!hit) hit = { t: 'b', i: i }; }
-    if (!wiz.armed) { // wait for everything to be let go, then note where the sticks rest
-      var still = !any;
-      for (i = 0; i < gp.axes.length && still; i++) if (wiz.rest.length && Math.abs(gp.axes[i] - wiz.rest[i]) > 0.3) still = false;
-      if (!wiz.rest.length || !still) { wiz.rest = Array.prototype.slice.call(gp.axes); wiz.quiet = 0; }
-      if (still && ++wiz.quiet > 12) wiz.armed = true;
-      return;
+    var ps = allPads(), gp, i, k, any = false, hit = null, see = [], moved = false;
+    if (!ps.length) { wiz.see = 'no controller seen'; return; }
+    for (k = 0; k < ps.length; k++) {
+      gp = ps[k];
+      for (i = 0; i < gp.buttons.length; i++) if (btn(gp, i)) { any = true; see.push('pad' + gp.index + ' button ' + i); if (!hit) hit = { t: 'b', p: gp.index, i: i }; }
+      var rest = wiz.rest[gp.index];
+      if (!rest) { wiz.rest[gp.index] = Array.prototype.slice.call(gp.axes); moved = true; continue; }
+      for (i = 0; i < gp.axes.length; i++) {
+        var d = gp.axes[i] - rest[i];
+        if (Math.abs(d) > 0.3) moved = true;
+        if (Math.abs(d) > 0.6) { see.push('pad' + gp.index + ' axis ' + i + (d > 0 ? '+' : '-')); if (!hit) hit = { t: 'a', p: gp.index, i: i, rest: rest[i], dir: d > 0 ? 1 : -1 }; }
+      }
     }
-    if (!hit) for (i = 0; i < gp.axes.length; i++) {
-      var d = gp.axes[i] - wiz.rest[i];
-      if (Math.abs(d) > 0.6) { hit = { t: 'a', i: i, rest: wiz.rest[i], dir: d > 0 ? 1 : -1 }; break; }
+    for (var code in keys) if (keys[code]) { any = true; see.push('key ' + code); if (!hit) hit = { t: 'k', i: +code }; }
+    wiz.see = see.length ? 'seeing ' + see.slice(0, 3).join(', ') : 'seeing nothing pressed';
+    if (!wiz.armed) { // wait for everything to be let go, then note where the sticks rest
+      if (any || moved) { wiz.quiet = 0; if (!any) for (k = 0; k < ps.length; k++) wiz.rest[ps[k].index] = Array.prototype.slice.call(ps[k].axes); }
+      else if (++wiz.quiet > 12) wiz.armed = true;
+      return;
     }
     if (!hit) return;
     wiz.map[WIZ[wiz.i][0]] = hit;
@@ -591,7 +603,8 @@
     if (wiz.i >= WIZ.length) {
       padMap[wiz.id] = wiz.map;
       try { localStorage.setItem(MAP_KEY, JSON.stringify(padMap)); } catch (e) {}
-      wiz.on = false; usedPad = true; demo.idle = 0; resetRun();
+      wiz.on = false; usedPad = true; demo.idle = 0; keys = {};
+      if (scene === 'play') resetRun();
     }
   }
 
@@ -885,7 +898,7 @@
     var i;
     tick++; applyShake();
     if (scene !== 'play') {
-      var ssig = [scene, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed].join('|');
+      var ssig = [scene, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       return;
     }
@@ -925,7 +938,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
+    var sig = [mode, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
   }
@@ -1083,7 +1096,8 @@
       t((wiz.i + 1) + ' of ' + WIZ.length, 135, 212, 7, C.dim, 'center');
       t(wiz.armed ? WIZ[wiz.i][1] : 'Let go of everything', 135, 240, 11, wiz.armed ? C.text : C.dim, 'center');
       t(wiz.i < 3 ? 'Any button you like' : 'Use the d-pad or the stick', 135, 258, 7, C.dim, 'center');
-      t('Click the mouse to cancel', 135, 278, 6.5, C.dim, 'center');
+      t(wiz.see, 135, 268, 6.5, C.flame, 'center');
+      t('Click the mouse to cancel', 135, 281, 6.5, C.dim, 'center');
     }
     if (run.won && run.result) {
       drawClear(u);
@@ -1263,6 +1277,7 @@
       box(20, 170, 230, 120, 'rgba(11,16,32,0.96)');
       t('CONTROLLER SETUP', 135, 196, 14, C.flame, 'center');
       t(wiz.armed ? WIZ[wiz.i][1] : 'Let go of everything', 135, 240, 11, wiz.armed ? C.text : C.dim, 'center');
+      t(wiz.see, 135, 262, 6.5, C.flame, 'center');
       t('Click the mouse to cancel', 135, 278, 6.5, C.dim, 'center');
     }
   }
