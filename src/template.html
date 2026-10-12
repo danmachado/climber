@@ -946,7 +946,7 @@
     var i;
     tick++; applyShake();
     if (scene !== 'play') {
-      var ssig = [scene, menuNote, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, hero.ready, menuNote, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       return;
     }
@@ -1415,8 +1415,11 @@
       box(0, 0, LW, LH, THEMES.brick.bg);
       for (i = 0; i < 6; i++) box(0, 446 - i * 6, LW, 1, i % 2 ? '#10152e' : '#141a38');
       // the lantern, big
-      box(119, 96, 32, 40, C.body); box(135, 108, 4, 8, C.eye); box(143, 108, 4, 8, C.eye);
-      box(127, 88, 16, 8, C.flame); box(131, 80, 8, 8, C.flame);
+      if (hero.ready) { h.imageSmoothingEnabled = false; h.drawImage(hero.sheets[0], 0, 0, 16, 16, Math.round(103 * u), Math.round(76 * u), Math.round(64 * u), Math.round(64 * u)); }
+      else if (!HERO.enabled) {
+        box(119, 96, 32, 40, C.body); box(135, 108, 4, 8, C.eye); box(143, 108, 4, 8, C.eye);
+        box(127, 88, 16, 8, C.flame); box(131, 80, 8, 8, C.flame);
+      }
       t('CLIMBER', 135, 186, 30, C.flame, 'center');
       for (i = 0; i < MENU.length; i++) {
         var on = i === sel.menu, y = 226 + i * 32;
