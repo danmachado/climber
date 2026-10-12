@@ -1400,7 +1400,7 @@
 
   // ---- settings: the controller picture, what each button does, and changing it ----
   var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
-  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['back', 'BACK']];
+  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['back', 'BACK']];
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
     if (!padCfg[gp.id]) { var c = cfgFor(gp); if (!c) return null; padCfg[gp.id] = { layout: c.layout, act: JSON.parse(JSON.stringify(c.act)) }; }
     return padCfg[gp.id];
@@ -1409,6 +1409,7 @@
     var id = SET_ROWS[k][0], gp = firstPad();
     set.row = k; set.note = ''; lastSig = '';
     if (id === 'back') { toMenu(); return; }
+    if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON. IT SHOWS IN THE TOP BAR WHILE PLAYING.' : 'SPEED READOUT OFF'; return; }
     if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
     if (id === 'redo' || !cfgFor(gp)) { startWiz(gp); return; }
     if (id === 'reset') { ownCfg(gp).act = JSON.parse(JSON.stringify(DEF_ACT)); savePads(); set.note = 'BUTTONS RESET'; return; }
@@ -1505,10 +1506,10 @@
       pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
     } else {
       for (i = 0; i < SET_ROWS.length; i++) {
-        var y = 254 + i * 30, on = i === set.row;
-        box(55, y, 160, 24, on ? C.flame : '#131a33');
+        var y = 250 + i * 27, on = i === set.row;
+        box(55, y, 160, 23, on ? C.flame : '#131a33');
         pxText(SET_ROWS[i][1], 135, y + 5, 2, on ? '#101426' : C.dim, 'center');
-        hits.push({ x: 55, y: y, w: 160, h: 24, fn: (function (k) { return function () { setPick(k); }; })(i) });
+        hits.push({ x: 55, y: y, w: 160, h: 23, fn: (function (k) { return function () { setPick(k); }; })(i) });
       }
     }
     if (set.note) pxText(set.note, 135, 442, 1, C.teal, 'center');
