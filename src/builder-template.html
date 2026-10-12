@@ -167,13 +167,14 @@
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Moving', [['=', 'Platform', '8'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Dash refill', 'R']]],
+    ['Scenery', [['b', 'Backdrop', 'B']]],
     ['Tools', [['.', 'Erase', 'X']]]
   ];
   var TILES = [];
   GROUPS.forEach(function (g) { g[1].forEach(function (t) { TILES.push(t); }); });
   var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
                  'S': 'start', 'E': 'exit', 'o': 'dash_refill',
-                 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
+                 'b': 'backdrop', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
   var $ = function (id) { return document.getElementById(id); };
 
 /*SHARED_CONFIG*/
@@ -243,9 +244,11 @@
   }
   function wallAt(c, r) { return r < 0 || r >= ROWS || c < 0 || c >= COLS || tiles[r][c] === '#' || tiles[r][c] === 'I'; }
   function alone() { return false; }
+  function backAt(c, r) { return wallAt(c, r) || tiles[r][c] === 'b'; }
   function drawTile(b, ch, x, y, c, r, icon) {
     if (ch === '#' || ch === 'I') drawSolid(b, x, y, SOLID_KIND[ch], icon ? alone : wallAt, c, r);
     else if (ch === 'C') drawCrumble(b, x, y, c, r);
+    else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === '=', !icon && c < COLS - 1 && tiles[r][c + 1] === '=');
     else if (ch === '-' || ch === '|') drawTrack(b, x, y, ch === '|');
     else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') spike(b, x, y, ch);

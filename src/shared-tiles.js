@@ -74,3 +74,17 @@
     if (vertical) { b.fillRect(x + 4, y + 1, 2, 3); b.fillRect(x + 4, y + 6, 2, 3); }
     else { b.fillRect(x + 1, y + 4, 3, 2); b.fillRect(x + 6, y + 4, 3, 2); }
   }
+  // Backdrop: dim brickwork that sits behind the action. Scenery only, nothing collides with it.
+  // sameAt(c, r) says whether a neighbouring cell is backdrop or wall, so only the ragged outer edge gets a rim.
+  function drawBack(b, x, y, sameAt, c, r) {
+    var v = tileHash(c + 31, r + 17);
+    b.fillStyle = '#171e47'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#0f1432';
+    var j1 = v < 0.34 ? 7 : (v < 0.67 ? 3 : 5), j2 = v < 0.34 ? 2 : (v < 0.67 ? 8 : 6);
+    b.fillRect(x, y + 4, 10, 1); b.fillRect(x, y + 9, 10, 1);
+    b.fillRect(x + j1, y, 1, 4); b.fillRect(x + j2, y + 5, 1, 4);
+    b.fillStyle = '#262f68';
+    if (!sameAt(c, r - 1)) b.fillRect(x, y, 10, 1);
+    if (!sameAt(c - 1, r)) b.fillRect(x, y, 1, 10);
+    if (!sameAt(c + 1, r)) b.fillRect(x + 9, y, 1, 10);
+  }

@@ -8,14 +8,15 @@ const fs = require('fs');
   await p.addScriptTag({ content: fs.readFileSync('/home/claude/climber/src/gen.js', 'utf8') + '\nwindow.generateRoom = generateRoom;' });
   const N = +(process.argv[2] || 20);
   const SP = JSON.parse(fs.readFileSync('/home/claude/climber/src/starter-plans.json', 'utf8'));
-  const out = await p.evaluate(([N, SP]) => {
+  const ONE = process.env.ONE ? JSON.parse(process.env.ONE) : null;
+  const out = await p.evaluate(([N, SP, ONE]) => {
     const G = window.__climber; G.manual(true);
     const col = (t, d) => d > 0 ? 1 + t : 25 - t;
     function solve(out) {
       G.load(out.room);
       let s = G.state(), frames = 0, where = 'spawn';
       const I = (o) => Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false }, o);
-      const step = (o) => { s = G.step(I(o), 1); window.__last = s; frames++; if (s.won) throw { won: true }; if (s.dead) throw new Error('died at ' + where); return s; };
+      const step = (o) => { s = G.step(I(o), 1); window.__last = s; frames++; if (window.__tr && frames % 15 === 0) window.__tr.push(where.replace('floor ', 'f') + ':' + s.x + ',' + s.y + (s.ground ? 'g' : '')); if (s.won) throw { won: true }; if (s.dead) throw new Error('died at ' + where); return s; };
       const until = (fn, cond, max) => { let k = 0; while (!cond()) { step(fn(k)); if (++k > (max || 600)) throw new Error('stuck at ' + where); } };
       for (let i = 0; i < 40; i++) step({});
       for (let fi = 0; fi < out.plan.length; fi++) {
@@ -84,40 +85,43 @@ const fs = require('fs');
         if (!F.conn) { where = 'floor ' + fi + ' exit'; until(() => ({ x: d }), () => false, 600); }
         const C = F.conn, yN = y - C.Hf;
         where = 'floor ' + fi + ' ' + C.type + ' W' + C.W + ' Hf' + C.Hf;
-        const atWall = () => d > 0 ? s.x >= 252 : s.x <= 10;
-        const nearWall = () => d > 0 ? s.x >= 246 : s.x <= 16;
+        const FW = 25 - (C.sh || 0);                       // tile where the far wall starts on this floor
+        const wallX = d > 0 ? col(FW, d) * 10 : (col(FW, d) + 1) * 10;
+        const atWall = () => d > 0 ? s.x + 8 >= wallX : s.x <= wallX;
+        const nearWall = () => d > 0 ? s.x + 8 >= wallX - 6 : s.x <= wallX + 6;
         if (C.type === 'lift') {
           const bottom = (y - 1) * 10;
-          until(() => ({ x: d }), () => dist(22) <= 26);
+          until(() => ({ x: d }), () => dist(FW - 3) <= 26);
           for (let k = 0; k < 8; k++) step({});
           until(() => ({}), () => { const m = mover(bottom); return m && m.wait > 0.2; }, 1200);
-          until((k) => ({ x: d, jump: (dist(22) <= 1 && s.ground && k % 2 === 0) || s.vy < 0 }), () => s.ground && (d > 0 ? s.x >= startEdge(22) + 2 : s.x + 8 <= startEdge(22) - 2) && s.y + 10 <= bottom, 300);
+          until((k) => ({ x: d, jump: (dist(FW - 3) <= 1 && s.ground && k % 2 === 0) || s.vy < 0 }), () => s.ground && (d > 0 ? s.x >= startEdge(FW - 3) + 2 : s.x + 8 <= startEdge(FW - 3) - 2) && s.y + 10 <= bottom, 300);
           until(() => ({}), () => s.y + 10 === yN * 10, 900);
-          until(() => ({ x: -d }), () => s.ground && s.y + 10 === yN * 10 && (d > 0 ? s.x + 8 <= endEdge(21) : s.x >= endEdge(21)), 300);
+          until(() => ({ x: -d }), () => s.ground && s.y + 10 === yN * 10 && (d > 0 ? s.x + 8 <= endEdge(FW - 4) : s.x >= endEdge(FW - 4)), 300);
           step({});
         } else if (C.type === 'open') {
           until(() => ({ x: d }), atWall);
           until(() => ({ x: d, y: -1, grab: true }), () => s.y + 10 <= yN * 10 - 8, 400);
-          const edge = endEdge(24 - C.W);
+          const edge = endEdge(FW - 1 - C.W);
           until((k) => ({ x: (d > 0 ? s.x + 8 <= edge - 3 : s.x >= edge + 3) ? 0 : -d, jump: k < 12 }), () => s.ground && s.y + 10 === yN * 10, 300);
         } else if (C.type === 'curtain') {
           until(() => ({ x: d }), nearWall);
           step({});
           until((k) => ({ x: -d, y: -1, grab: true, jump: k < 2 || (s.vy < 0 && s.state === 'normal' && k < 30) }), () => s.ground && s.y + 10 === yN * 10, 500);
         } else {
-          until(() => ({ x: d }), () => dist(22) <= 0);
+          until(() => ({ x: d }), () => dist(FW - 3) <= 0);
           step({});
           const hop = (dir, feet, near) => {
             until((k) => ({ x: (dir > 0 ? s.x >= near + 3 : s.x + 8 <= near - 3) ? 0 : dir, jump: k < 1 || s.vy < 0 }), () => s.ground && s.y + 10 === feet, 200);
             step({}); step({});
           };
-          hop(d, (y - 2) * 10, startEdge(22)); hop(-d, (y - 4) * 10, endEdge(20)); hop(-d, yN * 10, endEdge(17));
+          hop(d, (y - 2) * 10, startEdge(FW - 3)); hop(-d, (y - 4) * 10, endEdge(FW - 5)); hop(-d, yN * 10, endEdge(FW - 8));
         }
       }
       return { ok: false, why: 'ran out of plan' };
     }
     const res = { total: 0, fail: [] };
     if (N === 0) { for (let i = 1; i < SP.rooms.length; i++) { res.total++; try { const r = solve({ room: SP.rooms[i], plan: SP.plans[i] }); if (!r.ok) res.fail.push([SP.rooms[i].name, r.why]); } catch (e) { if (!e.won) res.fail.push([SP.rooms[i].name, e.message]); } } return res; }
+    if (ONE) { const out = window.generateRoom(ONE.opts, ONE.seed); const tr = []; window.__tr = tr; try { solve(out); } catch (e) { return { total: 1, fail: [[tr.join(' | '), e.message || 'won']] }; } return { total: 1, fail: [] }; }
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
@@ -129,10 +133,10 @@ const fs = require('fs');
       catch (e) { if (e.won) continue; res.fail.push([JSON.stringify(window.__last) + JSON.stringify(opts) + ' seed ' + (seed * 7919 + D * 31 + ob * 7 + sp), e.message]); }
     }
     return res;
-  }, [N, SP]);
+  }, [N, SP, ONE]);
   const kinds = {};
   out.fail.forEach(f => { const k = f[1].replace(/floor \d+ /, '').replace(/ t\d+/, ''); kinds[k] = (kinds[k] || 0) + 1; });
   console.log('rooms', out.total, 'failed', out.fail.length, JSON.stringify(kinds, null, 0).slice(0, 1500));
-  console.log(out.fail.slice(0, 4).map(f => f.join(' => ')).join('\n'), 'errors', JSON.stringify(errs).slice(0, 300));
+  console.log(out.fail.slice(0, ONE ? 1 : 4).map(f => ONE ? f.join(' => ') : f.join(' => ')).join('\n'), 'errors', JSON.stringify(errs).slice(0, 300));
   await b.close();
 })();

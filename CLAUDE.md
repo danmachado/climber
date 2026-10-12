@@ -16,6 +16,7 @@ A single-screen precision platformer for a wall-mounted Android display (the "fr
 ## Rules
 
 - **Every level element must be in the auto-builder.** When a new element is added to the game, in the same change also add it to: the builder palette, `src/gen.js` (so auto-build can place it, behind a "Pieces to use" toggle), and the auto-player in `tests/gentest.js`. Then run `gentest.js` with a large N and get zero failures before shipping.
+- Auto-built rooms get a shaping pass in `src/gen.js` (stepped walls, hanging ceilings, backdrop tile `b`). It may only fill space the route does not need (see the `need` clearance array). `ONE='{"opts":{...},"seed":N}' node tests/gentest.js 1` traces a single room.
 - Rooms are data (level format 1: a grid of tile characters). The game never hard-codes a room. New tiles must stay backward compatible.
 - Art, levels, names and sounds are original. Nothing copied from other games.
 - The frame is slow at repainting its 4K screen. The game draws to a 270 x 480 buffer and only copies changed pieces to the screen. Mark dirty rectangles for anything that moves. No full-screen redraws per frame, no flashing or strobing.

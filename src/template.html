@@ -107,7 +107,7 @@
   }
 
   var room, T, cols, rows, grid, spawn, hazards, exits, refills, tileLayer;
-  var crumbles = [], crumbleAt = {}, movers = [], tracks = [];
+  var crumbles = [], crumbleAt = {}, movers = [], tracks = [], backs = {};
   var KIND = { '#': 1, 'I': 2, 'C': 3 }; // 1 brick, 2 ice, 3 crumbling block
 
   function buildRoom(data) {
@@ -117,7 +117,7 @@
     }
     room = data; T = data.grid.tile; cols = data.grid.cols; rows = data.grid.rows;
     grid = []; hazards = []; exits = []; refills = []; spawn = { x: T, y: T };
-    crumbles = []; crumbleAt = {}; movers = []; tracks = [];
+    crumbles = []; crumbleAt = {}; movers = []; tracks = []; backs = {};
     for (var r = 0; r < rows; r++) {
       grid.push([]);
       for (var c = 0; c < cols; c++) {
@@ -125,6 +125,7 @@
         grid[r].push(KIND[ch] || 0);
         if (ch === 'C') { var cb = { c: c, r: r, x: x, y: y, state: 'idle', t: 0 }; crumbles.push(cb); crumbleAt[r * cols + c] = cb; }
         else if (ch === '-' || ch === '|') tracks.push({ x: x, y: y, v: ch === '|' });
+        else if (ch === 'b') backs[r * cols + c] = 1;   // backdrop: scenery only
         if (ch === 'S') spawn = { x: x + 1, y: y };
         else if (ch === 'E') exits.push({ x: x, y: y, w: T, h: T });
         else if (ch === 'o') refills.push({ x: x + 1, y: y + 1, w: T - 2, h: T - 2, timer: 0 });
@@ -725,6 +726,8 @@
       b.fillRect(sx, seed % LH, (i % 5 === 0) ? 2 : 1, (i % 5 === 0) ? 2 : 1);
     }
     var wallAt = function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr][cc] === 1 || grid[rr][cc] === 2; };
+    var backAt = function (cc, rr) { return wallAt(cc, rr) || !!backs[rr * cols + cc]; };
+    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) if (backs[r * cols + c]) drawBack(b, c * T, r * T, backAt, c, r);
     for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
       if (grid[r][c] === 1 || grid[r][c] === 2) drawSolid(b, c * T, r * T, grid[r][c] === 2 ? 'ice' : 'brick', wallAt, c, r);
     }
