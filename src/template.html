@@ -441,7 +441,9 @@
     pl.dashCooldown -= dt;
     var wasGround = pl.onGround;
     pl.onGround = pl.vy >= 0 && hit(pl.x, pl.y + 1);
-    if (pl.onGround && !wasGround && pl.fallV > 190) addShake(pl.fallV > 250 ? 2 : 1.5, 0.12);   // a hard landing
+    // a hard landing: only after a real drop (measured from the highest point of the fall), never after a normal jump
+    if (pl.onGround && !wasGround && pl.y - pl.peakY >= 70) addShake(pl.y - pl.peakY >= 130 ? 2 : 1.5, 0.12);
+    if (pl.onGround || pl.state === 'climb' || pl.peakY === undefined || pl.y < pl.peakY) pl.peakY = pl.y;
     if (shake.t > 0) shake.t -= dt;
     pl.floor = pl.onGround ? surface(pl.x, pl.y + pl.h, pl.w, 1) : '';
     if (pl.onGround) touchCrumble(pl.x, pl.y + pl.h, pl.w, 1);
