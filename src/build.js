@@ -38,6 +38,12 @@ SET2.forEach(function (s, i) {
   out.room.id = 'ice-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
   starters.push(out.room); plans.push(out.plan);
 });
+// Par times: the auto-player's time on each level (written by `tests/gentest.js 0`) plus a margin, so a clean,
+// unhurried run earns the time star. The hand-made first room uses the demo's time instead.
+var PAR_MARGIN = 1.4, times = {};
+try { times = JSON.parse(fs.readFileSync(d + '/starter-times.json', 'utf8')); } catch (e) {}
+first.par = 29;
+starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] * PAR_MARGIN); });
 fs.writeFileSync(d + '/starter-plans.json', JSON.stringify({ rooms: starters, plans: plans }));
 
 var one = JSON.stringify(first), all = JSON.stringify(starters);

@@ -16,7 +16,7 @@ const fs = require('fs');
       G.load(out.room);
       let s = G.state(), frames = 0, where = 'spawn';
       const I = (o) => Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false }, o);
-      const step = (o) => { s = G.step(I(o), 1); window.__last = s; frames++; if (window.__tr && frames % 15 === 0) window.__tr.push(where.replace('floor ', 'f') + ':' + s.x + ',' + s.y + (s.ground ? 'g' : '')); if (s.won) throw { won: true }; if (s.dead) throw new Error('died at ' + where); return s; };
+      const step = (o) => { s = G.step(I(o), 1); window.__last = s; frames++; window.__frames = frames; if (window.__tr && frames % 15 === 0) window.__tr.push(where.replace('floor ', 'f') + ':' + s.x + ',' + s.y + (s.ground ? 'g' : '')); if (s.won) throw { won: true }; if (s.dead) throw new Error('died at ' + where); return s; };
       const until = (fn, cond, max) => { let k = 0; while (!cond()) { step(fn(k)); if (++k > (max || 600)) throw new Error('stuck at ' + where); } };
       for (let i = 0; i < 40; i++) step({});
       for (let fi = 0; fi < out.plan.length; fi++) {
@@ -119,8 +119,8 @@ const fs = require('fs');
       }
       return { ok: false, why: 'ran out of plan' };
     }
-    const res = { total: 0, fail: [] };
-    if (N === 0) { for (let i = 1; i < SP.rooms.length; i++) { res.total++; try { const r = solve({ room: SP.rooms[i], plan: SP.plans[i] }); if (!r.ok) res.fail.push([SP.rooms[i].name, r.why]); } catch (e) { if (!e.won) res.fail.push([SP.rooms[i].name, e.message]); } } return res; }
+    const res = { total: 0, fail: [], times: {} };
+    if (N === 0) { for (let i = 1; i < SP.rooms.length; i++) { res.total++; try { const r = solve({ room: SP.rooms[i], plan: SP.plans[i] }); if (!r.ok) res.fail.push([SP.rooms[i].name, r.why]); } catch (e) { if (!e.won) res.fail.push([SP.rooms[i].name, e.message]); else res.times[SP.rooms[i].id] = +(window.__frames / 60).toFixed(1); } } return res; }
     if (ONE) { const out = window.generateRoom(ONE.opts, ONE.seed); const tr = []; window.__tr = tr; try { solve(out); } catch (e) { return { total: 1, fail: [[tr.join(' | '), e.message || 'won']] }; } return { total: 1, fail: [] }; }
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
@@ -134,6 +134,8 @@ const fs = require('fs');
     }
     return res;
   }, [N, SP, ONE]);
+  // the auto-player's time on each built-in level is what par times are set from (see src/build.js)
+  if (N === 0 && !out.fail.length) { fs.writeFileSync('/home/claude/climber/src/starter-times.json', JSON.stringify(out.times, null, 1)); console.log('bot times', JSON.stringify(out.times)); }
   const kinds = {};
   out.fail.forEach(f => { const k = f[1].replace(/floor \d+ /, '').replace(/ t\d+/, ''); kinds[k] = (kinds[k] || 0) + 1; });
   console.log('rooms', out.total, 'failed', out.fail.length, JSON.stringify(kinds, null, 0).slice(0, 1500));
