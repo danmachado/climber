@@ -553,8 +553,20 @@
     if (!b) return false;
     return typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5;
   }
-  var MAP_KEY = 'climber.padmap.v1', padMap = {}, padInfo = '';
-  try { padMap = JSON.parse(localStorage.getItem(MAP_KEY)) || {}; } catch (e) { padMap = {}; }
+  // Controller settings, remembered per controller. layout says which raw input is which physical button (only needed
+  // when the browser does not recognise the pad); act says what each button does.
+  var PAD_KEY = 'climber.pad.v2', padCfg = {}, padInfo = '', padVer = 0;
+  try { padCfg = JSON.parse(localStorage.getItem(PAD_KEY)) || {}; } catch (e) { padCfg = {}; }
+  function savePads() { padVer++; try { localStorage.setItem(PAD_KEY, JSON.stringify(padCfg)); } catch (e) {} }
+  var STD = { fb: 0, fr: 1, fl: 2, ft: 3, l1: 4, r1: 5, l2: 6, r2: 7, select: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
+  var DEF_ACT = { fb: 'jump', fl: 'dash', fr: 'dash', l1: 'grab', r1: 'grab', l2: 'grab', r2: 'grab' };
+  var ASSIGNABLE = ['fb', 'fr', 'fl', 'ft', 'l1', 'r1', 'l2', 'r2'];
+  function cfgFor(gp) { return padCfg[gp.id] || (gp.mapping === 'standard' ? { layout: null, act: DEF_ACT } : null); }
+  function isDown(gp, c, name) { return c.layout ? bound(gp, c.layout[name]) : btn(gp, STD[name]); }
+  function axisFree(gp, c, ax) {                   // the left stick moves you unless that axis is really the d-pad or a trigger
+    if (c.layout) for (var n in c.layout) { var b = c.layout[n]; if (b && b.t === 'a' && b.i === ax && (b.p === undefined || b.p === gp.index)) return false; }
+    return true;
+  }
   function allPads() {
     var gps = navigator.getGamepads ? navigator.getGamepads() : [], out = [];
     for (var i = 0; i < gps.length; i++) if (gps[i]) out.push(gps[i]);
@@ -571,11 +583,12 @@
     return ((gp.axes[b.i] || 0) - b.rest) * b.dir > 0.5;
   }
 
-  // Controller setup: asks for each control in turn and remembers the answer for that controller.
-  var WIZ = [['jump', 'Press the button for JUMP'], ['dash', 'Press the button for DASH'], ['grab', 'Press the button for GRAB'],
-             ['up', 'Press UP'], ['down', 'Press DOWN'], ['left', 'Press LEFT'], ['right', 'Press RIGHT']];
-  var wiz = { on: false, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: '', see: '', key: 0 };
-  function startWiz(gp) { wiz = { on: true, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: gp.id, see: '', key: 0 }; keys = {}; }
+  // Controller setup: asks you to press each physical button in turn, so the game learns the pad's layout.
+  var WIZ = [['fb', 'BOTTOM face button'], ['fr', 'RIGHT face button'], ['fl', 'LEFT face button'], ['ft', 'TOP face button'],
+             ['l1', 'LEFT shoulder'], ['r1', 'RIGHT shoulder'], ['l2', 'LEFT trigger'], ['r2', 'RIGHT trigger'],
+             ['up', 'UP on the d-pad'], ['down', 'DOWN on the d-pad'], ['left', 'LEFT on the d-pad'], ['right', 'RIGHT on the d-pad'], ['start', 'START']];
+  var wiz = { on: false, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: '', see: '', warn: '' };
+  function startWiz(gp) { wiz = { on: true, i: 0, armed: false, quiet: 0, rest: {}, map: {}, id: gp.id, see: '', warn: '' }; keys = {}; }
   function wizTick() {
     var ps = allPads(), gp, i, k, any = false, hit = null, see = [], moved = false;
     if (!ps.length) { wiz.see = 'no controller seen'; return; }
@@ -600,13 +613,13 @@
     if (!hit) return;
     for (var nm in wiz.map) {                       // one button cannot do two jobs
       var o = wiz.map[nm];
-      if (o.t === hit.t && o.i === hit.i && o.p === hit.p && (hit.t !== 'a' || o.dir === hit.dir)) { wiz.warn = 'That one is already ' + nm.toUpperCase() + '. Pick another.'; wiz.armed = false; wiz.quiet = 0; return; }
+      if (o.t === hit.t && o.i === hit.i && o.p === hit.p && (hit.t !== 'a' || o.dir === hit.dir)) { wiz.warn = 'You already pressed that one. Try again.'; wiz.armed = false; wiz.quiet = 0; return; }
     }
     wiz.map[WIZ[wiz.i][0]] = hit; wiz.warn = '';
     wiz.i++; wiz.armed = false; wiz.quiet = 0;
     if (wiz.i >= WIZ.length) {
-      padMap[wiz.id] = wiz.map;
-      try { localStorage.setItem(MAP_KEY, JSON.stringify(padMap)); } catch (e) {}
+      padCfg[wiz.id] = { layout: wiz.map, act: (padCfg[wiz.id] && padCfg[wiz.id].act) || JSON.parse(JSON.stringify(DEF_ACT)) };
+      savePads();
       wiz.on = false; usedPad = true; demo.idle = 0; keys = {};
       if (scene === 'play') resetRun();
     }
@@ -617,28 +630,24 @@
     var gp = firstPad();
     padInfo = 'none seen yet, press a button on it';
     if (gp) {
-      var m = padMap[gp.id], p = [];
+      var c = cfgFor(gp), p = [];
       for (i = 0; i < gp.buttons.length; i++) if (btn(gp, i)) p.push(i);
-      padInfo = (m ? 'your setup' : (gp.mapping === 'standard' ? 'standard' : 'unknown layout')) + ', pressed ' + (p.length ? p.join(' ') : 'none');
-      if (!m && gp.mapping !== 'standard' && !wiz.on && !wizAsked) { wizAsked = true; startWiz(gp); }
-      if (m) {
-        if (bound(gp, m.left)) x = -1;
-        if (bound(gp, m.right)) x = 1;
-        if (bound(gp, m.up)) y = -1;
-        if (bound(gp, m.down)) y = 1;
-        jump = bound(gp, m.jump); dash = bound(gp, m.dash); grab = bound(gp, m.grab);
-      } else {
-        if (Math.abs(gp.axes[0] || 0) > 0.5) x = gp.axes[0] > 0 ? 1 : -1;
-        if (Math.abs(gp.axes[1] || 0) > 0.5) y = gp.axes[1] > 0 ? 1 : -1;
-        if (btn(gp, 14)) x = -1;
-        if (btn(gp, 15)) x = 1;
-        if (btn(gp, 12)) y = -1;
-        if (btn(gp, 13)) y = 1;
-        if (btn(gp, 0)) jump = true;
-        if (btn(gp, 2) || btn(gp, 1)) dash = true;
-        if (btn(gp, 4) || btn(gp, 5) || btn(gp, 6) || btn(gp, 7)) grab = true;
+      padInfo = (padCfg[gp.id] ? 'your setup' : (c ? 'standard' : 'unknown layout')) + ', pressed ' + (p.length ? p.join(' ') : 'none');
+      if (!c) { if (!wiz.on && !wizAsked) { wizAsked = true; startWiz(gp); } }
+      else {
+        if (Math.abs(gp.axes[0] || 0) > 0.5 && axisFree(gp, c, 0)) x = gp.axes[0] > 0 ? 1 : -1;
+        if (Math.abs(gp.axes[1] || 0) > 0.5 && axisFree(gp, c, 1)) y = gp.axes[1] > 0 ? 1 : -1;
+        if (isDown(gp, c, 'left')) x = -1;
+        if (isDown(gp, c, 'right')) x = 1;
+        if (isDown(gp, c, 'up')) y = -1;
+        if (isDown(gp, c, 'down')) y = 1;
+        for (i = 0; i < ASSIGNABLE.length; i++) {
+          var an = ASSIGNABLE[i], what = c.act[an];
+          if (what && isDown(gp, c, an)) { if (what === 'jump') jump = true; else if (what === 'dash') dash = true; else if (what === 'grab') grab = true; }
+        }
+        if (isDown(gp, c, 'start')) back = true;   // Start: back to the map or menu
       }
-      if (btn(gp, 9) || btn(gp, 8)) back = true;      // Start or Select: back to the map or menu
+      // Start or Select: back to the map or menu
       if (x || y || jump || dash || grab) usedPad = true;
     }
     if (keys[37] || keys[65]) x = -1;
@@ -821,6 +830,7 @@
     if (wiz.on) { wiz.on = false; return; }
     if (embedded) { window.focus(); return; }
     if (goFullscreen()) return;
+    if (scene === 'settings' && set.mode === 'listen') { set.mode = 'idle'; lastSig = ''; return; }
     if (scene !== 'play') {                        // menus work with the mouse: click a button or a level
       var bx = stage.getBoundingClientRect(), mx = (e.clientX - bx.left) / bx.width * LW, my = (e.clientY - bx.top) / bx.height * LH;
       demo.idle = 0;
@@ -902,7 +912,7 @@
     var i;
     tick++; applyShake();
     if (scene !== 'play') {
-      var ssig = [scene, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       return;
     }
@@ -1094,15 +1104,7 @@
     }
     if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, low ' + fps.low, 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
-    if (wiz.on) {
-      h.fillStyle = 'rgba(11,16,32,0.94)'; h.fillRect(20 * u, 170 * u, 230 * u, 120 * u);
-      t('CONTROLLER SETUP', 135, 196, 14, C.flame, 'center');
-      t((wiz.i + 1) + ' of ' + WIZ.length, 135, 212, 7, C.dim, 'center');
-      t(wiz.armed ? WIZ[wiz.i][1] : 'Let go of everything', 135, 240, 11, wiz.armed ? C.text : C.dim, 'center');
-      t(wiz.i < 3 ? 'Any button you like' : 'Use the d-pad or the stick', 135, 258, 7, C.dim, 'center');
-      t(wiz.see, 135, 268, 6.5, C.flame, 'center');
-      t('Click the mouse to cancel', 135, 281, 6.5, C.dim, 'center');
-    }
+    if (wiz.on) drawWiz(u);
     if (run.won && run.result) {
       drawClear(u);
     } else if (run.won) {
@@ -1193,13 +1195,128 @@
   var hits = [], navPrev = { x: 0, y: 0, jump: false, dash: false, back: false };
   var MENU = [['MAP', 'Climb through the worlds, level by level', function () { sel.w = Math.min(sel.w, levels.length - 1); toMap(); }],
               ['ENDLESS', 'Every level you have unlocked, shuffled', startEndless],
-              ['CONTROLLER', 'Set up or redo the controller buttons', function () { var gp = firstPad(); if (gp) startWiz(gp); else { padNote = 'No controller seen. Press a button on it, then try again.'; lastSig = ''; } }]];
-  var padNote = '';
+              ['SETTINGS', 'Controller buttons', function () { scene = 'settings'; set.row = 0; set.mode = 'idle'; lastSig = ''; }]];
+
+  // ---- settings: the controller picture, what each button does, and changing it ----
+  var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
+  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['back', 'BACK']];
+  function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
+    if (!padCfg[gp.id]) { var c = cfgFor(gp); if (!c) return null; padCfg[gp.id] = { layout: c.layout, act: JSON.parse(JSON.stringify(c.act)) }; }
+    return padCfg[gp.id];
+  }
+  function setPick(k) {
+    var id = SET_ROWS[k][0], gp = firstPad();
+    set.row = k; set.note = ''; lastSig = '';
+    if (id === 'back') { toMenu(); return; }
+    if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
+    if (id === 'redo' || !cfgFor(gp)) { startWiz(gp); return; }
+    if (id === 'reset') { ownCfg(gp).act = JSON.parse(JSON.stringify(DEF_ACT)); savePads(); set.note = 'BUTTONS RESET'; return; }
+    set.mode = 'listen'; set.action = id; set.armed = false; set.quiet = 0;
+  }
+  function settingsTick(inp) {
+    var gp = firstPad(), c = gp ? cfgFor(gp) : null, down = [], i;
+    demo.idle = 0;
+    if (c) for (var n in STD) if (isDown(gp, c, n)) down.push(n);
+    set.lit = down.join(',');
+    if (set.wait > 0) { set.wait--; navPrev = inp; return; }
+    if (set.mode !== 'listen') { screenInput(inp); return; }
+    navPrev = inp;
+    if (!c) { set.mode = 'idle'; return; }
+    if (!set.armed) { if (down.length) set.quiet = 0; else if (++set.quiet > 10) set.armed = true; return; }
+    for (i = 0; i < down.length; i++) if (ASSIGNABLE.indexOf(down[i]) >= 0) {
+      var own = ownCfg(gp), name = down[i], was = own.act[name], left = 0;
+      if (was && was !== set.action) { for (var k in own.act) if (own.act[k] === was && k !== name) left++; if (!left) { set.note = was.toUpperCase() + ' NEEDS A BUTTON. GIVE IT ANOTHER ONE FIRST.'; set.mode = 'idle'; set.wait = 20; lastSig = ''; return; } }
+      own.act[name] = set.action; savePads();
+      set.note = set.action.toUpperCase() + ' ADDED'; set.mode = 'idle'; set.wait = 20; lastSig = '';
+      return;
+    }
+  }
+  // The controller picture. lit: button name -> colour. labels: button name -> text (drawn with a line to the button).
+  function drawPad(u, cy, lit, labels) {
+    var BODY = '#222c57', EDGE = '#4a5a9e', KEY = '#0e1429';
+    function rr(x, y, w, hh, r, fill) {
+      h.fillStyle = fill; h.beginPath();
+      h.moveTo((x + r) * u, y * u); h.arcTo((x + w) * u, y * u, (x + w) * u, (y + hh) * u, r * u); h.arcTo((x + w) * u, (y + hh) * u, x * u, (y + hh) * u, r * u);
+      h.arcTo(x * u, (y + hh) * u, x * u, y * u, r * u); h.arcTo(x * u, y * u, (x + w) * u, y * u, r * u); h.closePath(); h.fill();
+    }
+    function cc(x, y, r, fill) { h.fillStyle = fill; h.beginPath(); h.arc(x * u, y * u, r * u, 0, Math.PI * 2); h.fill(); }
+    function el(x, y, rx, ry, fill) { h.fillStyle = fill; h.beginPath(); h.ellipse(x * u, y * u, rx * u, ry * u, 0, 0, Math.PI * 2); h.fill(); }
+    var B = { l2: [66, cy - 54, 26, 11], r2: [178, cy - 54, 26, 11], l1: [60, cy - 42, 40, 9], r1: [170, cy - 42, 40, 9],
+              up: [79.5, cy - 21.5, 9, 9], down: [79.5, cy - 3.5, 9, 9], left: [70.5, cy - 12.5, 9, 9], right: [88.5, cy - 12.5, 9, 9],
+              fb: [186, cy + 3, 5.5], ft: [186, cy - 19, 5.5], fl: [175, cy - 8, 5.5], fr: [197, cy - 8, 5.5], select: [122, cy - 16, 3.2], start: [148, cy - 16, 3.2] };
+    function mid(n) { var b = B[n]; return b.length === 4 ? [b[0] + b[2] / 2, b[1] + b[3] / 2] : [b[0], b[1]]; }
+    function key(n, base) { var b = B[n], f = (lit && lit[n]) || base; if (b.length === 4) rr(b[0], b[1], b[2], b[3], n.length === 2 ? 4 : 1.5, f); else cc(b[0], b[1], b[2], f); }
+    key('l2', EDGE); key('r2', EDGE); key('l1', EDGE); key('r1', EDGE);
+    el(74, cy + 30, 23, 34, EDGE); el(196, cy + 30, 23, 34, EDGE); rr(48, cy - 34, 174, 64, 24, EDGE);
+    el(74, cy + 30, 21, 32, BODY); el(196, cy + 30, 21, 32, BODY); rr(50, cy - 32, 170, 60, 22, BODY);
+    rr(79.5, cy - 12.5, 9, 9, 0, KEY); key('up', KEY); key('down', KEY); key('left', KEY); key('right', KEY);
+    key('fb', KEY); key('ft', KEY); key('fl', KEY); key('fr', KEY); key('select', KEY); key('start', KEY);
+    cc(112, cy + 12, 10, KEY); cc(112, cy + 12, 6.5, EDGE); cc(158, cy + 12, 10, KEY); cc(158, cy + 12, 6.5, EDGE);
+    if (!labels) return;
+    var SPOT = { l2: [4, cy - 52, 0], l1: [4, cy - 40, 0], r2: [266, cy - 52, 1], r1: [266, cy - 40, 1], ft: [266, cy - 26, 1], fr: [266, cy - 12, 1], fl: [266, cy + 2, 1], fb: [266, cy + 16, 1],
+                 left: [4, cy - 11, 0], start: [148, cy - 74, 2] };
+    for (var n in SPOT) if (labels[n]) {
+      var sp = SPOT[n], m = mid(n), w = labels[n].length * 6 - 1, col = (lit && lit[n]) || C.dim;
+      h.strokeStyle = col; h.lineWidth = Math.max(1, u * 0.8); h.beginPath();
+      if (sp[2] === 2) { h.moveTo(m[0] * u, (sp[1] + 10) * u); h.lineTo(m[0] * u, (m[1] - 4) * u); }
+      else { var x0 = sp[2] ? sp[0] - w - 3 : sp[0] + w + 3, bend = sp[2] ? Math.max(m[0] + 8, 226) : Math.min(m[0] - 8, 44); h.moveTo(x0 * u, (sp[1] + 3.5) * u); h.lineTo(bend * u, (sp[1] + 3.5) * u); h.lineTo(m[0] * u, m[1] * u); }
+      h.stroke();
+      pxText(labels[n], sp[0], sp[1], 1, (lit && lit[n]) || C.text, sp[2] === 2 ? 'center' : (sp[2] ? 'right' : 'left'));
+    }
+  }
+  function drawWiz(u) {
+    function box(x, y, w, hh, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round(w * u), Math.round(hh * u)); }
+    var step = WIZ[wiz.i], lit = {};
+    lit[step[0]] = C.flame;
+    box(0, 0, LW, LH, '#070914');
+    pxText('CONTROLLER SETUP', 135, 70, 2, C.flame, 'center');
+    pxText((wiz.i + 1) + ' OF ' + WIZ.length, 135, 92, 1, C.dim, 'center');
+    drawPad(u, 200, wiz.armed ? lit : null, null);
+    pxText(wiz.armed ? 'PRESS' : 'LET GO OF EVERYTHING', 135, 286, 2, wiz.armed ? C.text : C.dim, 'center');
+    if (wiz.armed) pxText(step[1].toUpperCase(), 135, 308, 2, C.flame, 'center');
+    pxText(wiz.see.toUpperCase().substring(0, 42), 135, 340, 1, C.dim, 'center');
+    pxText('IT IS THE ONE LIT UP IN THE PICTURE', 135, 356, 1, C.dim, 'center');
+    pxText('CLICK THE MOUSE OR PRESS ESC TO CANCEL', 135, 440, 1, C.dim, 'center');
+  }
+  function drawSettings(u) {
+    function box(x, y, w, hh, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round(w * u), Math.round(hh * u)); }
+    var gp = firstPad(), c = gp ? cfgFor(gp) : null, lit = {}, labels = {}, i, n, focus = set.mode === 'listen' ? set.action : SET_ROWS[set.row][0];
+    var NAME = { jump: 'JUMP', dash: 'DASH', grab: 'GRAB' }, down = set.lit ? set.lit.split(',') : [];
+    box(0, 0, LW, LH, THEMES.brick.bg);
+    pxText('SETTINGS', 135, 34, 3, C.flame, 'center');
+    pxText(gp ? gp.id.toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 40) : 'NO CONTROLLER SEEN', 135, 66, 1, C.dim, 'center');
+    if (c) {
+      for (i = 0; i < ASSIGNABLE.length; i++) { n = ASSIGNABLE[i]; if (c.act[n]) { labels[n] = NAME[c.act[n]]; if (c.act[n] === focus) lit[n] = C.flame; } }
+      labels.left = 'MOVE'; labels.start = 'BACK';
+      for (i = 0; i < down.length; i++) lit[down[i]] = C.teal;        // whatever you are holding lights up, so you can check the layout
+    }
+    drawPad(u, 170, lit, c ? labels : null);
+    if (gp && !c) pxText('THIS CONTROLLER NEEDS SETTING UP FIRST', 135, 240, 1, C.text, 'center');
+    if (set.mode === 'listen') {
+      box(25, 262, 220, 60, C.flame);
+      pxText('PRESS THE BUTTON FOR', 135, 274, 1, '#101426', 'center'); pxText(NAME[set.action], 135, 290, 3, '#101426', 'center');
+      pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
+    } else {
+      for (i = 0; i < SET_ROWS.length; i++) {
+        var y = 254 + i * 30, on = i === set.row;
+        box(55, y, 160, 24, on ? C.flame : '#131a33');
+        pxText(SET_ROWS[i][1], 135, y + 5, 2, on ? '#101426' : C.dim, 'center');
+        hits.push({ x: 55, y: y, w: 160, h: 24, fn: (function (k) { return function () { setPick(k); }; })(i) });
+      }
+    }
+    if (set.note) pxText(set.note, 135, 442, 1, C.teal, 'center');
+    pxText(usedPad ? 'UP AND DOWN CHOOSE - JUMP SELECTS' : 'ARROWS CHOOSE - C SELECTS - OR CLICK', 135, 464, 1, C.dim, 'center');
+  }
   function nodePos(k) { var row = Math.floor(k / 3), p = k % 3; return { x: 55 + (row % 2 ? 2 - p : p) * 80, y: 392 - row * 76, row: row }; }
   function screenInput(inp) {
     var p = navPrev, dx = inp.x && !p.x ? inp.x : 0, dy = inp.y && !p.y ? inp.y : 0;
     var go = inp.jump && !p.jump, cancel = (inp.dash && !p.dash) || (inp.back && !p.back);
     navPrev = inp;
+    if (scene === 'settings') {
+      if (dy) { set.row = (set.row + dy + SET_ROWS.length) % SET_ROWS.length; set.note = ''; }
+      if (cancel) toMenu(); else if (go) setPick(set.row);
+      return;
+    }
     if (scene === 'menu') {
       if (dy) sel.menu = (sel.menu + dy + MENU.length) % MENU.length;
       if (go) MENU[sel.menu][2]();
@@ -1227,7 +1344,8 @@
     function box(x, y, w, hh, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round(w * u), Math.round(hh * u)); }
     hits = [];
     h.clearRect(0, 0, hud.width, hud.height);
-    if (scene === 'menu') {
+    if (scene === 'settings') drawSettings(u);
+    else if (scene === 'menu') {
       box(0, 0, LW, LH, THEMES.brick.bg);
       for (i = 0; i < 9; i++) box(0, 392 - i * 6, LW, 1, i % 2 ? '#10152e' : '#141a38');
       // the lantern, big
@@ -1240,7 +1358,7 @@
         t(MENU[i][0], 135, y + 3, 15, on ? '#1a1205' : C.dim, 'center');
         hits.push({ x: 55, y: y - 20, w: 160, h: 34, fn: (function (k) { return function () { sel.menu = k; MENU[k][2](); }; })(i) });
       }
-      t(sel.menu === 2 && padNote ? padNote : MENU[sel.menu][1], 135, 346, 7, C.text, 'center');
+      t(MENU[sel.menu][1], 135, 346, 7, C.text, 'center');
       t(usedPad ? 'Up and down to choose   Jump to start' : 'Arrows choose   C or Space starts   or click', 135, 468, 6.5, C.dim, 'center');
     } else {
       var w = sel.w, wd = WORLDS[w], th = THEMES[wd.theme], list = levels[w], open = worldOpen(w), got = 0;
@@ -1279,13 +1397,7 @@
       t(usedPad ? 'Jump: play   Dash: menu' : 'Arrows move   C plays   X or Esc: menu   or click', 135, 472, 6.5, C.dim, 'center');
     }
     if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps', 135, 10, 7, C.flame, 'center');
-    if (wiz.on) {
-      box(20, 170, 230, 120, 'rgba(11,16,32,0.96)');
-      t('CONTROLLER SETUP', 135, 196, 14, C.flame, 'center');
-      t(wiz.armed ? WIZ[wiz.i][1] : 'Let go of everything', 135, 240, 11, wiz.armed ? C.text : C.dim, 'center');
-      t(wiz.see, 135, 262, 6.5, C.flame, 'center');
-      t('Click the mouse to cancel', 135, 278, 6.5, C.dim, 'center');
-    }
+    if (wiz.on) drawWiz(u);
   }
 
   // Screen check: shows what the display is doing, marks the picture's edges, and can lay the tile grid on top.
@@ -1331,7 +1443,7 @@
       if (scene !== 'play') {                      // menu or map: nothing moves, so nothing is redrawn until you press something
         if (any) demo.idle = 0;
         else { demo.idle += Math.min(dt, 0.1); if (demo.idle >= DEMO_IDLE || location.hash === '#demo') startDemo(); }
-        if (scene !== 'play') screenInput(inp);
+        if (scene === 'settings') settingsTick(inp); else if (scene !== 'play') screenInput(inp);
         acc = 0;
       } else if (demo.on && any) { demo.on = false; toMenu(); navPrev = inp; acc = 0; }
       else {
