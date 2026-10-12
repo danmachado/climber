@@ -36,7 +36,7 @@
     dashSpeed: 240 * K, endDashSpeed: 160 * K, dashTime: 0.15, dashCooldown: 0.2, dashFreeze: 0.05,
     wallJumpH: 130 * K, wallJumpForce: 0.16, wallCheck: 3,
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
-    stamina: 110, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
+    stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
     cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, exitTime: 0.35, dieTime: 0.45, hurtTime: 0.08, spawnTime: 0.45, refillRespawn: 2.5
   };
 
@@ -514,7 +514,7 @@
     pl.vx = pl.dashDirX * P.dashSpeed; pl.vy = pl.dashDirY * P.dashSpeed;
     if (dx) pl.facing = dx;
     pl.state = 'dash'; pl.dashTimer = P.dashTime; pl.freeze = P.dashFreeze;
-    pl.dashes = 0; pl.dashCooldown = P.dashCooldown; pl.dashBuf = 0;
+    pl.stamina -= P.dashCost; pl.dashes = 0; pl.dashCooldown = P.dashCooldown; pl.dashBuf = 0;
     pl.varJumpTimer = 0; pl.forceMove = 0;
   }
   function die() {
@@ -557,10 +557,11 @@
     pl.floor = pl.onGround ? surface(pl.x, pl.y + pl.h, pl.w, 1) : '';
     if (pl.onGround) touchCrumble(pl.x, pl.y + pl.h, pl.w, 1);
     if (pl.onGround) {
-      pl.coyote = P.coyote; pl.stamina = P.stamina;
-      if (pl.state !== 'dash' && pl.dashCooldown <= 0.1) pl.dashes = 1;
+      pl.coyote = P.coyote;
+      if (pl.state !== 'dash' && pl.dashCooldown <= 0.1) pl.stamina = P.stamina;   // standing on anything refills the meter
     } else { pl.coyote -= dt; }
 
+    pl.dashes = pl.stamina >= P.dashCost ? 1 : 0;          // a dash needs this much of the meter left
     if (pl.dashBuf > 0 && pl.dashes > 0 && pl.dashCooldown <= 0) { startDash(inp); return; }
 
     if (pl.state === 'dash') {
@@ -629,7 +630,7 @@
     if (pl.y > rows * T + 20) { die(); return; }
     for (i = 0; i < refills.length; i++) {
       var rf = refills[i];
-      if (rf.timer <= 0 && pl.dashes < 1 && overlap(rf, pl.x, pl.y, pl.w, pl.h)) {
+      if (rf.timer <= 0 && pl.stamina < P.stamina && overlap(rf, pl.x, pl.y, pl.w, pl.h)) {   // a pickup fills the meter in mid-air
         pl.dashes = 1; pl.stamina = P.stamina; rf.timer = P.refillRespawn;
       }
     }
@@ -1015,7 +1016,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x, pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, run.result ? run.result.pick : 0, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
+    var sig = [mode, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, check ? padInfo : ''].join('|');
     flush();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
   }
@@ -1153,13 +1154,19 @@
     h.fillStyle = 'rgba(10,13,28,0.84)';
     h.fillRect(0, 0, hud.width, Math.round(TOP_H * u)); h.fillRect(0, hud.height - Math.round(BOT_H * u), hud.width, Math.round(BOT_H * u));
     var title = (room.name || '').toUpperCase();
-    if (title.length > 18) title = title.substring(0, 18);
+    if (title.length > 13) title = title.substring(0, 13);
     t(testMode || demo.on ? title : (mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : run.count) + '  ' + title, 4, 7.5, 7, C.text);
     t('FALLS ' + run.deaths + '   ' + clock(run.time), 266, 7.5, 7, C.text, 'right');
     t(testMode ? 'TEST   Esc returns to the builder' : demo.on ? 'DEMO   Any button to play   Click to fill the screen'
       : (usedPad ? 'Start goes back   Click three times to set up buttons' : 'Arrows move   C jump   X dash   hold Z to climb   Esc back'),
       135, 473, 6.5, C.dim, 'center');
-    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, lowest ' + fps.low, 135, 7.5, 7, C.flame, 'center');
+    // stamina meter: ten blocks. Amber while there is enough left for a dash, red when there is not.
+    var segs = Math.max(0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001)), canDash = pl.stamina >= P.dashCost;
+    for (var sg = 0; sg < 10 && check !== 1; sg++) {
+      h.fillStyle = sg < segs ? (canDash ? C.flame : C.hurt) : '#232c55';
+      h.fillRect(Math.round((106 + sg * 6) * u), Math.round(3 * u), Math.round(5 * u), Math.round(6 * u));
+    }
+    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, low ' + fps.low, 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
     if (wiz.on) {
       h.fillStyle = 'rgba(11,16,32,0.94)'; h.fillRect(20 * u, 170 * u, 230 * u, 120 * u);
