@@ -2,9 +2,13 @@
   // A room says which world and level it is with two plain fields in its data: world (1, 2, ...) and level (1, 2, ...).
   // Rooms without them belong to world 1 and go after the numbered levels.
   var WORLDS = [
-    { id: 1, name: 'Brickyard', theme: 'brick' },
-    { id: 2, name: 'Icehouse',  theme: 'frost' }
+    { id: 1, name: 'Brickyard', theme: 'brick', tiles: [], elements: [] },
+    { id: 2, name: 'Icehouse',  theme: 'frost', tiles: ['I'], elements: ['ice'] }
   ];
+  // Pieces that belong to one world only. tiles are level characters, elements are the auto-builder's piece names.
+  // Everything not listed by any world is common and can be used anywhere. A new world lists its own pieces here.
+  function tileWorld(ch) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].tiles.indexOf(ch) >= 0) return WORLDS[i].id; return 0; }
+  function elementWorld(name) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].elements.indexOf(name) >= 0) return WORLDS[i].id; return 0; }
   var THEMES = {
     brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a', accentLo: '#c47f24' },
     frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4' }

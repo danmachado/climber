@@ -176,6 +176,7 @@
   <aside id="paint">
     <div class="rail-head"><button class="rail-toggle" data-rail="paint" title="Hide or show this panel ( ] )" aria-label="Hide or show the paint panel">&raquo;</button><h1>Paint</h1></div>
     <div id="palette"></div>
+    <label class="hint"><input type="checkbox" id="allp"> Show pieces from every world</label>
     <div class="row"><button id="undo">Undo</button><button id="redo">Redo</button></div>
     <button id="play" class="primary">Play test</button>
     <p class="hint">Drag to paint. Right-drag erases. Hold Shift and drag to fill a box. The letter or number on each tile is its shortcut key.</p>
@@ -356,6 +357,15 @@
       var t = document.createElement('span'); t.textContent = k.text;
       li.appendChild(m); li.appendChild(t); ul.appendChild(li);
     });
+    // a heads-up (not a blocker) when the room uses a piece that belongs to a different world
+    var odd = {}, names = [], r, c;
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) { var tw = tileWorld(tiles[r][c]); if (tw && tw !== (room.world || 1)) odd[tw] = 1; }
+    for (var ow in odd) names.push(WORLDS[ow - 1].name);
+    if (names.length) {
+      var li = document.createElement('li'), m = document.createElement('span'), t = document.createElement('span');
+      m.className = 'mark'; m.textContent = 'NOTE'; m.style.color = 'var(--accent)'; t.textContent = 'Uses pieces from ' + names.join(' and ');
+      li.appendChild(m); li.appendChild(t); ul.appendChild(li);
+    }
     $('undo').disabled = !undoStack.length; $('redo').disabled = !redoStack.length;
     draw();
   }
@@ -402,11 +412,17 @@
   canvas.addEventListener('pointerleave', function () { hover = null; if (!stroke) { $('coords').textContent = ''; draw(); } });
 
   // ---- palette ----
+  // The palette shows the pieces of the room's world: the common ones plus that world's own. Other worlds' pieces are hidden.
+  function allowed(ch) { var w = tileWorld(ch); return !w || w === (room.world || 1) || $('allp').checked; }
   function buildPalette() {
-    GROUPS.forEach(function (grp) {
+    var wd = WORLDS[(room.world || 1) - 1];
+    $('palette').textContent = '';
+    GROUPS.forEach(function (grp, gi) {
+      var list = grp[1].filter(function (t) { return allowed(t[0]); });
+      if (!list.length) return;
       var box = document.createElement('div'); box.className = 'group';
-      var h = document.createElement('h2'); h.textContent = grp[0]; box.appendChild(h);
-      grp[1].forEach(function (t) {
+      var h = document.createElement('h2'); h.textContent = gi === 0 ? wd.name + ' terrain' : grp[0]; box.appendChild(h);
+      list.forEach(function (t) {
         var b = document.createElement('button'); b.type = 'button'; b.dataset.ch = t[0]; b.title = t[1] + ' (' + t[2] + ')';
         var ic = document.createElement('canvas'); ic.width = 20; ic.height = 20;
         var x = ic.getContext('2d'); x.fillStyle = C.bg; x.fillRect(0, 0, 20, 20);
@@ -418,6 +434,12 @@
         box.appendChild(b);
       });
       $('palette').appendChild(box);
+    });
+    pick(allowed(brush) ? brush : '#');
+    // auto-build offers only this world's pieces too
+    Array.prototype.forEach.call($('g-els').children, function (b) {
+      var w = elementWorld(b.dataset.v), ok = !w || w === wd.id;
+      if (b.hidden === ok) { b.hidden = !ok; b.setAttribute('aria-pressed', ok ? 'true' : 'false'); }
     });
   }
   function pick(ch) {
@@ -522,8 +544,10 @@
   function syncMeta() {
     $('world').value = String(room.world || 1); $('level').value = room.level > 0 ? room.level : ''; $('par').value = room.par > 0 ? room.par : '';
     var th = themeOf(room); setTileTheme(th); C.bg = th.bg;
+    buildPalette();
   }
-  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); draw(); });
+  $('allp').addEventListener('change', buildPalette);
+  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); refresh(); });
   $('level').addEventListener('input', function () { room.level = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
   $('par').addEventListener('input', function () { room.par = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
   window.addEventListener('keydown', function (e) {
@@ -534,7 +558,7 @@
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var key = e.key.toUpperCase();
-    for (var i = 0; i < TILES.length; i++) if (TILES[i][2] === key) { pick(TILES[i][0]); break; }
+    for (var i = 0; i < TILES.length; i++) if (TILES[i][2] === key && allowed(TILES[i][0])) { pick(TILES[i][0]); break; }
   });
   window.addEventListener('resize', fit);
 
@@ -709,7 +733,7 @@
   showPub();
 
   // ---- start: last draft if there is one, otherwise the starter room ----
-  buildPalette(); pick('#');
+  // the palette is built by load() below, once the room (and so its world) is known
   var draft = null;
   try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch (e) {}
   try { load(draft || JSON.parse($('starter').textContent), draft ? 'Picked up your last draft.' : ''); }

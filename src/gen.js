@@ -13,7 +13,8 @@
     var SP = EL.spikes ? Math.max(1, opts.spikes | 0) : 0;                               // 0 none, 1 some, 2 lots
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
     var SHAPE = opts.shape !== false;
-    var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces                                                    // organic shaping on by default
+    var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces
+    if (WORLD && WORLD !== 2 && EL.ice) { EL = Object.assign({}, EL); EL.ice = false; }   // and never borrows another world's (ice is Icehouse only)                                                    // organic shaping on by default
     function likes(st) { return styles.length && styles.length < 3 && styles.indexOf(st) >= 0; }
     function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
     function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }

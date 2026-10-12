@@ -176,6 +176,7 @@
   <aside id="paint">
     <div class="rail-head"><button class="rail-toggle" data-rail="paint" title="Hide or show this panel ( ] )" aria-label="Hide or show the paint panel">&raquo;</button><h1>Paint</h1></div>
     <div id="palette"></div>
+    <label class="hint"><input type="checkbox" id="allp"> Show pieces from every world</label>
     <div class="row"><button id="undo">Undo</button><button id="redo">Redo</button></div>
     <button id="play" class="primary">Play test</button>
     <p class="hint">Drag to paint. Right-drag erases. Hold Shift and drag to fill a box. The letter or number on each tile is its shortcut key.</p>
@@ -317,9 +318,13 @@
   // A room says which world and level it is with two plain fields in its data: world (1, 2, ...) and level (1, 2, ...).
   // Rooms without them belong to world 1 and go after the numbered levels.
   var WORLDS = [
-    { id: 1, name: 'Brickyard', theme: 'brick' },
-    { id: 2, name: 'Icehouse',  theme: 'frost' }
+    { id: 1, name: 'Brickyard', theme: 'brick', tiles: [], elements: [] },
+    { id: 2, name: 'Icehouse',  theme: 'frost', tiles: ['I'], elements: ['ice'] }
   ];
+  // Pieces that belong to one world only. tiles are level characters, elements are the auto-builder's piece names.
+  // Everything not listed by any world is common and can be used anywhere. A new world lists its own pieces here.
+  function tileWorld(ch) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].tiles.indexOf(ch) >= 0) return WORLDS[i].id; return 0; }
+  function elementWorld(name) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].elements.indexOf(name) >= 0) return WORLDS[i].id; return 0; }
   var THEMES = {
     brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a', accentLo: '#c47f24' },
     frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4' }
@@ -346,7 +351,8 @@
     var SP = EL.spikes ? Math.max(1, opts.spikes | 0) : 0;                               // 0 none, 1 some, 2 lots
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
     var SHAPE = opts.shape !== false;
-    var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces                                                    // organic shaping on by default
+    var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces
+    if (WORLD && WORLD !== 2 && EL.ice) { EL = Object.assign({}, EL); EL.ice = false; }   // and never borrows another world's (ice is Icehouse only)                                                    // organic shaping on by default
     function likes(st) { return styles.length && styles.length < 3 && styles.indexOf(st) >= 0; }
     function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
     function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
@@ -705,6 +711,15 @@
       var t = document.createElement('span'); t.textContent = k.text;
       li.appendChild(m); li.appendChild(t); ul.appendChild(li);
     });
+    // a heads-up (not a blocker) when the room uses a piece that belongs to a different world
+    var odd = {}, names = [], r, c;
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) { var tw = tileWorld(tiles[r][c]); if (tw && tw !== (room.world || 1)) odd[tw] = 1; }
+    for (var ow in odd) names.push(WORLDS[ow - 1].name);
+    if (names.length) {
+      var li = document.createElement('li'), m = document.createElement('span'), t = document.createElement('span');
+      m.className = 'mark'; m.textContent = 'NOTE'; m.style.color = 'var(--accent)'; t.textContent = 'Uses pieces from ' + names.join(' and ');
+      li.appendChild(m); li.appendChild(t); ul.appendChild(li);
+    }
     $('undo').disabled = !undoStack.length; $('redo').disabled = !redoStack.length;
     draw();
   }
@@ -751,11 +766,17 @@
   canvas.addEventListener('pointerleave', function () { hover = null; if (!stroke) { $('coords').textContent = ''; draw(); } });
 
   // ---- palette ----
+  // The palette shows the pieces of the room's world: the common ones plus that world's own. Other worlds' pieces are hidden.
+  function allowed(ch) { var w = tileWorld(ch); return !w || w === (room.world || 1) || $('allp').checked; }
   function buildPalette() {
-    GROUPS.forEach(function (grp) {
+    var wd = WORLDS[(room.world || 1) - 1];
+    $('palette').textContent = '';
+    GROUPS.forEach(function (grp, gi) {
+      var list = grp[1].filter(function (t) { return allowed(t[0]); });
+      if (!list.length) return;
       var box = document.createElement('div'); box.className = 'group';
-      var h = document.createElement('h2'); h.textContent = grp[0]; box.appendChild(h);
-      grp[1].forEach(function (t) {
+      var h = document.createElement('h2'); h.textContent = gi === 0 ? wd.name + ' terrain' : grp[0]; box.appendChild(h);
+      list.forEach(function (t) {
         var b = document.createElement('button'); b.type = 'button'; b.dataset.ch = t[0]; b.title = t[1] + ' (' + t[2] + ')';
         var ic = document.createElement('canvas'); ic.width = 20; ic.height = 20;
         var x = ic.getContext('2d'); x.fillStyle = C.bg; x.fillRect(0, 0, 20, 20);
@@ -767,6 +788,12 @@
         box.appendChild(b);
       });
       $('palette').appendChild(box);
+    });
+    pick(allowed(brush) ? brush : '#');
+    // auto-build offers only this world's pieces too
+    Array.prototype.forEach.call($('g-els').children, function (b) {
+      var w = elementWorld(b.dataset.v), ok = !w || w === wd.id;
+      if (b.hidden === ok) { b.hidden = !ok; b.setAttribute('aria-pressed', ok ? 'true' : 'false'); }
     });
   }
   function pick(ch) {
@@ -871,8 +898,10 @@
   function syncMeta() {
     $('world').value = String(room.world || 1); $('level').value = room.level > 0 ? room.level : ''; $('par').value = room.par > 0 ? room.par : '';
     var th = themeOf(room); setTileTheme(th); C.bg = th.bg;
+    buildPalette();
   }
-  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); draw(); });
+  $('allp').addEventListener('change', buildPalette);
+  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); refresh(); });
   $('level').addEventListener('input', function () { room.level = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
   $('par').addEventListener('input', function () { room.par = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
   window.addEventListener('keydown', function (e) {
@@ -883,7 +912,7 @@
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var key = e.key.toUpperCase();
-    for (var i = 0; i < TILES.length; i++) if (TILES[i][2] === key) { pick(TILES[i][0]); break; }
+    for (var i = 0; i < TILES.length; i++) if (TILES[i][2] === key && allowed(TILES[i][0])) { pick(TILES[i][0]); break; }
   });
   window.addEventListener('resize', fit);
 
@@ -1058,7 +1087,7 @@
   showPub();
 
   // ---- start: last draft if there is one, otherwise the starter room ----
-  buildPalette(); pick('#');
+  // the palette is built by load() below, once the room (and so its world) is known
   var draft = null;
   try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch (e) {}
   try { load(draft || JSON.parse($('starter').textContent), draft ? 'Picked up your last draft.' : ''); }
