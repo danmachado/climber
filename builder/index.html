@@ -25,7 +25,7 @@
   .two { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
   #paint { width: 300px; border-right: 0; border-left: 1px solid var(--line); }
   #palette { display: flex; flex-direction: column; gap: 12px; }
-  #palette .group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #palette .group { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; }
   #palette h2 { grid-column: 1 / -1; margin: 0; }
   #palette button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; font-size: 12px; line-height: 1.15; text-align: center; }
   #palette canvas { width: 40px; height: 40px; flex: none; image-rendering: pixelated; border-radius: 2px; }
@@ -62,6 +62,9 @@
   #zlabel { font: 12px Menlo, Consolas, monospace; color: var(--dim); min-width: 44px; text-align: center; }
   #scroll { flex: 1; min-height: 0; overflow: auto; display: flex; padding: 6px; }
   #scroll > #board { margin: auto; flex: none; }
+  .grip { flex: none; width: 7px; margin: 0 -3px; z-index: 2; cursor: col-resize; touch-action: none; background: transparent; }
+  .grip:hover, .grip.drag { background: var(--accent); opacity: .55; }
+  @media (max-width: 1100px) { .grip { display: none; } }
   .rail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .rail-toggle { padding: 2px 8px; font: 700 13px/1.4 Menlo, Consolas, monospace; color: var(--dim); }
   aside.collapsed { width: 38px !important; padding: 10px 4px; overflow: hidden; align-items: center; }
@@ -150,6 +153,7 @@
     </div>
     <p id="status" role="status"></p>
   </aside>
+  <div class="grip" data-rail="rail" title="Drag to resize. Double-click to reset."></div>
   <main>
     <div id="bar">
       <button id="z-out" title="Zoom out ( - )" aria-label="Zoom out">&minus;</button>
@@ -162,6 +166,7 @@
     </div>
     <div id="scroll"><div id="board"><canvas id="grid"></canvas><iframe id="game" title="Play test" hidden></iframe></div></div>
   </main>
+  <div class="grip" data-rail="paint" title="Drag to resize. Double-click to reset."></div>
   <aside id="paint">
     <div class="rail-head"><button class="rail-toggle" data-rail="paint" title="Hide or show this panel ( ] )" aria-label="Hide or show the paint panel">&raquo;</button><h1>Paint</h1></div>
     <div id="palette"></div>
@@ -713,7 +718,6 @@
   function buildPalette() {
     GROUPS.forEach(function (grp) {
       var box = document.createElement('div'); box.className = 'group';
-      if (grp[1].length === 4) box.style.gridTemplateColumns = 'repeat(4, 1fr)';
       var h = document.createElement('h2'); h.textContent = grp[0]; box.appendChild(h);
       grp[1].forEach(function (t) {
         var b = document.createElement('button'); b.type = 'button'; b.dataset.ch = t[0]; b.title = t[1] + ' (' + t[2] + ')';
@@ -833,7 +837,7 @@
 
   // ---- view: zoom and collapsible side panels (remembered on this computer) ----
   var VIEW_KEY = 'climber.builder.view.v1';
-  function saveView() { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ mode: zoomMode, zoom: userZoom, rail: $('rail').classList.contains('collapsed'), paint: $('paint').classList.contains('collapsed') })); } catch (e) {} }
+  function saveView() { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ mode: zoomMode, zoom: userZoom, rail: $('rail').classList.contains('collapsed'), paint: $('paint').classList.contains('collapsed'), w: railW })); } catch (e) {} }
   function setZoom(mode, z) {
     zoomMode = mode;
     if (mode === 'user') userZoom = Math.max(0.5, Math.min(6, Math.round(z * 4) / 4));
@@ -864,9 +868,23 @@
     else if (e.key === '[') { setRail('rail', !$('rail').classList.contains('collapsed')); saveView(); }
     else if (e.key === ']') { setRail('paint', !$('paint').classList.contains('collapsed')); saveView(); }
   });
+  // drag the edge of a panel to make it wider or narrower
+  var railW = { rail: 280, paint: 300 }, RAIL_DEF = { rail: 280, paint: 300 };
+  function setRailW(id, w) { railW[id] = Math.max(200, Math.min(Math.round(w), Math.min(640, window.innerWidth - 420))); $(id).style.width = railW[id] + 'px'; fit(); }
+  Array.prototype.forEach.call(document.querySelectorAll('.grip'), function (gr) {
+    var id = gr.dataset.rail, start = null;
+    gr.addEventListener('pointerdown', function (e) {
+      if ($(id).classList.contains('collapsed')) return;
+      start = { x: e.clientX, w: $(id).getBoundingClientRect().width }; gr.setPointerCapture(e.pointerId); gr.classList.add('drag'); e.preventDefault();
+    });
+    gr.addEventListener('pointermove', function (e) { if (start) setRailW(id, start.w + (id === 'rail' ? 1 : -1) * (e.clientX - start.x)); });
+    function end() { if (start) { start = null; gr.classList.remove('drag'); saveView(); } }
+    gr.addEventListener('pointerup', end); gr.addEventListener('pointercancel', end);
+    gr.addEventListener('dblclick', function () { setRailW(id, RAIL_DEF[id]); saveView(); });
+  });
   function restoreView() { try {
     var view = JSON.parse(localStorage.getItem(VIEW_KEY));
-    if (view) { zoomMode = view.mode || 'fit'; userZoom = view.zoom || 1; if (view.rail) setRail('rail', true); if (view.paint) setRail('paint', true); }
+    if (view) { zoomMode = view.mode || 'fit'; userZoom = view.zoom || 1; if (view.w) { setRailW('rail', view.w.rail || 280); setRailW('paint', view.w.paint || 300); } if (view.rail) setRail('rail', true); if (view.paint) setRail('paint', true); }
   } catch (e) {} }
 
   // ---- publishing: drafts stay private, Publish makes a room live, and any saved version can be made live again ----
