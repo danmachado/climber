@@ -1292,15 +1292,15 @@
     for (i = 0; i < len; i++) {
       var tx = px - facing * (back + speed * 0.7), ty = py + (i ? droop : 0.3) - speed * 0.9 - up * 1.6;   // hangs when still, streams when moving, lifts in a fall
       n[i].x += (tx - n[i].x) / 2; n[i].y += (ty - n[i].y) / 2;
-      var ddx = n[i].x - px, ddy = n[i].y - py, dd = Math.sqrt(ddx * ddx + ddy * ddy), mx = 2;   // cloth has a length: no segment longer than this
+      var ddx = n[i].x - px, ddy = n[i].y - py, dd = Math.sqrt(ddx * ddx + ddy * ddy), mx = 1.5;   // cloth has a length: no segment longer than this
       if (dd > mx) { n[i].x = px + ddx / dd * mx; n[i].y = py + ddy / dd * mx; }
-      n[i].wy = Math.sin(t * (3.5 + speed * 7) + i * 1.15 + ph) * (0.25 + i * 0.4) * (0.7 + speed);   // flutter, more at the tip and at speed
+      n[i].wy = Math.sin(t * (3.5 + speed * 7) + i * 1.15 + ph) * (0.15 + i * 0.25) * (0.7 + speed);   // flutter, more at the tip and at speed
       px = n[i].x; py = n[i].y;
     }
   }
   function stepChain(an, facing) {
-    stepTail(chain.a, 5, an, facing, 0, 1.4, 1.5);                          // long tail: streams back
-    stepTail(chain.b, 4, { x: an.x, y: an.y + 1 }, facing, 2.6, 2.0, 0.6);   // short tail: starts a pixel lower, hangs straighter
+    stepTail(chain.a, 4, an, facing, 0, 1.2, 1.1);                          // long tail: streams back (about 6 px)
+    stepTail(chain.b, 3, { x: an.x, y: an.y + 1 }, facing, 2.6, 1.5, 0.5);   // short tail: starts a pixel lower, hangs straighter (about 4 px)
     var can = pl.dashes > 0;
     if (can && !chain.can) chain.flash = 0.12;
     chain.can = can; if (chain.flash > 0) chain.flash -= STEP;

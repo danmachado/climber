@@ -34,7 +34,7 @@ HEAD = {
 .odddddo.
 odddDdddo
 kodBBBBBo
-kobbbbbbo
+.obbbbbbo
 .oSSSSSo.
 .oSsssso.
 ..oSSSo..
@@ -44,7 +44,7 @@ kobbbbbbo
 .odddddo.
 odddDdddo
 kodBBBBBo
-kobbbbbbo
+.obbbbbbo
 .oSSSSSo.
 .oSsssso.
 ..oSSSo..
@@ -54,7 +54,7 @@ kobbbbbbo
 .odddddo.
 odddDdddo
 kodBBBBBo
-kobbbbbbo
+.obbbbbbo
 .oSSsSSo.
 .oSsssso.
 ..oSSSo..
@@ -64,7 +64,7 @@ kobbbbbbo
 .odddddo.
 odddDdddo
 kodBBBBBo
-kobbbbbbo
+.obbbbbbo
 .odSSSSo.
 .oSsssso.
 ..oSSSo..
@@ -74,7 +74,7 @@ kobbbbbbo
 .odddddo.
 odddDdddo
 kodBBBBBo
-kobbbbbbo
+.obbbbbbo
 .oSSSSSo.
 .oSSsSso.
 ..oSSSo..
