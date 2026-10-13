@@ -286,6 +286,36 @@
     b.fillStyle = '#ffd27a'; b.fillRect(x + 3, y + 2, 3, 2); b.fillRect(x + 4, y + 4, 1, 4); b.fillRect(x + 5, y + 6, 1, 1); b.fillRect(x + 5, y + 8, 1, 1);
     b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + 3, 1, 1);
   }
+  // Fire jet: a floor vent (static) that fires a three tile column of flame on a cycle (drawn per frame while it burns).
+  function drawVent(b, x, y) {
+    b.fillStyle = '#2b0f0c'; b.fillRect(x + 1, y + 6, 8, 4);
+    b.fillStyle = '#5a2a1e'; b.fillRect(x + 2, y + 7, 6, 2);
+    b.fillStyle = '#2b0f0c'; b.fillRect(x + 3, y + 7, 1, 2); b.fillRect(x + 5, y + 7, 1, 2); b.fillRect(x + 7, y + 7, 1, 2);
+  }
+  function drawJetWarn(b, x, y, f) {                     // a sputter at the grate just before it fires
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + (f ? 3 : 5), y + 4, 2, 2); b.fillRect(x + (f ? 6 : 2), y + 5, 1, 1);
+  }
+  function drawJet(b, x, y, f) {
+    var top = y - 20;
+    b.fillStyle = '#e2491f'; b.fillRect(x + 2, top + 2, 6, 27); b.fillRect(x + 1, top + 8, 8, 16);
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + 3, top + 4, 4, 24); if (f) { b.fillRect(x + 2, top + 12, 1, 4); b.fillRect(x + 7, top + 18, 1, 4); } else { b.fillRect(x + 7, top + 10, 1, 4); b.fillRect(x + 2, top + 20, 1, 3); }
+    b.fillStyle = '#ffe08a'; b.fillRect(x + 4, top + (f ? 8 : 12), 2, 18);
+    b.fillStyle = '#e2491f'; b.fillRect(x + (f ? 3 : 5), top, 2, 2); b.fillRect(x + (f ? 6 : 2), top + 1, 1, 1);   // licks at the tip
+  }
+  // Lava: a tile for the builder and the static layer, and the rising body the game draws over everything below the surface.
+  function drawLava(b, x, y, surface) {
+    b.fillStyle = '#c2401c'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#e2491f'; b.fillRect(x + 1, y + 3, 3, 2); b.fillRect(x + 6, y + 6, 3, 2);
+    if (surface) { b.fillStyle = '#ffb347'; b.fillRect(x, y, 10, 2); b.fillStyle = '#ffe08a'; b.fillRect(x + 2, y, 2, 1); b.fillRect(x + 7, y + 1, 2, 1); }
+  }
+  function drawLavaBody(b, ly, w, h, tick) {
+    b.fillStyle = '#c2401c'; b.fillRect(0, ly, w, h - ly);
+    b.fillStyle = '#ffb347'; b.fillRect(0, ly, w, 2);
+    b.fillStyle = '#ffe08a';
+    for (var x = 0; x < w; x += 12) b.fillRect(x + ((tick >> 3) + x) % 7, ly + ((x + (tick >> 4)) % 3 === 0 ? 1 : 0), 3, 1);   // slow glints
+    b.fillStyle = '#e2491f';
+    for (var y = ly + 6; y < h; y += 9) for (var k = ((y * 7) % 11); k < w; k += 23) b.fillRect(k, y, 4, 2);
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);

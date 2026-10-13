@@ -49,6 +49,18 @@ const fs = require('fs');
             until(() => ({ x: d }), () => past(o.t0, 3), 200);
             continue;
           }
+          if (o.type === 'jet') {               // wait beside the vent until it has just gone out, then run past
+            where = 'floor ' + fi + ' jet t' + o.t0;
+            const jx = col(o.t0, d) * 10;
+            const jet = () => s.jets.filter(j => j.x === jx && j.y === (y - 1) * 10)[0];
+            until(() => ({}), () => s.ground, 200);
+            if (dist(o.t0) < 11) until(() => ({ x: -d }), () => dist(o.t0) >= 12, 200);
+            until(() => ({ x: d }), () => dist(o.t0) <= 14);
+            for (let k = 0; k < 8; k++) step({});
+            until(() => ({}), () => { const j = jet(); return j && !j.on && !j.warn && j.left > 0.7; }, 300);
+            until(() => ({ x: d }), () => past(o.t0, 3), 200);
+            continue;
+          }
           if (o.type === 'ferry') {
             where = 'floor ' + fi + ' ferry w' + o.w;
             const rowY = (y - 2) * 10, cA = col(o.t0, d), cB = col(o.t0 + o.pl - 1, d), cE = col(o.t0 + o.w - 1, d), cE2 = col(o.t0 + o.w - o.pl, d);
@@ -144,7 +156,7 @@ const fs = require('fs');
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
       const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1, rows: seed % 5 === 0 ? 96 : 48,
-                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0 } };
+                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0, jets: seed % 4 !== 3, lava: seed % 2 === 1 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }

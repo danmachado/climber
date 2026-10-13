@@ -135,6 +135,8 @@
             <button type="button" data-v="ice" aria-pressed="true">Ice</button>
             <button type="button" data-v="firepits" aria-pressed="true">Fire</button>
             <button type="button" data-v="fireballs" aria-pressed="true">Fireballs</button>
+            <button type="button" data-v="jets" aria-pressed="true">Fire jets</button>
+            <button type="button" data-v="lava" aria-pressed="true">Rising lava</button>
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="zips" aria-pressed="true">Zip movers</button>
@@ -222,7 +224,7 @@
   var GROUPS = [
     ['Terrain', [['#', 'Solid', '1'], ['I', 'Ice', '2'], ['C', 'Crumble', '3']]],
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
-    ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y']]],
+    ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y'], ['J', 'Fire jet', 'H'], ['~', 'Lava', 'V']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
@@ -530,6 +532,36 @@
     b.fillStyle = '#ffd27a'; b.fillRect(x + 3, y + 2, 3, 2); b.fillRect(x + 4, y + 4, 1, 4); b.fillRect(x + 5, y + 6, 1, 1); b.fillRect(x + 5, y + 8, 1, 1);
     b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + 3, 1, 1);
   }
+  // Fire jet: a floor vent (static) that fires a three tile column of flame on a cycle (drawn per frame while it burns).
+  function drawVent(b, x, y) {
+    b.fillStyle = '#2b0f0c'; b.fillRect(x + 1, y + 6, 8, 4);
+    b.fillStyle = '#5a2a1e'; b.fillRect(x + 2, y + 7, 6, 2);
+    b.fillStyle = '#2b0f0c'; b.fillRect(x + 3, y + 7, 1, 2); b.fillRect(x + 5, y + 7, 1, 2); b.fillRect(x + 7, y + 7, 1, 2);
+  }
+  function drawJetWarn(b, x, y, f) {                     // a sputter at the grate just before it fires
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + (f ? 3 : 5), y + 4, 2, 2); b.fillRect(x + (f ? 6 : 2), y + 5, 1, 1);
+  }
+  function drawJet(b, x, y, f) {
+    var top = y - 20;
+    b.fillStyle = '#e2491f'; b.fillRect(x + 2, top + 2, 6, 27); b.fillRect(x + 1, top + 8, 8, 16);
+    b.fillStyle = '#ff9a3c'; b.fillRect(x + 3, top + 4, 4, 24); if (f) { b.fillRect(x + 2, top + 12, 1, 4); b.fillRect(x + 7, top + 18, 1, 4); } else { b.fillRect(x + 7, top + 10, 1, 4); b.fillRect(x + 2, top + 20, 1, 3); }
+    b.fillStyle = '#ffe08a'; b.fillRect(x + 4, top + (f ? 8 : 12), 2, 18);
+    b.fillStyle = '#e2491f'; b.fillRect(x + (f ? 3 : 5), top, 2, 2); b.fillRect(x + (f ? 6 : 2), top + 1, 1, 1);   // licks at the tip
+  }
+  // Lava: a tile for the builder and the static layer, and the rising body the game draws over everything below the surface.
+  function drawLava(b, x, y, surface) {
+    b.fillStyle = '#c2401c'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#e2491f'; b.fillRect(x + 1, y + 3, 3, 2); b.fillRect(x + 6, y + 6, 3, 2);
+    if (surface) { b.fillStyle = '#ffb347'; b.fillRect(x, y, 10, 2); b.fillStyle = '#ffe08a'; b.fillRect(x + 2, y, 2, 1); b.fillRect(x + 7, y + 1, 2, 1); }
+  }
+  function drawLavaBody(b, ly, w, h, tick) {
+    b.fillStyle = '#c2401c'; b.fillRect(0, ly, w, h - ly);
+    b.fillStyle = '#ffb347'; b.fillRect(0, ly, w, 2);
+    b.fillStyle = '#ffe08a';
+    for (var x = 0; x < w; x += 12) b.fillRect(x + ((tick >> 3) + x) % 7, ly + ((x + (tick >> 4)) % 3 === 0 ? 1 : 0), 3, 1);   // slow glints
+    b.fillStyle = '#e2491f';
+    for (var y = ly + 6; y < h; y += 9) for (var k = ((y * 7) % 11); k < w; k += 23) b.fillRect(k, y, 4, 2);
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);
@@ -558,7 +590,7 @@
   var WORLDS = [
     { id: 1, name: 'Brickyard', theme: 'brick', tiles: [], elements: [] },
     { id: 2, name: 'Icehouse',  theme: 'frost', tiles: ['I'], elements: ['ice'] },
-    { id: 3, name: 'Furnace',   theme: 'ember', tiles: ['F', '*'], elements: ['firepits', 'fireballs'] }
+    { id: 3, name: 'Furnace',   theme: 'ember', tiles: ['F', '*', 'J', '~'], elements: ['firepits', 'fireballs', 'jets', 'lava'] }
   ];
   // Pieces that belong to one world only. tiles are level characters, elements are the auto-builder's piece names.
   // Everything not listed by any world is common and can be used anywhere. A new world lists its own pieces here.
@@ -624,10 +656,11 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0, jets: 0, lava: 0 };
     function zipPick() { return EL.zips && (!EL.movers || rnd() < 0.5); }   // a platform spot becomes a zip mover
     var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
     g[ROWS - 3][col(2, d)] = 'S';
+    if (EL.lava && ROWS >= 96) { for (var lc = 1; lc < COLS - 1; lc++) g[ROWS - 1][lc] = '~'; stats.lava = 1; }   // rising lava starts under the first floor of a tall room
 
     while (true) {
       var maxHf = y - 8, top = maxHf < 6, headroom = top ? y - 1 : maxHf - 1;
@@ -669,7 +702,8 @@
           iceblock: EL.ice && SP < 2 && room >= TUNE.iceL[0] + 3 ? (SP ? 1 : 3) * ICY : 0,           // slide into a block to hop
           bridge: EL.crumble && floor > 0 && room >= 4 ? 3 : 0,                                // crumbling stretch of floor
           ferry: (EL.movers || EL.zips) && (HZ > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0,    // ride a platform across a gap
-          fireball: EL.fireballs && room >= 2 && headroom >= 6 ? 4 : 0                       // time a run under a fireball on a track
+          fireball: EL.fireballs && room >= 2 && headroom >= 6 ? 4 : 0,                      // time a run under a fireball on a track
+          jet: EL.jets && room >= 2 && headroom >= 6 ? 4 : 0                                // wait for a fire jet to die down, then run past
         };
         // "Some" spikes means every floor has at least one; "Lots" removed the harmless options above
         if (HZ === 1 && SP < 2 && !spiked && (w.spikes || w.wide || w.crown || w.wallspikes || w.icespikes)) { w.block = 0; w.wall = 0; w.iceblock = 0; }
@@ -689,6 +723,7 @@
         else if (type === 'bridge') { o.w = Math.min(rr(TUNE.bridgeW), room - 1); }
         else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = HZ === 0; o.zip = zipPick(); after = Math.max(3, after); }
         else if (type === 'fireball') { o.w = 1; after = Math.max(3, after); }
+        else if (type === 'jet') { o.w = 1; after = Math.max(3, after); }
         else if (type === 'wall') { o.w = 2; o.h = Math.min(rr(TUNE.wallH), headroom - 3); minHf = Math.max(minHf, o.h + 4); after = 5; }
         else { o.h = 4; o.sw = Math.min(D >= 5 ? ri(3, 4) : ri(2, 3), room - 3); o.w = 2 + o.sw; minHf = Math.max(minHf, 9); }
         if (type !== 'block' && type !== 'wall' && type !== 'iceblock' && type !== 'bridge' && !(type === 'ferry' && o.pit)) spiked++;
@@ -738,6 +773,8 @@
           box(ob.t0, e, y - 2, y - 2, d, '-'); box(ob.t0, ob.t0 + ob.pl - 1, y - 2, y - 2, d, ob.zip ? 'z' : '='); if (ob.zip) stats.zips++; else stats.platforms++;
         } else if (ob.type === 'fireball') {
           box(ob.t0, ob.t0, y - 5, y - 1, d, '|'); put(ob.t0, d, y - 5, '*'); stats.fireballs++;
+        } else if (ob.type === 'jet') {
+          put(ob.t0, d, y - 1, 'J'); stats.jets++;
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
       }
       stats.floors++; stats.obstacles += obs.length;
@@ -749,7 +786,7 @@
       for (t = 0; t <= 24; t++) need.push(t < off ? 2 : (t < s0 + 1 ? 6 : 5));
       if (conn && conn.type === 'spring') for (t = Math.max(0, F - 6); t <= F - 1; t++) need[t] = Math.max(need[t], 6);
       for (i = 0; i < obs.length; i++) {
-        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' ? 6 : 5));
+        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' || q.type === 'jet' ? 6 : 5));
         for (t = Math.max(0, q.t0 - 3); t <= Math.min(24, q.t0 + q.w + 2); t++) need[t] = Math.max(need[t], n);
       }
 
@@ -918,6 +955,8 @@
     else if (ch === 'u') drawSpringIcon(b, x, y);
     else if (ch === 'G') drawGemIcon(b, x, y);
     else if (ch === 'k') drawKey(b, x, y);
+    else if (ch === 'J') { drawVent(b, x, y); if (icon) drawJetWarn(b, x, y, 1); }
+    else if (ch === '~') drawLava(b, x, y, icon || r === 0 || tiles[r - 1][c] !== '~');
     else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
@@ -1195,7 +1234,7 @@
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
-    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door');
+    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava');
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
