@@ -373,9 +373,14 @@
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(skyLayer(), 0, 0);
+    var wl = document.createElement('canvas'), wb;                       // walls on a transparent layer (roughen clears chips), same as the game
+    wl.width = COLS * T; wl.height = ROWS * T; wb = wl.getContext('2d');
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) if (tiles[r][c] === 'b') drawTile(ctx, 'b', c * T, r * T, c, r, false);
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) if (tiles[r][c] === '#' || tiles[r][c] === 'I') drawTile(wb, tiles[r][c], c * T, r * T, c, r, false);
+    ctx.drawImage(wl, 0, 0);
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       var ch = tiles[r][c];
-      if (ch !== '.') drawTile(ctx, ch, c * T, r * T, c, r, false);
+      if (ch !== '.' && ch !== 'b' && ch !== '#' && ch !== 'I') drawTile(ctx, ch, c * T, r * T, c, r, false);
     }
     for (c = 1; c < COLS; c++) { ctx.fillStyle = c % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(c * T, 0, px, ROWS * T); }
     for (r = 1; r < ROWS; r++) { ctx.fillStyle = r % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(0, r * T, COLS * T, px); }
