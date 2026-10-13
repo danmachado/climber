@@ -1527,11 +1527,11 @@
   // pulse when the arms are tired. Cost: five small rects inside the hero's dirty rectangle, widened a little.
   var chain = { a: [], b: [], flash: 0, can: true };
   function stepTail(n, len, an, facing, ph, droop, back) {
-    var i, t = tick / 60, speed = Math.min(1, (Math.abs(pl.vx) + Math.abs(pl.vy) * 0.6) / 180);
+    var i, t = tick / 60, speed = Math.min(1, (Math.abs(pl.vx) + Math.abs(pl.vy) * 0.6) / 180), up = Math.max(0, pl.vy) / 220;   // up: falling or sliding lifts the cloth
     if (n.length !== len || Math.abs(n[0].x - an.x) > 24 || Math.abs(n[0].y - an.y) > 24) { n.length = 0; for (i = 0; i < len; i++) n.push({ x: an.x - facing * i, y: an.y + i, wy: 0 }); }
     var px = an.x, py = an.y;
     for (i = 0; i < len; i++) {
-      var tx = px - facing * (back + speed * 0.7), ty = py + (i ? droop : 0.3) - speed * 0.9;   // hangs when still, streams when moving
+      var tx = px - facing * (back + speed * 0.7), ty = py + (i ? droop : 0.3) - speed * 0.9 - up * 1.6;   // hangs when still, streams when moving, lifts in a fall
       n[i].x += (tx - n[i].x) / 2; n[i].y += (ty - n[i].y) / 2;
       var ddx = n[i].x - px, ddy = n[i].y - py, dd = Math.sqrt(ddx * ddx + ddy * ddy), mx = 2;   // cloth has a length: no segment longer than this
       if (dd > mx) { n[i].x = px + ddx / dd * mx; n[i].y = py + ddy / dd * mx; }
