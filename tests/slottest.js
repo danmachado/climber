@@ -31,6 +31,14 @@ const mock = require('./mock.js');
   await p.fill('#name', 'Dans First v2'); await p.dispatchEvent('#name', 'input'); await beat(); await p.click('#p-publish'); await p.waitForTimeout(800);
   console.log('8 publish again ->', await status(), '| db rooms', mock.db.rooms.length, 'versions', mock.db.versions.length);
   console.log('9 game world 1:', await gameWorld(0), '| game world 2 untouched:', (await gameWorld(1)).split(', ').length, 'levels');
+  // reorder: move the open level (1-1) three places later, save, and the game follows
+  for (let i = 0; i < 3; i++) await p.click('#mv-fwd');
+  console.log('10 moved ->', await status(), '| map:', (await slots()).split(' | ').slice(0, 5).join(' | '));
+  await p.click('#order-save'); await p.waitForTimeout(800);
+  console.log('11 saved ->', await status(), '| my rooms list:', (await p.locator('#p-rooms').innerText()).replace(/\n/g, ' / '));
+  console.log('12 game world 1:', await gameWorld(0));
+  await p.reload(); await p.waitForTimeout(700);
+  console.log('13 after reload map:', (await slots()).split(' | ').slice(0, 5).join(' | '));
   await p.screenshot({ path: __dirname + '/slots.png' });
   console.log('errors', JSON.stringify(errs));
   await b.close(); process.exit(0);

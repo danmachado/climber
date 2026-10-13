@@ -210,7 +210,11 @@
       for (i = 0; i < liveRooms.length; i++) { r = liveRooms[i]; if (worldOf(r) === w + 1) { if (r.level > 0) slot[r.level] = r; else loose.push(r); } }
       for (n in slot) nums.push(+n);
       nums.sort(function (a, b) { return a - b; });
-      return nums.map(function (k) { return slot[k]; }).concat(loose);
+      // the saved map order lists slot numbers in the order they should appear; anything it does not mention goes after, in number order
+      var want = mapOrder[w + 1] || [], order = [], seen = {};
+      for (i = 0; i < want.length; i++) if (slot[want[i]] && !seen[want[i]]) { order.push(want[i]); seen[want[i]] = 1; }
+      for (i = 0; i < nums.length; i++) if (!seen[nums[i]]) order.push(nums[i]);
+      return order.map(function (k) { return slot[k]; }).concat(loose);
     });
     dataVer++;
   }
@@ -247,11 +251,14 @@
     return queue.shift();
   }
   // Published rooms are fetched as plain data. If that fails, the last good copy is used, then the built-in set.
+  // One published record is not a room: it holds the order of the levels on the map (set in the builder's Game map).
+  var mapOrder = {};
   function useLive(list) {
-    var ok = [];
-    for (var i = 0; i < (list || []).length; i++) if (usable(list[i])) ok.push(list[i]);
+    var ok = [], doc = null;
+    for (var i = 0; i < (list || []).length; i++) { if (list[i] && list[i].kind === 'map') doc = list[i]; else if (usable(list[i])) ok.push(list[i]); }
+    mapOrder = (doc && doc.order) || {};
     liveRooms = ok; queue = []; rebuildLevels();
-    return ok.length;
+    return ok.length + (doc ? 1 : 0);
   }
   function fetchLive() {
     if (!window.fetch) return;
