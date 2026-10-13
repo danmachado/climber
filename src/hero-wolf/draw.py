@@ -124,7 +124,28 @@ oSvhhHHHo
 .ovhhhHo.
 .oooooyoo
 """),
+    'bare': G("""
+.ovhHHHo.
+.ovhhHHo.
+.ovhhhHo.
+.oooooyoo
+"""),
+    'tie': G("""
+.ovhHHHo.
+.ovhhHHo.
+.ovhhhHo.
+.oooooyoo
+"""),
 }
+ARM_F = G("""
+os
+so
+""")                                                  # front arm: a bent forearm, skin with outline
+ARM_B = G("""
+oS
+So
+""")                                                  # back arm, in shadow
+
 LEGS = {
     'stand': G("""
 opPPpPPo
@@ -169,6 +190,17 @@ def pose(head='normal', hy=2, torso='idle', ty=10, legs='stand', ly=14, hx=3, tx
     fr = blank()
     put(fr, LEGS[legs], lx, ly); put(fr, TORSO[torso], tx, ty); put(fr, HEAD[head], hx, hy)
     if extra: put(fr, G(extra), 0, 0)
+    return fr
+
+def run_frame(k, bob):                                    # k 0..5: arms swing opposite each other, legs cycle
+    # front arm goes forward-high, forward, down, back-low, back, down; back arm is half a cycle behind
+    swing = [(9, 10), (10, 11), (8, 12), (5, 12), (4, 11), (6, 12)]
+    legs = ['run1', 'run2', 'run3', 'run1', 'run2', 'run3']
+    ty = 10 - bob
+    fr = pose(hy=2 - bob, ty=ty, torso='bare', legs=legs[k], ly=14 - bob, lx=3 if k % 3 == 0 else 4)
+    bx, by = swing[(k + 3) % 6]; fx_, fy_ = swing[k]
+    put(fr, ARM_B, bx - 1, by - bob - (1 if k in (3, 4) else 0))
+    put(fr, ARM_F, fx_, fy_ - bob)
     return fr
 
 def raw(s):                                            # a whole hand-drawn frame
@@ -264,6 +296,16 @@ DASH_DIAG_DOWN = raw("""
 ..opPPpoooo.....
 ..oCcCco........
 """)
+def tie_frame(k):                                         # both hands up at the knot behind the head
+    fr = pose(torso='bare', head='blink' if k else 'normal')
+    put(fr, G('oS\noS\noS\nSS'), 2, 7 - k)            # back arm reaches up to the knot (in shadow, behind the head)
+    put(fr, G('.o\nos\nos\nos\nss'), 3, 5 + k)          # front arm over it, hand at the knot
+    return fr
+def flex_frame(k):                                        # front arm out, hand opening and closing
+    fr = pose(torso='bare')
+    put(fr, G('oS\nSo'), 4, 11)
+    put(fr, G('oss\nsso') if k else G('os\nso'), 10, 11)
+    return fr
 COIL = pose(head='normal', hy=4, torso='brace', ty=11, legs='wide', ly=14, lx=3)   # the crouch before any dash
 
 def wall_frame(dy, hand_hi):                            # facing the wall on the right; arm up to the grip
@@ -280,9 +322,11 @@ oo
 ANIMS = [
     # name, fps, loop, frames
     ('idle', 4, True, [pose(), pose(hy=1, ty=10, torso='breath'), pose(head='blink', hy=1), pose()]),
-    ('run', 12, True, [
-        pose(torso='run_a', legs='run1', ly=14, lx=3), pose(hy=1, ty=9, ly=13, torso='run_b', legs='run2'), pose(hy=1, ty=9, ly=13, torso='run_a', legs='run3'),
-        pose(torso='run_b', legs='run1', ly=14, lx=3), pose(hy=1, ty=9, ly=13, torso='run_a', legs='run2'), pose(hy=1, ty=9, ly=13, torso='run_b', legs='run3')]),
+    ('run', 12, True, [run_frame(0, 0), run_frame(1, 1), run_frame(2, 1), run_frame(3, 0), run_frame(4, 1), run_frame(5, 1)]),
+    # idle one-shots: look up at the climb, retighten the knot, shake out a hand. Played by the game after a few seconds still.
+    ('idle_look', 4, False, [pose(head='up'), pose(head='up'), pose(head='up', hy=1, ty=10), pose(head='up'), pose()]),
+    ('idle_tie', 6, False, [tie_frame(0), tie_frame(1), tie_frame(0), tie_frame(1), pose()]),
+    ('idle_flex', 8, False, [flex_frame(0), flex_frame(1), flex_frame(0), flex_frame(1), pose()]),
     ('jump_up', 0, False, [pose(hy=1, ty=9, torso='reach', legs='tuck', ly=13), pose(hy=0, ty=8, torso='reach', legs='kick', ly=12)]),
     ('fall', 0, False, [pose(hy=2, ty=10, torso='brace', legs='tuck', ly=14), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=3)]),
     ('land', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=3), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=3)]),

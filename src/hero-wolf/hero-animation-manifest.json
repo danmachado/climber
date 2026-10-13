@@ -132,6 +132,90 @@
    ]
   },
   {
+   "name": "idle_look",
+   "frameCount": 5,
+   "fps": 4,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "idle_tie",
+   "frameCount": 5,
+   "fps": 6,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     5.0
+    ],
+    [
+     3,
+     5.0
+    ],
+    [
+     3,
+     5.0
+    ],
+    [
+     3,
+     5.0
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "idle_flex",
+   "frameCount": 5,
+   "fps": 8,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
    "name": "jump_up",
    "frameCount": 2,
    "fps": 0,
