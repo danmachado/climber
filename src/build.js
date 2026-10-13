@@ -37,6 +37,12 @@ var SET3 = [
   ['Crucible',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true } }, 6407],
   ['Meltdown',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true, movers: true } }, 6408]
 ];
+// One tall (two-screen) level per world, so the scrolling camera has something to show.
+var TALL = [
+  ['The Long Way', { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, refills: true, crumble: true, movers: true, springs: true, gems: true }, world: 1, rows: 96 }, 7101],
+  ['Cold Shaft',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, ice: true, springs: true, gems: true }, world: 2, rows: 96 }, 7202],
+  ['The Chimney',  { difficulty: 3, obstacles: 1, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, firepits: true, fireballs: true, springs: true, gems: true }, world: 3, rows: 96 }, 7303]
+];
 first.world = 1; first.level = 1;
 var starters = [first], plans = [null];
 SET.forEach(function (s, i) {
@@ -60,6 +66,11 @@ SET3.forEach(function (s, i) {
   s[1].world = 3;
   var out = generateRoom(s[1], s[2]);
   out.room.id = 'fire-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
+  starters.push(out.room); plans.push(out.plan);
+});
+TALL.forEach(function (s, i) {
+  var out = generateRoom(s[1], s[2]);
+  out.room.id = 'tall-0' + (i + 1); out.room.name = s[0]; out.room.level = 9;
   starters.push(out.room); plans.push(out.plan);
 });
 starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] * PAR_MARGIN); });

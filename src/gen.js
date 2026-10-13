@@ -8,7 +8,7 @@
   // RULE: every level element the game supports must also be something this builder can place. When a new
   // element is added to the game, add it here (and to the auto-player in tests/gentest.js) in the same change.
   function generateRoom(opts, seed) {
-    var COLS = 27, ROWS = 48, D = Math.max(1, Math.min(5, opts.difficulty | 0)), s = seed >>> 0;
+    var COLS = 27, ROWS = opts.rows === 96 ? 96 : 48, D = Math.max(1, Math.min(5, opts.difficulty | 0)), s = seed >>> 0;
     var EL = opts.elements || { spikes: opts.spikes > 0, refills: !!opts.refills };      // which pieces may be used
     var SP = EL.spikes ? Math.max(1, opts.spikes | 0) : 0;                               // 0 none, 1 some, 2 lots
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
@@ -25,7 +25,7 @@
     var g = [], r, c;
     for (r = 0; r < ROWS; r++) { g.push([]); for (c = 0; c < COLS; c++) g[r].push((r === 0 || r >= ROWS - 2 || c === 0 || c === COLS - 1) ? '#' : '.'); }
     function col(t, d) { return d > 0 ? 1 + t : 25 - t; }
-    function put(t, d, row, ch) { var x = col(t, d); if (x >= 1 && x <= 25 && row >= 1 && row <= 45) g[row][x] = ch; }
+    function put(t, d, row, ch) { var x = col(t, d); if (x >= 1 && x <= 25 && row >= 1 && row <= ROWS - 3) g[row][x] = ch; }
     function box(t0, t1, r0, r1, d, ch) { for (var q = r0; q <= r1; q++) for (var t = t0; t <= t1; t++) put(t, d, q, ch); }
     function get(t, d, row) { var x = col(t, d); return (x >= 0 && x <= 26 && row >= 0 && row < ROWS) ? g[row][x] : '#'; }
 
@@ -41,9 +41,10 @@
       ferryW: [[8, 8], [8, 9], [9, 10], [10, 11], [11, 12]][D - 1]        // gap crossed on a moving platform
     };
     var target = [1, 2, 9][opts.obstacles];
-    var plan = [], y = 46, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, fire: 0, fireballs: 0 };
-    g[45][col(2, d)] = 'S';
+    var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, fire: 0, fireballs: 0, springs: 0, gems: 0 };
+    var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
+    g[ROWS - 3][col(2, d)] = 'S';
 
     while (true) {
       var maxHf = y - 8, top = maxHf < 6, headroom = top ? y - 1 : maxHf - 1;
@@ -54,14 +55,15 @@
           steps: [5, 3, 2, 1, 0.5][D - 1] * (likes('jump') ? 2 : 1),
           open: 2 * (likes('dash') || likes('climb') ? 2 : 1),
           curtain: maxHf >= 7 ? [1, 2, 3, 4, 5][D - 1] * 0.8 * (likes('climb') ? 2 : 1) : 0,
-          lift: EL.movers ? 3 : 0
+          lift: EL.movers ? 3 : 0,
+          spring: EL.springs !== false ? 2.5 : 0                       // bounce up through the opening
         }) };
-        conn.W = conn.type === 'steps' ? 7 : (conn.type === 'lift' ? 3 : (conn.type === 'curtain' ? ri(3, 5) : ri(3, 4)));
+        conn.W = conn.type === 'steps' ? 7 : (conn.type === 'lift' || conn.type === 'spring' ? 3 : (conn.type === 'curtain' ? ri(3, 5) : ri(3, 4)));
         // the far wall can step inward by a few tiles, so the room is not a plain box
         if (SHAPE && rnd() < 0.6) sh = ri(2, 6);
       }
-      var s0 = floor === 0 ? 6 : off + Wprev + (prevType === 'open' ? 5 : 3);
-      function zoneEnd(k) { var F = 25 - k; return top ? 18 : (conn.type === 'steps' ? F - 10 : (conn.type === 'lift' ? F - 8 : (conn.type === 'curtain' ? F - conn.W - 4 : F - conn.W - 2))); }
+      var s0 = floor === 0 ? 6 : off + Wprev + (prevType === 'open' || prevType === 'spring' ? 5 : 3);   // a flying arrival needs more room to land
+      function zoneEnd(k) { var F = 25 - k; return top ? 18 : (conn.type === 'steps' ? F - 10 : (conn.type === 'lift' ? F - 8 : (conn.type === 'spring' ? F - 7 : (conn.type === 'curtain' ? F - conn.W - 4 : F - conn.W - 2)))); }
       while (sh > 0 && zoneEnd(sh) - s0 < 7) sh--;
       if (sh === 1) sh = 0;
       var F = 25 - sh, e0 = zoneEnd(sh);
@@ -71,7 +73,7 @@
       var obs = [], cur = s0 + (D <= 2 ? ri(0, 1) : 0), minHf = 6, lastGap = 9, spiked = 0;
       while (obs.length < target) {
         var room = e0 - cur;
-        var canWall = (top || conn.type !== 'steps') && headroom >= 7;
+        var canWall = (top || (conn.type !== 'steps' && conn.type !== 'spring')) && headroom >= 7;   // these ways up fix the floor height, so no tall walls
         var canDrop = canWall && SP > 0 && D >= 4 && headroom >= 8;
         var w = {
           spikes: HZ > 0 && room >= 3 ? (likes('jump') ? 5 : 3) * (SP > 1 ? 2 : 1) : 0,
@@ -116,7 +118,7 @@
       // height of this floor
       var Hf = 0, yN = 0;
       if (!top) {
-        if (conn.type === 'steps') Hf = 6;
+        if (conn.type === 'steps' || conn.type === 'spring') Hf = 6;
         else {
           var lo = Math.max(minHf, conn.type === 'curtain' ? 7 : 6), hi = Math.max(lo, Math.min(9, maxHf));
           if (conn.type === 'open' && likes('dash') && lo <= 7 && hi >= 7) Hf = 7;
@@ -136,6 +138,7 @@
         var ob = obs[i], e = ob.t0 + ob.w - 1;
         if (ob.type === 'spikes' || ob.type === 'wide') {
           box(ob.t0, e, y - 1, y - 1, d, ob.fire ? 'F' : '^'); stats[ob.fire ? 'fire' : 'spikes'] += ob.w;
+          if (gemFloor >= 0 && floor >= gemFloor && !stats.gems && ob.type === 'spikes') { put(ob.t0 + Math.floor(ob.w / 2), d, y - 4, 'G'); stats.gems++; }
           if (ob.type === 'wide' && EL.refills) put(ob.t0 + Math.floor(ob.w / 2), d, y - 4, 'o');
         } else if (ob.type === 'crown') {
           box(ob.t0, e, y - 1, y - 1, d, '#'); box(ob.t0, e, y - 2, y - 2, d, '^'); stats.spikes += ob.w;
@@ -159,6 +162,7 @@
       // How much open air the route needs above the floor at each column. Anything above that is free to fill.
       var need = [], t;
       for (t = 0; t <= 24; t++) need.push(t < off ? 2 : (t < s0 + 1 ? 6 : 5));
+      if (conn && conn.type === 'spring') for (t = Math.max(0, F - 6); t <= F - 1; t++) need[t] = Math.max(need[t], 6);
       for (i = 0; i < obs.length; i++) {
         var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' ? 6 : 5));
         for (t = Math.max(0, q.t0 - 3); t <= Math.min(24, q.t0 + q.w + 2); t++) need[t] = Math.max(need[t], n);
@@ -195,6 +199,8 @@
         box(F - 3, F - 1, y - 2, y - 1, d, '#');
         conn.crumble = !!EL.crumble && D >= 2;                   // the floating step gives way if you linger
         box(F - 7, F - 5, y - 4, y - 4, d, conn.crumble ? 'C' : '#'); if (conn.crumble) stats.crumble += 3;
+      } else if (conn.type === 'spring') {                       // a spring under the opening throws you up to the next floor
+        put(F - 2, d, y - 1, 'u'); stats.springs++;
       } else if (conn.type === 'lift') {                         // a platform that rides up through the opening
         box(F - 3, F - 1, y - 1, y - 1, d, '='); box(F - 3, F - 3, yN, y - 2, d, '|'); stats.platforms++;
       } else if (EL.refills && Hf >= 8) put(F - 2, d, y - 5, 'o');

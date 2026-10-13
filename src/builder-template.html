@@ -32,7 +32,7 @@
   #slots span { display: block; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #slots .live b { color: var(--ok); }
   #slots .add b { color: var(--dim); }
-  .three { display: grid; grid-template-columns: 1fr 64px; gap: 8px; }
+  .three { display: grid; grid-template-columns: 1fr 92px 64px; gap: 8px; }
   #moves { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
   #moves button { padding: 4px 6px; font-size: 12px; }
   #order-save { width: 100%; margin-top: 6px; }
@@ -101,6 +101,7 @@
     </div>
     <div class="three">
       <label>World <select id="world"></select></label>
+      <label title="One screen is 48 rows. Two screens is 96 rows and the game scrolls up and down to follow you.">Height <select id="rows"><option value="48">1 screen</option><option value="96">2 screens</option></select></label>
       <label hidden>Level <input type="text" id="level" inputmode="numeric" maxlength="2" placeholder="-"></label>
       <label title="Par time in seconds for the time star. Set from your play test if left empty.">Par s <input type="text" id="par" inputmode="numeric" maxlength="3" placeholder="auto"></label>
     </div>
@@ -137,6 +138,8 @@
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="refills" aria-pressed="true">Stamina pickups</button>
+            <button type="button" data-v="springs" aria-pressed="true">Springs</button>
+            <button type="button" data-v="gems" aria-pressed="true">Gem</button>
           </div>
         </div>
         <label>How many spikes
@@ -219,7 +222,7 @@
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y']]],
     ['Moving', [['=', 'Platform', '8'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
-    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R']]],
+    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
     ['Tools', [['.', 'Erase', 'X']]]
   ];
@@ -227,7 +230,7 @@
   GROUPS.forEach(function (g) { g[1].forEach(function (t) { TILES.push(t); }); });
   var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
                  'S': 'start', 'E': 'exit', 'o': 'dash_refill',
-                 'b': 'backdrop', 'F': 'fire', '*': 'fireball', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
+                 'b': 'backdrop', 'u': 'spring', 'G': 'gem', 'F': 'fire', '*': 'fireball', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical' };
   var $ = function (id) { return document.getElementById(id); };
 
 /*SHARED_CONFIG*/
@@ -265,8 +268,9 @@
   }
   function fromJSON(d) {
     if (!d || d.format !== 1) throw new Error('This is not a format 1 room file.');
-    if (!d.grid || d.grid.cols !== COLS || d.grid.rows !== ROWS || d.grid.tile !== T) throw new Error('Room must be ' + COLS + ' by ' + ROWS + ' tiles of ' + T + ' px.');
-    if (!d.tiles || d.tiles.length !== ROWS) throw new Error('Room has the wrong number of rows.');
+    if (!d.grid || d.grid.cols !== COLS || (d.grid.rows !== 48 && d.grid.rows !== 96) || d.grid.tile !== T) throw new Error('Room must be ' + COLS + ' tiles wide and 48 or 96 tall, at ' + T + ' px.');
+    if (!d.tiles || d.tiles.length !== d.grid.rows) throw new Error('Room has the wrong number of rows.');
+    ROWS = d.grid.rows;
     var g = d.tiles.map(function (row, r) {
       if (row.length !== COLS) throw new Error('Row ' + r + ' is the wrong width.');
       return row.split('').map(function (ch) { if (!LEGEND[ch]) throw new Error('Unknown tile "' + ch + '" in row ' + r + '.'); return ch; });
@@ -276,7 +280,7 @@
     tiles = g;
   }
   function snapshot() { return tiles.map(function (r) { return r.join(''); }).join('\n'); }
-  function restore(s) { tiles = s.split('\n').map(function (r) { return r.split(''); }); }
+  function restore(s) { tiles = s.split('\n').map(function (r) { return r.split(''); }); if (tiles.length !== ROWS) { ROWS = tiles.length; $('rows').value = String(ROWS); fit(); } }
   function saveDraft() { dirty = true; try { localStorage.setItem(DRAFT_KEY, JSON.stringify(toJSON())); } catch (e) {} }
   function say(msg) { $('status').textContent = msg || ''; }
 
@@ -307,10 +311,22 @@
   function wallAt(c, r) { return r < 0 || r >= ROWS || c < 0 || c >= COLS || tiles[r][c] === '#' || tiles[r][c] === 'I'; }
   function alone() { return false; }
   function backAt(c, r) { return wallAt(c, r) || tiles[r][c] === 'b'; }
+  function drawSpringIcon(b, x, y) {
+    b.fillStyle = '#5a6485'; b.fillRect(x + 1, y + 8, 8, 2);
+    b.fillStyle = '#9aa5bb'; b.fillRect(x + 3, y + 6, 4, 1); b.fillRect(x + 2, y + 4, 6, 1); b.fillRect(x + 3, y + 2, 4, 1); b.fillRect(x + 1, y, 8, 2);
+    b.fillStyle = '#e6ebf5'; b.fillRect(x + 1, y, 8, 1);
+  }
+  function drawGemIcon(b, x, y) {
+    b.fillStyle = C.tealDim; b.fillRect(x + 4, y + 1, 2, 8); b.fillRect(x + 2, y + 3, 6, 4); b.fillRect(x + 1, y + 4, 8, 2);
+    b.fillStyle = C.teal; b.fillRect(x + 4, y + 2, 2, 6); b.fillRect(x + 3, y + 4, 4, 2);
+    b.fillStyle = '#d8fff3'; b.fillRect(x + 5, y + 3, 1, 1);
+  }
   function drawTile(b, ch, x, y, c, r, icon) {
     if (ch === '#' || ch === 'I') drawSolid(b, x, y, SOLID_KIND[ch], icon ? alone : wallAt, c, r);
     else if (ch === 'C') drawCrumble(b, x, y, c, r);
     else if (ch === 'F') drawFlame(b, x, y, (c + r) % 2);
+    else if (ch === 'u') drawSpringIcon(b, x, y);
+    else if (ch === 'G') drawGemIcon(b, x, y);
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === '=', !icon && c < COLS - 1 && tiles[r][c + 1] === '=');
@@ -552,14 +568,15 @@
   function autoBuild(seed) {
     lastSeed = seed;
     var styles = picked('g-styles'), els = {};
-    picked('g-els').forEach(function (k) { els[k] = true; });
-    var out = generateRoom({ difficulty: +$('g-diff').value, obstacles: +$('g-obs').value, styles: styles, spikes: +$('g-spikes').value, elements: els, world: room.world || 1 }, seed);
+    Array.prototype.forEach.call($('g-els').children, function (b) { els[b.dataset.v] = !b.hidden && b.getAttribute('aria-pressed') === 'true'; });
+    var out = generateRoom({ difficulty: +$('g-diff').value, obstacles: +$('g-obs').value, styles: styles, spikes: +$('g-spikes').value, elements: els, world: room.world || 1, rows: ROWS }, seed);
     pushUndo(); setDb(null);
     tiles = out.room.tiles.map(function (r) { return r.split(''); });
     room = { id: out.room.id, name: out.room.name, difficulty: out.room.difficulty, entities: [], world: room.world || 1, level: room.level || 0, par: 0 };
     syncMeta();
     $('name').value = room.name; $('diff').value = String(room.difficulty);
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
+    if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
     if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms'));
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
@@ -571,11 +588,29 @@
   // which world and level this room is, and its par time; the world also sets the look
   WORLDS.forEach(function (w) { var o = document.createElement('option'); o.value = w.id; o.textContent = w.id + ' ' + w.name; $('world').appendChild(o); });
   function syncMeta() {
-    $('world').value = String(room.world || 1); $('level').value = room.level > 0 ? room.level : ''; $('par').value = room.par > 0 ? room.par : '';
+    $('world').value = String(room.world || 1); $('rows').value = String(ROWS); $('level').value = room.level > 0 ? room.level : ''; $('par').value = room.par > 0 ? room.par : '';
     var th = themeOf(room); setTileTheme(th); C.bg = th.bg;
     buildPalette();
   }
   $('allp').addEventListener('change', buildPalette);
+  // Height: growing adds blank rows above the old top; shrinking cuts the top half. Undo brings the old height back.
+  $('rows').addEventListener('change', function () {
+    var want = +this.value, r, c;
+    if (want === ROWS) return;
+    pushUndo();
+    if (want > ROWS) {
+      var extra = [];
+      for (r = 0; r < want - ROWS; r++) { var row = []; for (c = 0; c < COLS; c++) row.push(c === 0 || c === COLS - 1 ? '#' : '.'); extra.push(row); }
+      var oldTop = tiles[0].map(function (ch, cc) { return cc === 0 || cc === COLS - 1 ? '#' : '.'; });
+      tiles = [extra[0]].concat(extra.slice(1), [oldTop], tiles.slice(1));
+      for (c = 0; c < COLS; c++) tiles[0][c] = '#';
+    } else {
+      tiles = tiles.slice(tiles.length - want);
+      for (c = 0; c < COLS; c++) tiles[0][c] = '#';
+    }
+    ROWS = want;
+    changed(); fit(); say('Room is now ' + (want / 48) + (want > 48 ? ' screens' : ' screen') + ' tall. Undo brings the old height back.');
+  });
   $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); refresh(); mapWorld = room.world; renderSlots(); });
   $('level').addEventListener('input', function () { room.level = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); renderSlots(); });
   $('par').addEventListener('input', function () { room.par = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });

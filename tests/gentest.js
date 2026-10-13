@@ -79,6 +79,7 @@ const fs = require('fs');
           } else {
             until(() => ({}), () => s.ground, 200);
             if (o.type === 'crown' && dist(o.t0) < 26) { until(() => ({ x: -d }), () => dist(o.t0) >= 30, 200); step({}); step({}); step({}); }
+            if (o.type !== 'crown' && dist(o.t0) < 4) { until(() => ({ x: -d }), () => dist(o.t0) >= 8, 200); step({}); step({}); }   // landed too close: back off before the jump
             until(() => ({ x: d }), () => dist(o.t0) <= (o.type === 'crown' ? 24 : 6));
             let dashed = false, k = 0;
             step({ x: d, jump: true });
@@ -110,6 +111,11 @@ const fs = require('fs');
           until(() => ({}), () => s.y + 10 === yN * 10, 900);
           until(() => ({ x: -d }), () => s.ground && s.y + 10 === yN * 10 && (d > 0 ? s.x + 8 <= endEdge(FW - 4) : s.x >= endEdge(FW - 4)), 300);
           step({});
+        } else if (C.type === 'spring') {    // step onto the spring, ride it up through the opening, land on the slab
+          until(() => ({ x: d }), () => dist(FW - 2) <= -3);
+          until(() => ({ jump: true }), () => s.y + 10 <= yN * 10 - 2, 150);
+          until((k) => ({ x: -d, jump: s.vy < 0 }), () => s.ground && s.y + 10 === yN * 10, 300);
+          step({});
         } else if (C.type === 'open') {
           until(() => ({ x: d }), atWall);
           until(() => ({ x: d, y: -1, grab: true }), () => s.y + 10 <= yN * 10 - 8, 400);
@@ -137,8 +143,8 @@ const fs = require('fs');
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
-      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1,
-                     elements: { firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
+      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1, rows: seed % 5 === 0 ? 96 : 48,
+                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }
