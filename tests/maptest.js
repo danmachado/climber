@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const ctx = await b.newContext({ viewport: { width: 540, height: 960 } });
   const p = await ctx.newPage();
-  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  const errs = []; p.on('pageerror', e => errs.push(String(e) + ' @ ' + (e.stack || '').split('\n').slice(0, 3).join(' | ')));
   await p.route('**/rest/v1/**', r => r.abort());           // built-in levels only
   await p.goto('file:///home/claude/climber/index.html'); await p.waitForTimeout(300);
   const shot = async (n) => { await p.waitForTimeout(150); await p.screenshot({ path: __dirname + '/' + n + '.png' }); };
