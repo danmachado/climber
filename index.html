@@ -199,16 +199,18 @@
   var LIVE_KEY = 'climber.live.v1';
   var starters = JSON.parse(document.getElementById('starter-rooms').textContent); // built-in set, also the offline fallback
   var pool = starters, queue = [];
-  // Worlds and levels. Built-in rooms fill each world until numbered levels are published for it.
+  // Worlds and levels. Built-in rooms fill every slot; a published level with the same world and number takes that slot over.
   var PROG_KEY = 'climber.progress.v1', prog = {}, levels = [], liveRooms = [], dataVer = 0, unlockAll = location.hash === '#unlock';
   try { prog = JSON.parse(localStorage.getItem(PROG_KEY)) || {}; } catch (e) {}
   function rebuildLevels() {
     levels = WORLDS.map(function (wd, w) {
-      var built = [], pub = [], loose = [], i, r;
-      for (i = 0; i < starters.length; i++) if (worldOf(starters[i]) === w + 1) built.push(starters[i]);
-      for (i = 0; i < liveRooms.length; i++) { r = liveRooms[i]; if (worldOf(r) === w + 1) (r.level > 0 ? pub : loose).push(r); }
-      var byLevel = function (a, b) { return (a.level | 0) - (b.level | 0); };
-      return (pub.length ? pub.sort(byLevel) : built.sort(byLevel)).concat(loose);
+      // each numbered slot holds the built-in room unless a published level has that number; unnumbered ones go last
+      var slot = {}, nums = [], loose = [], i, r, n;
+      for (i = 0; i < starters.length; i++) if (worldOf(starters[i]) === w + 1 && starters[i].level > 0) slot[starters[i].level] = starters[i];
+      for (i = 0; i < liveRooms.length; i++) { r = liveRooms[i]; if (worldOf(r) === w + 1) { if (r.level > 0) slot[r.level] = r; else loose.push(r); } }
+      for (n in slot) nums.push(+n);
+      nums.sort(function (a, b) { return a - b; });
+      return nums.map(function (k) { return slot[k]; }).concat(loose);
     });
     dataVer++;
   }

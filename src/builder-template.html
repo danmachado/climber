@@ -23,6 +23,15 @@
   input[type=text], input[type=password], select, textarea { width: 100%; margin-top: 4px; padding: 7px 8px; background: var(--field); color: var(--text);
     border: 1px solid var(--line); border-radius: 4px; font: inherit; }
   .two { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+  #mapworlds { display: flex; gap: 5px; margin-bottom: 6px; }
+  #mapworlds button { flex: 1; padding: 4px 4px; font-size: 12px; color: var(--dim); }
+  #mapworlds button[aria-pressed=true] { color: var(--text); background: #26315f; }
+  #slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  #slots button { padding: 5px 3px 4px; text-align: center; line-height: 1.15; min-width: 0; }
+  #slots b { display: block; font: 700 13px Menlo, Consolas, monospace; }
+  #slots span { display: block; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #slots .live b { color: var(--ok); }
+  #slots .add b { color: var(--dim); }
   .three { display: grid; grid-template-columns: 1fr 64px 64px; gap: 8px; }
   #paint { width: 300px; border-right: 0; border-left: 1px solid var(--line); }
   #palette { display: flex; flex-direction: column; gap: 12px; }
@@ -91,6 +100,12 @@
       <label>World <select id="world"></select></label>
       <label title="Its place in the world: 1 is the first level. Leave empty to put it after the numbered ones.">Level <input type="text" id="level" inputmode="numeric" maxlength="2" placeholder="-"></label>
       <label title="Par time in seconds for the time star. Set from your play test if left empty.">Par s <input type="text" id="par" inputmode="numeric" maxlength="3" placeholder="auto"></label>
+    </div>
+    <div>
+      <h2>Game map</h2>
+      <div id="mapworlds"></div>
+      <div id="slots"></div>
+      <p class="hint" id="slot-note" style="margin-top:6px"></p>
     </div>
     <details id="auto">
       <summary>Auto-build a room</summary>
@@ -187,6 +202,7 @@
 </div>
 
 <script type="application/json" id="starter">/*ROOM_JSON*/</script>
+<script type="application/json" id="all-rooms">[/*ALL_ROOMS*/]</script>
 <script>
 (function () {
   'use strict';
@@ -256,7 +272,7 @@
   }
   function snapshot() { return tiles.map(function (r) { return r.join(''); }).join('\n'); }
   function restore(s) { tiles = s.split('\n').map(function (r) { return r.split(''); }); }
-  function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(toJSON())); } catch (e) {} }
+  function saveDraft() { dirty = true; try { localStorage.setItem(DRAFT_KEY, JSON.stringify(toJSON())); } catch (e) {} }
   function say(msg) { $('status').textContent = msg || ''; }
 
   // ---- editing ----
@@ -266,6 +282,7 @@
     tiles[r][c] = ch;
   }
   function changed() { cleared = false; saveDraft(); refresh(); }
+  var dirty = false;                               // edits since this room was opened or published
   function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 200) undoStack.shift(); redoStack = []; }
   function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); changed(); }
   function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); changed(); }
@@ -491,7 +508,8 @@
   function load(d, note) {
     fromJSON(d); undoStack = []; redoStack = []; cleared = false;
     $('name').value = room.name; $('diff').value = String(room.difficulty); syncMeta();
-    saveDraft(); refresh(); say(note || '');
+    saveDraft(); dirty = false; refresh(); say(note || '');
+    if (window.renderSlots) { mapWorld = room.world || 1; renderSlots(); }
   }
 
   [$('play'), $('play2')].forEach(function (b) { b.addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); }); });
@@ -553,8 +571,8 @@
     buildPalette();
   }
   $('allp').addEventListener('change', buildPalette);
-  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); refresh(); });
-  $('level').addEventListener('input', function () { room.level = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
+  $('world').addEventListener('change', function () { room.world = +this.value; syncMeta(); saveDraft(); refresh(); mapWorld = room.world; renderSlots(); });
+  $('level').addEventListener('input', function () { room.level = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); renderSlots(); });
   $('par').addEventListener('input', function () { room.par = Math.max(0, parseInt(this.value, 10) || 0); saveDraft(); });
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && playing) { stopPlay(); return; }
@@ -714,13 +732,18 @@
   });
   $('p-publish').addEventListener('click', function () {
     if (runChecks().some(function (k) { return !k.ok; })) { say('Not published. Every check must pass, including beating the room in play test.'); return; }
+    var w = room.world || 1, lv = room.level || 0, old = lv ? liveAt(w, lv) : null, note = '';
     saveVersion(true).then(function (vid) { return api('rooms?id=eq.' + dbId, { method: 'PATCH', body: { published_version_id: vid } }); })
-      .then(function () { say('Published. The game picks it up the next time it starts.'); return listRooms(); }).catch(fail);
+      .then(function () {                           // one level per slot: whatever was published there before steps aside
+        if (old && old.id !== dbId) { note = ' It replaced "' + old.name + '" in that slot.'; return api('rooms?id=eq.' + old.id, { method: 'PATCH', body: { published_version_id: null } }); }
+      })
+      .then(function () { dirty = false; say((lv ? 'Published as ' + w + '-' + lv + '.' : 'Published.') + note + ' The game picks it up the next time it starts.'); return listRooms(); })
+      .then(loadLive).catch(fail);
   });
   $('p-unpub').addEventListener('click', function () {
     var r = pickedRoom(); if (!r) return;
     api('rooms?id=eq.' + r.id, { method: 'PATCH', body: { published_version_id: null } })
-      .then(function () { say('Unpublished "' + r.name + '". It is a draft again.'); return listRooms(); }).catch(fail);
+      .then(function () { say('Unpublished "' + r.name + '". It is a draft again.'); return listRooms(); }).then(loadLive).catch(fail);
   });
   $('p-open').addEventListener('click', function () {
     var r = pickedRoom(), vid = $('p-vers').value; if (!r || !vid) return;
@@ -734,9 +757,75 @@
     if (!r || !v) return;
     if (!v.validated) { say('That version was never beaten in play test, so it cannot go live.'); return; }
     api('rooms?id=eq.' + r.id, { method: 'PATCH', body: { published_version_id: vid } })
-      .then(function () { say('That version of "' + r.name + '" is now live.'); return listRooms(); }).catch(fail);
+      .then(function () { say('That version of "' + r.name + '" is now live.'); return listRooms(); }).then(loadLive).catch(fail);
   });
   showPub();
+
+  // ---- game map: every slot in every world, what is in it, and opening it to edit ----
+  var ALL = JSON.parse($('all-rooms').textContent), liveRooms = [], mapWorld = 1, slotArm = '';
+  function liveAt(w, lv) { return liveRooms.filter(function (r) { return worldOf(r.data) === w && (r.data.level | 0) === lv; })[0] || null; }
+  function builtAt(w, lv) { return ALL.filter(function (r) { return worldOf(r) === w && (r.level | 0) === lv; })[0] || null; }
+  // Published levels are public, so the map can be read without signing in.
+  function loadLive() {
+    var head = { headers: { apikey: BACKEND.key } }, rows;
+    return fetch(BACKEND.url + '/rest/v1/rooms?select=id,name,difficulty,published_version_id&published_version_id=not.is.null', head)
+      .then(function (r) { if (!r.ok) throw new Error('rooms'); return r.json(); })
+      .then(function (list) {
+        rows = list;
+        if (!rows.length) return [];
+        return fetch(BACKEND.url + '/rest/v1/room_versions?select=id,data&id=in.(' + rows.map(function (x) { return x.published_version_id; }).join(',') + ')', head).then(function (r) { if (!r.ok) throw new Error('versions'); return r.json(); });
+      })
+      .then(function (vers) {
+        var byId = {};
+        vers.forEach(function (v) { byId[v.id] = v.data; });
+        liveRooms = rows.filter(function (x) { return byId[x.published_version_id]; }).map(function (x) { return { id: x.id, name: x.name, difficulty: x.difficulty, data: byId[x.published_version_id] }; });
+        renderSlots();
+      })
+      .catch(function () { renderSlots(); });
+  }
+  function slotCount(w) {
+    var n = 0;
+    ALL.forEach(function (r) { if (worldOf(r) === w) n = Math.max(n, r.level | 0); });
+    liveRooms.forEach(function (r) { if (worldOf(r.data) === w) n = Math.max(n, r.data.level | 0); });
+    return n;
+  }
+  function openSlot(w, lv) {
+    var key = w + '-' + lv, live = liveAt(w, lv), built = builtAt(w, lv), d;
+    if (dirty && slotArm !== key && !((room.world || 1) === w && room.level === lv)) { slotArm = key; say('You have changes that are not published. Click ' + key + ' again to open it anyway.'); return; }
+    slotArm = '';
+    if (live) { d = JSON.parse(JSON.stringify(live.data)); d.name = live.name; d.difficulty = live.difficulty; }
+    else if (built) d = JSON.parse(JSON.stringify(built));
+    else d = { format: 1, id: '', name: 'Level ' + key, difficulty: 1, grid: { cols: COLS, rows: ROWS, tile: T }, tiles: blankTiles().map(function (r) { return r.join(''); }), entities: [] };
+    d.world = w; d.level = lv;
+    load(d, live ? 'Editing ' + key + ' "' + d.name + '" (your published level). Publish saves over it.'
+               : (built ? 'Editing ' + key + ' "' + d.name + '" (built-in). Publish makes your version the real ' + key + '.' : 'New level ' + key + '. Publish adds it to the map.'));
+    setDb(live ? live.id : null);
+    if (live && session) listRooms().catch(fail);
+  }
+  function renderSlots() {
+    var mw = $('mapworlds'), box = $('slots'), n = slotCount(mapWorld), i;
+    mw.textContent = ''; box.textContent = '';
+    WORLDS.forEach(function (w) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = w.id + ' ' + w.name; b.setAttribute('aria-pressed', w.id === mapWorld ? 'true' : 'false');
+      b.addEventListener('click', function () { mapWorld = w.id; renderSlots(); });
+      mw.appendChild(b);
+    });
+    for (i = 1; i <= n + 1; i++) (function (lv) {
+      var live = liveAt(mapWorld, lv), built = builtAt(mapWorld, lv), b = document.createElement('button'), t = document.createElement('b'), s = document.createElement('span');
+      b.type = 'button'; t.textContent = lv > n ? '+ ' + mapWorld + '-' + lv : mapWorld + '-' + lv;
+      s.textContent = live ? live.name : (built ? built.name : 'new');
+      b.className = live ? 'live' : (lv > n ? 'add' : '');
+      b.title = live ? 'Your published level. Click to edit it.' : (built ? 'Built-in placeholder. Click to edit and publish your own version.' : 'Add a level here.');
+      b.setAttribute('aria-pressed', (room.world || 1) === mapWorld && room.level === lv ? 'true' : 'false');
+      b.appendChild(t); b.appendChild(s);
+      b.addEventListener('click', function () { openSlot(mapWorld, lv); });
+      box.appendChild(b);
+    })(i);
+    var mine = liveRooms.filter(function (r) { return worldOf(r.data) === mapWorld && (r.data.level | 0) > 0; }).length;
+    $('slot-note').textContent = 'Green numbers are your published levels (' + mine + ' of ' + n + ' here). The rest are built-in placeholders.';
+    $('p-publish').textContent = room.level > 0 ? 'Publish ' + (room.world || 1) + '-' + room.level : 'Publish';
+  }
+  window.renderSlots = renderSlots;
 
   // ---- start: last draft if there is one, otherwise the starter room ----
   // the palette is built by load() below, once the room (and so its world) is known
@@ -746,6 +835,7 @@
   catch (e) { load(JSON.parse($('starter').textContent), ''); }
   restoreView();
   fit();
+  loadLive();
 })();
 </script>
 </body>
