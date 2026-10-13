@@ -1079,12 +1079,13 @@
       else if (cb.state === 'shake') drawCrumble(g, cb.x + (Math.floor(cb.t * 24) % 2 ? 1 : -1), cb.y, cb.c, cb.r);
       else if (cb.t < 0.3) { g.globalAlpha = 1 - cb.t / 0.3; drawCrumble(g, cb.x, cb.y + Math.round(300 * cb.t * cb.t), cb.c, cb.r); g.globalAlpha = 1; }
     }
-    var flick = Math.floor(tick / 14) % 2;            // flames swap shape about four times a second
-    for (i = 0; i < flames.length; i++) { drawFlame(g, flames[i].x, flames[i].y, (flick + i) % 2); if (tick % 14 === 0) mark(flames[i].x, flames[i].y, T, T); }
+    var flick = Math.floor(tick / 14) % 2;
+    // flames swap shape three times a second, each on its own beat, so the screen never repaints every flame at once
+    for (i = 0; i < flames.length; i++) { var fph = (tick + i * 7) % 20 < 10 ? 1 : 0; drawFlame(g, flames[i].x, flames[i].y, fph); if ((tick + i * 7) % 10 === 0) mark(flames[i].x, flames[i].y, T, T); }
     for (i = 0; i < fireballs.length; i++) {
       var fb = fireballs[i];
       drawFireball(g, fb.x, fb.y, flick, fb.axis === 'x' ? fb.dir : 0, fb.axis === 'y' ? fb.dir : 0);
-      mark(fb.x - 6, fb.y - 6, T + 12, T + 12);
+      mark(Math.floor(fb.x) - 2, Math.floor(fb.y) - 2, T + 5, T + 5);   // last frame's spot is still in the previous dirty list, so only the new one is marked
     }
     for (i = 0; i < movers.length; i++) {
       var mv = movers[i];
