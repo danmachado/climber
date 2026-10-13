@@ -25,159 +25,146 @@ NAMES = {
 def G(s): return [r for r in s.strip('\n').split('\n')]
 
 # ---- parts (facing right) ----
-HEAD = {                                              # no eyes: long hair comes out from under the band and hangs over the face
+# ---- parts (facing right). Built like a heavy: a swept mass of dark hair with the band cutting across it, a small
+# face under the band with no eyes (a squint shadow instead), shoulders wider than the head, bare arms, a wide stance
+# and heavy boots. The dark masses (hair, boots, outline) carry the silhouette. ----
+HEAD = {
     'normal': G("""
-...oooo..
-..oddDdo.
-.oBBBBBBo
+..ooooo..
+.odddddo.
+odddDdddo
+kodBBBBBo
 kobbbbbbo
-koSdddddo
-.oSsdsdso
-.oSssssso
-..oSSSSo.
+.oSSSSSo.
+.oSsssso.
+..oSSSo..
 """),
     'blink': G("""
-...oooo..
-..oddDdo.
-.oBBBBBBo
+..ooooo..
+.odddddo.
+odddDdddo
+kodBBBBBo
 kobbbbbbo
-koSdddddo
-.oSsddsdo
-.oSssssso
-..oSSSSo.
+.oSSSSSo.
+.oSsssso.
+..oSSSo..
 """),
     'up': G("""
-...oooo..
-..oddDdo.
-.oBBBBBBo
+..ooooo..
+.odddddo.
+odddDdddo
+kodBBBBBo
 kobbbbbbo
-koSddddso
-.oSsdsdso
-.oSssssso
-..oSSSSo.
+.oSSsSSo.
+.oSsssso.
+..oSSSo..
 """),
     'profile': G("""
-...oooo..
-..oddDdo.
-.oBBBBBBo
+..ooooo..
+.odddddo.
+odddDdddo
+kodBBBBBo
 kobbbbbbo
-koSdddddo
-.oSssdsdo
-.oSssssso
-..oSSSSo.
+.odSSSSo.
+.oSsssso.
+..oSSSo..
 """),
     'shut': G("""
-...oooo..
-..oddDdo.
-.oBBBBBBo
+..ooooo..
+.odddddo.
+odddDdddo
+kodBBBBBo
 kobbbbbbo
-koSdddddo
-.oSdsdsdo
-.oSssssso
-..oSSSSo.
+.oSSSSSo.
+.oSSsSso.
+..oSSSo..
 """),
 }
-TORSO = {                                             # 9 wide: back arm, body, front arm; belt row last
+TORSO = {                                             # 10 wide: back arm (shadow skin), tank top, front arm (skin); belt row last
     'idle': G("""
-.ovhHHHo.
-oSvhhHHso
-oSvhhhHso
-.oooooyoo
+osSvhHHsso
+osSvhhHsso
+.osvhhHso.
+.oooooyoo.
 """),
     'breath': G("""
-.ovhHHHo.
-oSvhhHHso
-oSvhhhHso
-.oooooyoo
-"""),
-    'run_a': G("""
-.ovhHHHso
-oSvhhHHo.
-.ovhhhHo.
-.oooooyoo
-"""),
-    'run_b': G("""
-.ovhHHHo.
-oSvhhHHso
-.ovhhhHo.
-.oooooyoo
+osSvhHHsso
+osSvhhHsso
+.osvhhHso.
+.oooooyoo.
 """),
     'reach': G("""
-oSvhHHHso
-oSvhhHHso
-.ovhhhHo.
-.oooooyoo
+osSvhHHsso
+osSvhhHsso
+.oovhhHoo.
+.oooooyoo.
 """),
     'brace': G("""
-.ovhHHHo.
-.ovhhHHso
-oSvhhhHso
-.oooooyoo
+.osvhHHso.
+osSvhhHsso
+osSvhhHsso
+.oooooyoo.
 """),
     'squash': G("""
-oSvhhHHso
-.oooooyoo
+osSvhhHsso
+.oooooyoo.
 """),
     'wall': G("""
-.ovhHHHo.
-oSvhhHHHo
-.ovhhhHo.
-.oooooyoo
+.osvhHHHo.
+osSvhhHHso
+.osvhhHso.
+.oooooyoo.
 """),
     'bare': G("""
-.ovhHHHo.
-.ovhhHHo.
-.ovhhhHo.
-.oooooyoo
-"""),
-    'tie': G("""
-.ovhHHHo.
-.ovhhHHo.
-.ovhhhHo.
-.oooooyoo
+..ovhHHo..
+..ovhhHo..
+..ovhhHo..
+.oooooyoo.
 """),
 }
 ARM_F = G("""
 os
+ss
 so
-""")                                                  # front arm: a bent forearm, skin with outline
+""")                                                  # front arm: bare, skin
 ARM_B = G("""
 oS
+SS
 So
 """)                                                  # back arm, in shadow
 
-LEGS = {
+LEGS = {                                              # 10 wide, feet apart
     'stand': G("""
-opPPpPPo
-oCc..Cco
+opPo..oPPo
+oCco..oCco
 """),
     'run1': G("""
-pPPo.oPPo
-Cco...oCo
+opPo...oPo
+oCco...oCo
 """),
     'run2': G("""
-.opPPpPo.
-.oCc.Cco.
+.opPo.oPo.
+.oCo..oCo.
 """),
     'run3': G("""
-.opPPPpo.
-..oCcCco.
+..opPPPo..
+..oCcCco..
 """),
     'tuck': G("""
-.opPPpo.
-.oCc.Co.
+..opPPPo..
+...oCco...
 """),
     'kick': G("""
-opPo.oPo
-oCc..oCo
+opPo...oPo
+oCo....oCo
 """),
     'wide': G("""
-opPPPPPPo
-oCc...Cco
+opPo....oPPo
+oCco....oCco
 """),
     'wall': G("""
-.opPPPPo
-.oCc.Cco
+...opPPPo.
+...oCcCco.
 """),
 }
 
@@ -186,130 +173,53 @@ def put(fr, part, x, y):
     for r, row in enumerate(part):
         for c, ch in enumerate(row):
             if ch != '.' and 0 <= y + r < 16 and 0 <= x + c < 16: fr[y + r][x + c] = ch
-def pose(head='normal', hy=2, torso='idle', ty=10, legs='stand', ly=14, hx=3, tx=4, lx=4, extra=None):
+def pose(head='normal', hy=2, torso='idle', ty=10, legs='stand', ly=14, hx=3, tx=3, lx=3, extra=None):
     fr = blank()
     put(fr, LEGS[legs], lx, ly); put(fr, TORSO[torso], tx, ty); put(fr, HEAD[head], hx, hy)
     if extra: put(fr, G(extra), 0, 0)
     return fr
 
 def run_frame(k, bob):                                    # k 0..5: arms swing opposite each other, legs cycle
-    # front arm goes forward-high, forward, down, back-low, back, down; back arm is half a cycle behind
-    swing = [(9, 10), (10, 11), (8, 12), (5, 12), (4, 11), (6, 12)]
+    swing = [(9, 9), (10, 10), (8, 11), (4, 11), (3, 10), (5, 11)]
     legs = ['run1', 'run2', 'run3', 'run1', 'run2', 'run3']
     ty = 10 - bob
-    fr = pose(hy=2 - bob, ty=ty, torso='bare', legs=legs[k], ly=14 - bob, lx=3 if k % 3 == 0 else 4)
+    fr = pose(hy=2 - bob, ty=ty, torso='bare', legs=legs[k], ly=14 - bob, lx=2 if k % 3 == 0 else 3)
     bx, by = swing[(k + 3) % 6]; fx_, fy_ = swing[k]
-    put(fr, ARM_B, bx - 1, by - bob - (1 if k in (3, 4) else 0))
+    put(fr, ARM_B, bx, by - bob)
     put(fr, ARM_F, fx_, fy_ - bob)
     return fr
 
 def raw(s):                                            # a whole hand-drawn frame
     fr = blank(); put(fr, G(s), 0, 0); return fr
 
-DASH_SIDE = raw("""
-................
-................
-................
-................
-................
-.......oooo.....
-......oddDdo....
-.....oBBBBBBo...
-....kobbbbbbo...
-....koSsssSso...
-.....oSsseseo...
-...oooSSSSSso...
-..oSvvhhhHHHHso.
-..oovvhhhhHHoo..
-....oooooyoooo..
-....oCc.oCc.oo..
+# dashes: the body leans into the direction; the game stretches the sprite along the dash as well
+DASH_SIDE = pose(hy=5, hx=5, ty=12, tx=4, torso='reach', legs='kick', ly=14, lx=1)
+DASH_UP = pose(hy=1, hx=4, ty=9, tx=3, torso='reach', legs='tuck', ly=13, lx=3, extra="""
+..........oo....
+..........so....
+..........so....
 """)
-DASH_UP = raw("""
+DASH_DOWN = pose(hy=2, ty=10, torso='brace', legs='wide', ly=14, lx=2)
+DASH_DIAG_UP = pose(hy=2, hx=5, ty=10, tx=4, torso='reach', legs='kick', ly=14, lx=1, extra="""
 ...........oo...
 ...........so...
-.......oooooso..
-......oddDdoo...
-.....oBBBBBBo...
-....kobbbbbbo...
-....koSsseseo...
-.....oSsssSso...
-.....oSssssso...
-......oSSSSo....
-......ovhHHo....
-.....oSvhHHo....
-.....oSvhhHo....
-......ooooyo....
-......opPPpo....
-......oCcCco....
+...........so...
 """)
-DASH_DOWN = raw("""
-................
-......oooo......
-.....oddDdo.....
-....oBBBBBBo....
-...kobbbbbbo....
-...koSsssSso....
-....oSssssso....
-....oSsseseo....
-.....oSSSSo.....
-...osvhHHHso....
-...oSvhhHHHo....
-....ovhhhHo.....
-....oooooyo.....
-....opPPpPo.....
-....oCc.Cco.....
-.....oo.oo......
-""")
-DASH_DIAG_UP = raw("""
-............oo..
-...........oso..
-......oooooso...
-.....oddDdoo....
-....oBBBBBBo....
-...kobbbbbbo....
-...koSsseseo....
-....oSsssSso....
-....oSssssso....
-..ooooSSSSo.....
-.oSvvhhHHHo.....
-.oovvhhhHHo.....
-...ooooyooo.....
-...opPPpo.......
-...oCcCco.......
-....oo..........
-""")
-DASH_DIAG_DOWN = raw("""
-................
-................
-................
-.......oooo.....
-......oddDdo....
-.....oBBBBBBo...
-....kobbbbbbo...
-....koSsssSso...
-.....oSsseseo...
-.....oSssssSso..
-...ooooSSSSSSo..
-..oSvvhhhHHHHo..
-..oovvhhhhHHo...
-...ooooooyoo....
-..opPPpoooo.....
-..oCcCco........
-""")
+DASH_DIAG_DOWN = pose(hy=4, hx=5, ty=11, tx=4, torso='brace', legs='kick', ly=14, lx=1)
 def tie_frame(k):                                         # both hands up at the knot behind the head
     fr = pose(torso='bare', head='blink' if k else 'normal')
-    put(fr, G('oS\noS\noS\nSS'), 2, 7 - k)            # back arm reaches up to the knot (in shadow, behind the head)
-    put(fr, G('.o\nos\nos\nos\nss'), 3, 5 + k)          # front arm over it, hand at the knot
+    put(fr, G('oS\noS\noS\nSS'), 2, 7 - k)
+    put(fr, G('.o\nos\nos\nos\nss'), 3, 5 + k)
     return fr
 def flex_frame(k):                                        # front arm out, hand opening and closing
     fr = pose(torso='bare')
-    put(fr, G('oS\nSo'), 4, 11)
-    put(fr, G('oss\nsso') if k else G('os\nso'), 10, 11)
+    put(fr, ARM_B, 3, 10)
+    put(fr, G('oss\nsso') if k else G('os\nso'), 11, 11)
     return fr
-COIL = pose(head='normal', hy=4, torso='brace', ty=11, legs='wide', ly=14, lx=3)   # the crouch before any dash
+COIL = pose(head='normal', hy=4, torso='brace', ty=11, legs='wide', ly=14, lx=2)   # the crouch before any dash
 
 def wall_frame(dy, hand_hi):                            # facing the wall on the right; arm up to the grip
-    fr = pose(head='profile', hy=2 + dy, torso='wall', ty=10 + dy, legs='wall', ly=14, lx=5)
+    fr = pose(head='profile', hy=2 + dy, torso='wall', ty=10 + dy, legs='wall', ly=14, lx=4)
     arm = G("""
 .o
 so
@@ -328,8 +238,8 @@ ANIMS = [
     ('idle_tie', 6, False, [tie_frame(0), tie_frame(1), tie_frame(0), tie_frame(1), pose()]),
     ('idle_flex', 8, False, [flex_frame(0), flex_frame(1), flex_frame(0), flex_frame(1), pose()]),
     ('jump_up', 0, False, [pose(hy=1, ty=9, torso='reach', legs='tuck', ly=13), pose(hy=0, ty=8, torso='reach', legs='kick', ly=12)]),
-    ('fall', 0, False, [pose(hy=2, ty=10, torso='brace', legs='tuck', ly=14), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=3)]),
-    ('land', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=3), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=3)]),
+    ('fall', 0, False, [pose(hy=2, ty=10, torso='brace', legs='tuck', ly=14), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=2)]),
+    ('land', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=2)]),
     ('dash_side', 0, False, [COIL, DASH_SIDE]),
     ('dash_up', 0, False, [COIL, DASH_UP]),
     ('dash_down', 0, False, [COIL, DASH_DOWN]),
@@ -338,9 +248,9 @@ ANIMS = [
     ('wall_hold', 4, True, [wall_frame(0, 5), wall_frame(1, 5)]),
     ('climb', 8, True, [wall_frame(0, 4), wall_frame(-1, 2), wall_frame(-1, 3), wall_frame(0, 6)]),
     ('wall_slide', 8, True, [wall_frame(1, 7), wall_frame(2, 7)]),
-    ('hurt', 0, False, [pose(head='shut', hy=3, torso='brace', ty=11, legs='wide', ly=14, lx=3)]),
-    ('spawn', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=3), pose(hy=3, ty=11, torso='brace', legs='stand'), pose(hy=0, ty=8, torso='reach', legs='stand', ly=14), pose(hy=1, ty=9, torso='breath'), pose()]),
-    ('exit', 10, False, [pose(torso='run_a', legs='run1', lx=3), pose(hy=1, ty=9, ly=13, torso='run_b', legs='run2', hx=4, tx=5, lx=5), pose(hx=6, tx=7, lx=7), blank()]),
+    ('hurt', 0, False, [pose(head='shut', hy=3, torso='brace', ty=11, legs='wide', ly=14, lx=2)]),
+    ('spawn', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='stand'), pose(hy=0, ty=8, torso='reach', legs='stand', ly=14), pose(hy=1, ty=9, torso='breath'), pose()]),
+    ('exit', 10, False, [run_frame(0, 0), run_frame(1, 1), pose(hx=6, tx=6, lx=6), blank()]),
 ]
 
 def hexrgb(h): h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
