@@ -937,7 +937,7 @@
   var lastSig = '';
   var view = { scale: 0, whole: false, physW: 0, physH: 0 };
   var check = 0; // screen check: 0 off, 1 fps in the top bar, 2 full readout and edge markers, 3 adds the tile grid
-  var fps = { now: 0, low: 0, frames: 0, acc: 0, secs: 0 };
+  var fps = { now: 0, low: 0, frames: 0, acc: 0, secs: 0, work: 0, ms: 0 };   // ms is how long our own code takes per frame; the rest of the interval is the browser
 
   function layout() {
     var dpr = window.devicePixelRatio || 1;
@@ -1125,7 +1125,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
+    var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     drawWeather();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
@@ -1279,7 +1279,7 @@
       h.fillStyle = sg < segs ? (canDash ? C.flame : C.hurt) : '#232c55';
       h.fillRect(Math.round((106 + sg * 6 + (shaky() && sg % 2 === Math.floor(tick / 6) % 2 ? 1 : 0)) * u), Math.round(3 * u), Math.round(5 * u), Math.round(6 * u));
     }
-    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' fps, low ' + fps.low, 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
+    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS', 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
     if (wiz.on) drawWiz(u);
     if (run.won && run.result) {
@@ -1649,13 +1649,14 @@
   // ---- main loop: fixed 60 steps a second so it plays the same on any refresh rate ----
   var last = 0, acc = 0, manual = false;
   function frame(now) {
+    var t0 = performance.now();
     if (!manual) {
       var dt = last ? (now - last) / 1000 : STEP;
       last = now;
       acc += Math.min(dt, 0.1);
       fps.frames++; fps.acc += dt;
       if (fps.acc >= 1) {
-        fps.now = Math.round(fps.frames / fps.acc); fps.secs++;
+        fps.now = Math.round(fps.frames / fps.acc); fps.secs++; fps.ms = Math.round(fps.work / fps.frames * 10) / 10; fps.work = 0;
         if (fps.secs === 2 || (fps.secs > 2 && fps.now < fps.low)) fps.low = fps.now;
         fps.frames = 0; fps.acc = 0;
       }
@@ -1675,6 +1676,7 @@
       }
     }
     render();
+    fps.work += performance.now() - t0;
     window.requestAnimationFrame(frame);
   }
 
