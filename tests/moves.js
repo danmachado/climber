@@ -31,10 +31,15 @@ const { chromium } = require('playwright');
     s = fresh(); for (let i = 0; i < 5; i++) s = G.step(I({ x: 1, grab: true }), 1); const st0 = s.stamina;
     s = G.step(I({ grab: true, jump: true }), 1); const st1 = s.stamina; for (let i = 0; i < 3; i++) s = G.step(I({ x: -1 }), 1);
     R.refund = { before: st0, afterJump: st1, afterPushAway: s.stamina, vx: Math.round(s.vx) };
+    // 5 super and hyper: dash sideways on the ground, press jump a few frames in (holding down makes it a hyper)
+    s = fresh(); for (let i = 0; i < 30; i++) s = G.step(I({ x: -1 }), 1); s = G.step(I({ x: 1, dash: true }), 1); for (let i = 0; i < 5; i++) s = G.step(I({ x: 1 }), 1); s = G.step(I({ x: 1, jump: true }), 1);
+    R.superDash = { vx: Math.round(s.vx), vy: Math.round(s.vy) };
+    s = fresh(); for (let i = 0; i < 30; i++) s = G.step(I({ x: -1 }), 1); s = G.step(I({ x: 1, dash: true }), 1); for (let i = 0; i < 5; i++) s = G.step(I({ x: 1, y: 1 }), 1); s = G.step(I({ x: 1, y: 1, jump: true }), 1);
+    R.hyper = { vx: Math.round(s.vx), vy: Math.round(s.vy) };
     return R;
   });
   console.log(JSON.stringify(out));
-  const ok = out.slide[0] < 40 && out.slide[1] > 60 && out.neutral.backTowardWall && out.directional.stillPushedAway && out.bounce.vy <= -190 && out.bounce.vx <= -200 && out.refund.afterJump < out.refund.before && out.refund.afterPushAway >= out.refund.before - 1;
+  const ok = out.slide[0] < 40 && out.slide[1] > 60 && out.neutral.backTowardWall && out.directional.stillPushedAway && out.bounce.vy <= -190 && out.bounce.vx <= -200 && out.refund.afterJump < out.refund.before && out.refund.afterPushAway >= out.refund.before - 1 && out.superDash.vx >= 300 && out.superDash.vy <= -120 && out.hyper.vx >= 380 && out.hyper.vy > out.superDash.vy;
   console.log('all good:', ok, 'errors', JSON.stringify(errs));
   await b.close();
 })();

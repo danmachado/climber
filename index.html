@@ -38,6 +38,7 @@
     coyote: 0.1, jumpBuffer: 0.1, dashBuffer: 0.08,
     dashSpeed: 240 * K, endDashSpeed: 160 * K, dashTime: 0.15, dashCooldown: 0.2, dashFreeze: 0.05,
     wallJumpH: 130 * K, wallJumpForce: 0.16, wallCheck: 3, wallBoostTime: 0.2,
+    superH: 260 * K, hyperH: 325 * K, hyperV: 0.5,   // jump out of a ground dash: a super (long and high) or, holding down, a hyper (longer and low)
     bounceH: 170 * K, bounceV: -160 * K, bounceVarTime: 0.25, bounceForce: 0.2, bounceCheck: 5,   // wall bounce: dash up beside a wall, then jump
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
     stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
@@ -930,9 +931,15 @@
       if (pl.jumpBuf > 0 && pl.dashDirY <= -0.75 && Math.abs(pl.dashDirX) <= 0.2) {   // dashing straight up beside a wall
         if (touching(1, P.bounceCheck)) wallBounce(-1);
         else if (touching(-1, P.bounceCheck)) wallBounce(1);
+      } else if (pl.jumpBuf > 0 && pl.onGround && Math.abs(pl.dashDirY) < 0.3) {       // jumping out of a sideways dash on the ground
+        var hyper = inp.y > 0, hd = pl.dashDirX > 0 ? 1 : -1;
+        pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal'; pl.dashTimer = 0; pl.forceMove = 0;
+        pl.vx = (hyper ? P.hyperH : P.superH) * hd; pl.vy = P.jumpSpeed * (hyper ? P.hyperV : 1);
+        pl.varJumpSpeed = pl.vy; pl.varJumpTimer = P.varJumpTime; pl.facing = hd;
+        addShake(1, 0.1);
       }
-      if (++pl.trailTick % 2 === 0) pl.trail.push({ x: pl.x, y: pl.y, life: 0.3, facing: pl.facing, dx: pl.dashDirX, dy: pl.dashDirY });
-      if (pl.dashTimer <= 0) {
+      if (pl.state === 'dash' && ++pl.trailTick % 2 === 0) pl.trail.push({ x: pl.x, y: pl.y, life: 0.3, facing: pl.facing, dx: pl.dashDirX, dy: pl.dashDirY });
+      if (pl.state === 'dash' && pl.dashTimer <= 0) {       // the dash runs out on its own (a super or hyper has already ended it)
         pl.state = 'normal';
         if (pl.dashDirY <= 0) { pl.vx = pl.dashDirX * P.endDashSpeed; pl.vy = pl.dashDirY * P.endDashSpeed; }
         if (pl.vy < 0) pl.vy *= 0.75;
