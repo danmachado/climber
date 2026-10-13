@@ -58,9 +58,9 @@
   // so repeats do not show, and a ring of sparse "infill" detail just inside the edge. Each terrain type is its
   // own tileset with the same layout, so new looks can be swapped in without touching the rules.
   var TILESETS = {
-    brick: { face: '#4a5ad0', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#161c4a', core: '#10142c', infill: '#1b2254', moss: '#5f9a74' },
-    frost: { face: '#587a9e', hi: '#f4fcff', side: '#86a9c9', lo: '#2a4361', line: '#172a41', core: '#0b1826', infill: '#14283c', snow: '#f4fcff', snowLo: '#b9d9ec', icicle: '#a8d6ee' },
-    ember: { face: '#8c3b2c', hi: '#ffb48c', side: '#b9573e', lo: '#4c1c15', line: '#2b0f0c', core: '#180a09', infill: '#2c1311', soot: '#2b0f0c', drip: '#d4531f', dripHi: '#ff9a3c' },
+    brick: { face: '#4a5ad0', deep: '#2a3590', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#1e2666', core: '#141a3e', infill: '#1b2254', mark: '#5a6ad8', moss: '#5f9a74' },
+    frost: { face: '#587a9e', deep: '#345070', hi: '#f4fcff', side: '#86a9c9', lo: '#2a4361', line: '#243d58', core: '#0e1f33', infill: '#14283c', mark: '#7a9ab8', snow: '#f4fcff', snowLo: '#b9d9ec', icicle: '#a8d6ee' },
+    ember: { face: '#8c3b2c', deep: '#542016', hi: '#ffb48c', side: '#b9573e', lo: '#4c1c15', line: '#3a1410', core: '#1c0c0a', infill: '#2c1311', mark: '#a84a30', soot: '#2b0f0c', drip: '#d4531f', dripHi: '#ff9a3c' },
     ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
   };
   var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
@@ -78,13 +78,14 @@
       b.fillStyle = S.core; b.fillRect(x, y, 10, 10);
       var near = false;
       for (var dy = -2; dy <= 2 && !near; dy++) for (var dx = -2; dx <= 2; dx++) if (!solidAt(c + dx, r + dy)) { near = true; break; }
-      if (near && v > 0.15) { // infill ring: a fragment or two of the edge pattern, in a colour close to the fill
+      if (v > 0.3) {                                        // mottle: a blob or two of the lighter infill colour, denser near the edge
         b.fillStyle = S.infill;
-        var k = Math.floor(v * 4);
-        if (k === 0) { b.fillRect(x + 1, y + 1, 5, 3); b.fillRect(x + 6, y + 6, 3, 3); }
-        else if (k === 1) { b.fillRect(x + 4, y + 1, 5, 3); }
-        else if (k === 2) { b.fillRect(x + 1, y + 5, 4, 4); b.fillRect(x + 7, y + 2, 2, 2); }
-        else { b.fillRect(x + 2, y + 2, 6, 3); b.fillRect(x + 1, y + 7, 3, 2); }
+        var k = Math.floor(v * 5);
+        if (k === 1) { b.fillRect(x + 1, y + 2, 4, 3); b.fillRect(x + 6, y + 6, 3, 2); }
+        else if (k === 2) { b.fillRect(x + 4, y + 1, 4, 3); b.fillRect(x + 1, y + 7, 2, 2); }
+        else if (k === 3) { b.fillRect(x + 2, y + 5, 5, 3); }
+        else { b.fillRect(x + 5, y + 4, 4, 4); if (near) b.fillRect(x + 1, y + 1, 2, 2); }
+        if (!near && v > 0.6) { b.fillStyle = S.core; b.fillRect(x + 3, y + 3, 2, 2); }   // deeper in, the blobs thin out
       }
       return;
     }
@@ -98,11 +99,35 @@
       var gx = v < 0.34 ? 2 : (v < 0.67 ? 5 : 3);
       b.fillRect(x + gx + 1, y + 2, 1, 1); b.fillRect(x + gx, y + 3, 1, 1);
     } else {
-      b.fillStyle = S.line; b.fillRect(x, y, 10, 10);       // mortar, then two courses of brick with the joints shifted per variant
-      b.fillStyle = S.face;
-      var j1 = v < 0.34 ? 9 : (v < 0.67 ? 6 : 3), j2 = v < 0.34 ? 4 : (v < 0.67 ? 2 : 7);
-      b.fillRect(x, y, j1, 4); if (j1 < 9) b.fillRect(x + j1 + 1, y, 9 - j1, 4);
-      b.fillRect(x, y + 5, j2, 4); b.fillRect(x + j2 + 1, y + 5, 9 - j2, 4);
+      // Celeste-style edge tile: a lit rim, a band of face colour whose inner edge wanders, then the darker interior
+      // with one or two marks per tile (a mortar joint, a frost fleck, a crack) instead of a repeating pattern.
+      var cUL = !solidAt(c - 1, r - 1), cUR = !solidAt(c + 1, r - 1), cDL = !solidAt(c - 1, r + 1), cDR = !solidAt(c + 1, r + 1);
+      var t0 = 2 + Math.floor(v * 2), px, py, deep = [];
+      for (py = 0; py < 10; py++) for (px = 0; px < 10; px++) {
+        var d = 99;
+        if (up) d = Math.min(d, py); if (dn) d = Math.min(d, 9 - py); if (lf) d = Math.min(d, px); if (rt) d = Math.min(d, 9 - px);
+        if (cUL && !up && !lf) d = Math.min(d, Math.max(px, py)); if (cUR && !up && !rt) d = Math.min(d, Math.max(9 - px, py));
+        if (cDL && !dn && !lf) d = Math.min(d, Math.max(px, 9 - py)); if (cDR && !dn && !rt) d = Math.min(d, Math.max(9 - px, 9 - py));
+        var along = (up || dn) ? px : py, t = t0 + Math.floor(tileHash(c * 3 + (along >> 1), r * 5 + 1) * 3);   // 2 to 5 px, wandering along the edge
+        var isDeep = d >= t; deep.push(isDeep);
+        b.fillStyle = isDeep ? S.deep : S.face;
+        b.fillRect(x + px, y + py, 1, 1);
+      }
+      // a mark or two per tile, only in the interior band, in one of four patterns so no two tiles repeat side by side
+      var k = Math.floor(v * 4), marks = [], mi;
+      if (kind === 'brick') {                               // joints of large stones
+        marks = k === 0 ? [[2, 5, 6, 1], [4, 2, 1, 3]] : k === 1 ? [[1, 4, 5, 1], [6, 4, 1, 4]] : k === 2 ? [[3, 6, 5, 1], [5, 3, 1, 3]] : [[4, 1, 1, 6]];
+      } else if (kind === 'frost') {                        // hairline cracks and a frost fleck
+        marks = k === 0 ? [[3, 4, 1, 3], [4, 7, 2, 1]] : k === 1 ? [[2, 5, 3, 1], [6, 3, 1, 2]] : k === 2 ? [[5, 2, 1, 4]] : [[3, 6, 4, 1]];
+      } else {                                              // cracks running down through the rock
+        marks = k === 0 ? [[3, 2, 1, 3], [4, 5, 1, 3]] : k === 1 ? [[6, 3, 1, 2], [5, 5, 1, 3], [4, 8, 1, 1]] : k === 2 ? [[2, 4, 3, 1], [5, 5, 1, 2]] : [[6, 2, 1, 5]];
+      }
+      b.fillStyle = S.line;
+      for (mi = 0; mi < marks.length; mi++) { var m = marks[mi]; for (py = m[1]; py < m[1] + m[3]; py++) for (px = m[0]; px < m[0] + m[2]; px++) if (deep[py * 10 + px]) b.fillRect(x + px, y + py, 1, 1); }
+      if (v > 0.55) {                                       // a lighter fleck: a worn stone face, a frost glint, an ember in the crack
+        var fx = 2 + Math.floor(v * 6), fy = 3 + Math.floor((v * 13) % 4);
+        if (deep[fy * 10 + fx]) { b.fillStyle = kind === 'ember' && v > 0.85 ? S.dripHi : S.mark; b.fillRect(x + fx, y + fy, 1, 1); }
+      }
     }
     // one-pixel edge light: bright on top, dimmer on the sides, dark underneath
     if (lf) { b.fillStyle = S.side; b.fillRect(x, y, 1, 10); }
