@@ -1,0 +1,380 @@
+{
+ "design": "Lone climber: dark olive shirt, slate pants, red bandana (tails simulated in the game)",
+ "dashIndicator": {
+  "feature": "Bandana",
+  "hex": "#D93A2E"
+ },
+ "palette": {
+  "o": {
+   "name": "Outline",
+   "hex": "#0D0F18"
+  },
+  "d": {
+   "name": "Hair",
+   "hex": "#2E201C"
+  },
+  "D": {
+   "name": "Hair tuft",
+   "hex": "#543A30"
+  },
+  "B": {
+   "name": "Bandana highlight",
+   "hex": "#F05C46"
+  },
+  "b": {
+   "name": "Bandana",
+   "hex": "#D93A2E"
+  },
+  "k": {
+   "name": "Bandana knot",
+   "hex": "#A0261E"
+  },
+  "s": {
+   "name": "Skin",
+   "hex": "#D8A77A"
+  },
+  "S": {
+   "name": "Skin shadow",
+   "hex": "#B2805A"
+  },
+  "e": {
+   "name": "Eye",
+   "hex": "#14101A"
+  },
+  "H": {
+   "name": "Shirt highlight",
+   "hex": "#606E58"
+  },
+  "h": {
+   "name": "Shirt",
+   "hex": "#3E483A"
+  },
+  "v": {
+   "name": "Shirt shadow",
+   "hex": "#2C342A"
+  },
+  "y": {
+   "name": "Buckle",
+   "hex": "#CDAA5A"
+  },
+  "P": {
+   "name": "Pants highlight",
+   "hex": "#424858"
+  },
+  "p": {
+   "name": "Pants",
+   "hex": "#2A2F3A"
+  },
+  "c": {
+   "name": "Boots",
+   "hex": "#604C3C"
+  },
+  "C": {
+   "name": "Boot highlight",
+   "hex": "#80665A"
+  }
+ },
+ "animations": [
+  {
+   "name": "idle",
+   "frameCount": 4,
+   "fps": 4,
+   "loop": true,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "run",
+   "frameCount": 6,
+   "fps": 12,
+   "loop": true,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     4.5
+    ]
+   ]
+  },
+  {
+   "name": "jump_up",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     3.5
+    ]
+   ]
+  },
+  {
+   "name": "fall",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     6.5
+    ]
+   ]
+  },
+  {
+   "name": "land",
+   "frameCount": 2,
+   "fps": 12,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     8.5
+    ],
+    [
+     3,
+     6.5
+    ]
+   ]
+  },
+  {
+   "name": "dash_side",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     7.5
+    ],
+    [
+     4,
+     8.5
+    ]
+   ]
+  },
+  {
+   "name": "dash_up",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     7.5
+    ],
+    [
+     4,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "dash_down",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     7.5
+    ],
+    [
+     3,
+     4.5
+    ]
+   ]
+  },
+  {
+   "name": "dash_diag_up",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     7.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "dash_diag_down",
+   "frameCount": 2,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     7.5
+    ],
+    [
+     4,
+     6.5
+    ]
+   ]
+  },
+  {
+   "name": "wall_hold",
+   "frameCount": 2,
+   "fps": 4,
+   "loop": true,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     6.5
+    ]
+   ]
+  },
+  {
+   "name": "climb",
+   "frameCount": 4,
+   "fps": 8,
+   "loop": true,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "wall_slide",
+   "frameCount": 2,
+   "fps": 8,
+   "loop": true,
+   "anchors": [
+    [
+     3,
+     6.5
+    ],
+    [
+     3,
+     7.5
+    ]
+   ]
+  },
+  {
+   "name": "hurt",
+   "frameCount": 1,
+   "fps": 0,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     6.5
+    ]
+   ]
+  },
+  {
+   "name": "spawn",
+   "frameCount": 5,
+   "fps": 12,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     8.5
+    ],
+    [
+     3,
+     6.5
+    ],
+    [
+     3,
+     3.5
+    ],
+    [
+     3,
+     4.5
+    ],
+    [
+     3,
+     5.5
+    ]
+   ]
+  },
+  {
+   "name": "exit",
+   "frameCount": 4,
+   "fps": 10,
+   "loop": false,
+   "anchors": [
+    [
+     3,
+     5.5
+    ],
+    [
+     4,
+     4.5
+    ],
+    [
+     6,
+     5.5
+    ],
+    null
+   ]
+  }
+ ]
+}

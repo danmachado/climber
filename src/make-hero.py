@@ -6,7 +6,8 @@ def rgb(h): h = h.lstrip('#'); return [int(h[i:i+2], 16) for i in (0, 2, 4)]
 #   'lantern'        the simple lantern character drawn in code (no sprite sheet)
 #   'hero-mustache'  Dan's mustached hero (sprite pack in hero-mustache/)
 #   'hero'           the earlier human with the orange hat (sprite pack in hero/)
-HERO_CHOICE = 'hero-mustache'
+#   'hero-wolf'      the lone climber with the bandana (drawn in code by hero-wolf/draw.py; the tails are simulated in the game)
+HERO_CHOICE = 'hero-wolf'
 
 # colour roles per pack: the game recolours these for "dash used" and "tired", and takes its effect colours from here
 ROLES = {
@@ -19,6 +20,13 @@ ROLES = {
         'spent': '#3A2E14',                                                   # belt buckle goes dull when there is not enough stamina to dash
         'tired': [['#FFFFFF', '#C9CEDD'], ['#E0E0E0', '#A9AFC2'], ['#EEC39A', '#CFA07A'], ['#EABD8B', '#C2936C']],   # low stamina: shirt and skin go grey and flat
         'trail': ['#FFFFFF', '#EEC39A'], 'burst': ['#ffffff', '#eec39a'],     # dash afterimages and the death burst: shirt white, then skin
+    },
+    'hero-wolf': {
+        'spent': '#5A5F6E',                                                   # band goes slate grey when there is not enough stamina to dash
+        'spentPairs': [['#F05C46', '#6E7382'], ['#D93A2E', '#5A5F6E'], ['#A0261E', '#40444F']],   # every shade of the band, not just one
+        'tired': [['#606E58', '#3E483A'], ['#3E483A', '#2C342A'], ['#D8A77A', '#B2805A'], ['#B2805A', '#8C6244']],   # low stamina: shirt and skin drop a tone
+        'trail': ['#D93A2E', '#D8A77A'], 'burst': ['#d93a2e', '#d8a77a'],     # afterimages and the death burst: bandana red, then skin
+        'chain': { 'can': ['#D93A2E', '#F05C46'], 'spent': ['#5A5F6E', '#6E7382'], 'tired': ['#C47F24', '#FFB74A'], 'flash': '#FFFFFF' },   # the simulated tails
     },
 }
 PACK = HERO_CHOICE if HERO_CHOICE != 'lantern' else 'hero-mustache'           # the lantern still carries a sheet, it just is not switched on
@@ -34,12 +42,15 @@ for i, a in enumerate(rows):
     assert im.size == (a['frameCount'] * 16, 16), (a['name'], im.size)
     atlas.paste(im, (0, i * 16))
     meta[a['name']] = {'row': i, 'n': a['frameCount'], 'fps': a['fps'] or 16, 'loop': bool(a['loop'])}
+    if a.get('anchors'): meta[a['name']]['anchors'] = a['anchors']
 buf = io.BytesIO(); atlas.save(buf, 'PNG', optimize=True)
 cfg = {
     'enabled': USE_SPRITES,
     'frame': 16,
     'dashColor': rgb(m['dashIndicator']['hex']),
     'spentColor': rgb(R['spent']),
+    'spentPairs': [[rgb(a), rgb(b)] for a, b in R.get('spentPairs', [])],
+    'chain': R.get('chain'),
     'tired': [[rgb(a), rgb(b)] for a, b in R['tired']],
     'trail': [rgb(c) for c in R['trail']],
     'burst': R['burst'] if USE_SPRITES else ['#ffe9b8', '#ffb74a'],          # death, respawn and trail colours
