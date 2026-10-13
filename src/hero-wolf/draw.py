@@ -166,6 +166,18 @@ oCco....oCco
 ...opPPPo.
 ...oCcCco.
 """),
+    'wallbent': G("""
+....opPPo.
+.....oCco.
+"""),
+    'wallpush': G("""
+..opPPPPo.
+..oCc.Cco.
+"""),
+    'duck': G("""
+opPPo.oPPo
+oCco..oCco
+"""),
 }
 
 def blank(): return [['.'] * 16 for _ in range(16)]
@@ -218,16 +230,44 @@ def flex_frame(k):                                        # front arm out, hand 
     return fr
 COIL = pose(head='normal', hy=4, torso='brace', ty=11, legs='wide', ly=14, lx=2)   # the crouch before any dash
 
-def wall_frame(dy, hand_hi):                            # facing the wall on the right; arm up to the grip
-    fr = pose(head='profile', hy=2 + dy, torso='wall', ty=10 + dy, legs='wall', ly=14, lx=4)
-    arm = G("""
+ARM_UP = G("""
 .o
 so
 so
 oo
-""")
-    put(fr, arm, 12, hand_hi)
+""")                                                  # an arm reaching up the wall, hand at the top
+def wall_frame(dy, hand_hi, legs='wall', back_hi=None, hx=3, tx=3):   # facing the wall on the right
+    fr = pose(head='profile', hy=2 + dy, torso='wall', ty=10 + dy, legs=legs, ly=14, lx=4, hx=hx, tx=tx)
+    if back_hi is not None: put(fr, G('.o\nSo\nSo\noo'), 11, back_hi)   # the other hand, lower, in shadow
+    put(fr, ARM_UP, 12, hand_hi)
     return fr
+# climb: reach high, pull the body up with the knees bent, push with the legs, plant and grip again
+CLIMB = [wall_frame(0, 4, 'wall', 8), wall_frame(-1, 5, 'wallbent', 9), wall_frame(-2, 2, 'wallpush', 6), wall_frame(-1, 3, 'wall', 7)]
+# wall slide: leaning away from the wall, one arm braced straight at it, feet on the wall, knees bent
+def slide_frame(dy):
+    fr = pose(head='profile', hy=2 + dy, hx=2, torso='wall', ty=10 + dy, tx=2, legs='wallbent', ly=14, lx=5)
+    put(fr, G('oss\n.oo'), 11, 9 + dy)                    # arm straight out to the wall
+    return fr
+def fall_frame(k):                                        # arms up at first, then out to brace, body tucking
+    fr = pose(hy=2 + k, ty=10 + k, torso='bare', legs='tuck' if k else 'kick', ly=14, lx=3)
+    if k: put(fr, G('oS\nSo'), 2, 10 + k); put(fr, G('os\nso'), 11, 10 + k)
+    else: put(fr, G('oS\noS\nSS'), 3, 7); put(fr, G('os\nos\nss'), 11, 7)
+    return fr
+HURT = pose(head='shut', hy=3, torso='bare', ty=11, legs='wide', ly=14, lx=2, extra="""
+................
+................
+................
+................
+................
+................
+................
+..oS......so....
+..oS......so....
+..SS......ss....
+""")
+DUCK = pose(hy=5, ty=12, torso='squash', legs='duck', ly=14, lx=3)
+LOOKUP = pose(head='up', hy=1)
+SKID = pose(hy=2, hx=2, ty=10, tx=2, torso='brace', legs='wide', ly=14, lx=3)   # leaning back, feet braced forward
 
 ANIMS = [
     # name, fps, loop, frames
@@ -238,17 +278,20 @@ ANIMS = [
     ('idle_tie', 6, False, [tie_frame(0), tie_frame(1), tie_frame(0), tie_frame(1), pose()]),
     ('idle_flex', 8, False, [flex_frame(0), flex_frame(1), flex_frame(0), flex_frame(1), pose()]),
     ('jump_up', 0, False, [pose(hy=1, ty=9, torso='reach', legs='tuck', ly=13), pose(hy=0, ty=8, torso='reach', legs='kick', ly=12)]),
-    ('fall', 0, False, [pose(hy=2, ty=10, torso='brace', legs='tuck', ly=14), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=2)]),
+    ('fall', 0, False, [fall_frame(0), fall_frame(1)]),
     ('land', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=2)]),
     ('dash_side', 0, False, [COIL, DASH_SIDE]),
     ('dash_up', 0, False, [COIL, DASH_UP]),
     ('dash_down', 0, False, [COIL, DASH_DOWN]),
     ('dash_diag_up', 0, False, [COIL, DASH_DIAG_UP]),
     ('dash_diag_down', 0, False, [COIL, DASH_DIAG_DOWN]),
-    ('wall_hold', 4, True, [wall_frame(0, 5), wall_frame(1, 5)]),
-    ('climb', 8, True, [wall_frame(0, 4), wall_frame(-1, 2), wall_frame(-1, 3), wall_frame(0, 6)]),
-    ('wall_slide', 8, True, [wall_frame(1, 7), wall_frame(2, 7)]),
-    ('hurt', 0, False, [pose(head='shut', hy=3, torso='brace', ty=11, legs='wide', ly=14, lx=2)]),
+    ('wall_hold', 4, True, [wall_frame(0, 5, 'wall', 8), wall_frame(1, 5, 'wall', 9)]),
+    ('climb', 8, True, CLIMB),
+    ('wall_slide', 8, True, [slide_frame(0), slide_frame(1)]),
+    ('hurt', 0, False, [HURT]),
+    ('duck', 0, False, [DUCK]),
+    ('look_up', 0, False, [LOOKUP]),
+    ('skid', 0, False, [SKID]),
     ('spawn', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='stand'), pose(hy=0, ty=8, torso='reach', legs='stand', ly=14), pose(hy=1, ty=9, torso='breath'), pose()]),
     ('exit', 10, False, [run_frame(0, 0), run_frame(1, 1), pose(hx=6, tx=6, lx=6), blank()]),
 ]
