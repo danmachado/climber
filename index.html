@@ -10,7 +10,7 @@
 <style>
   html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
-  #stage { position: relative; background: #0a0d1c; overflow: hidden; will-change: transform; transform: translate(0px,0px); }
+  #stage { position: relative; background: #0a0d1c; overflow: hidden; }
   #fx { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   #world { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
   #stage canvas { position: absolute; display: block; image-rendering: pixelated; }
@@ -1167,7 +1167,9 @@
   // turns it on, and when it is off the layer is hidden and nothing runs.
   var wx = makeCanvas(LW, LH, true), wg = wx.getContext('2d'); wx.id = 'fx';
   var FX_KEY = 'climber.fx.v1', weather = { on: false, list: [], kind: '' };
-  try { weather.on = localStorage.getItem(FX_KEY) === '1'; } catch (e) {}
+  var SHAKE_KEY = 'climber.shake.v1', shakeOn = true;      // screen shake moves the stage with a transform; off means the stage never moves
+  try { weather.on = localStorage.getItem(FX_KEY) === '1'; shakeOn = localStorage.getItem(SHAKE_KEY) !== '0'; } catch (e) {}
+  function setShake(on) { shakeOn = on; try { localStorage.setItem(SHAKE_KEY, on ? '1' : '0'); } catch (e) {} }
   function setWeather(on) {
     weather.on = on; weather.list = [];
     try { localStorage.setItem(FX_KEY, on ? '1' : '0'); } catch (e) {}
@@ -1362,8 +1364,8 @@
   function shaky() { return scene === 'play' && !pl.dead && !run.won && !pl.onGround && pl.stamina < P.stamina * TREMBLE; }
   function tremble() { return shaky() && Math.floor(tick / 3) % 2 ? 1 : 0; }
   function applyShake() {
-    var v = 'translate(0px,0px)';                   // always a transform, so the stage stays one compositing layer and never gets re-promoted
-    if (scene === 'play' && shake.t > 0 && !run.won) {
+    var v = '';                                     // no transform at rest: the frame's speed lab shows transforms cost it more than they save
+    if (shakeOn && scene === 'play' && shake.t > 0 && !run.won) {
       shake.n++;
       var k = view.scale / (window.devicePixelRatio || 1), a = shake.size * Math.min(1, shake.t / 0.1);
       var dx = Math.round(a * (shake.n % 2 ? 1 : -1) * k), dy = Math.round(a * 0.6 * (shake.n % 4 < 2 ? 1 : -1) * k);
@@ -1377,7 +1379,7 @@
     tick++; applyShake();
     if (scene === 'play') applyCam();
     if (scene !== 'play') {
-      var ssig = [scene, hero.ready, menuNote, set.row, weather.on, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, hero.ready, menuNote, set.row, weather.on, shakeOn, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       drawWeather();
       return;
@@ -1721,7 +1723,7 @@
 
   // ---- settings: the controller picture, what each button does, and changing it ----
   var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
-  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['fx', 'PARTICLES'], ['back', 'BACK']];
+  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['fx', 'PARTICLES'], ['shake', 'SHAKE'], ['back', 'BACK']];
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
     if (!padCfg[gp.id]) { var c = cfgFor(gp); if (!c) return null; padCfg[gp.id] = { layout: c.layout, act: JSON.parse(JSON.stringify(c.act)) }; }
     return padCfg[gp.id];
@@ -1730,6 +1732,7 @@
     var id = SET_ROWS[k][0], gp = firstPad();
     set.row = k; set.note = ''; lastSig = '';
     if (id === 'back') { toMenu(); return; }
+    if (id === 'shake') { setShake(!shakeOn); set.note = shakeOn ? 'SCREEN SHAKE ON' : 'SCREEN SHAKE OFF. CHECK THE SPEED READOUT.'; return; }
     if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
     if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON. IT SHOWS IN THE TOP BAR WHILE PLAYING.' : 'SPEED READOUT OFF'; return; }
     if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
@@ -1828,10 +1831,10 @@
       pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
     } else {
       for (i = 0; i < SET_ROWS.length; i++) {
-        var y = 248 + i * 24, on = i === set.row;
-        box(55, y, 160, 21, on ? C.flame : '#131a33');
-        pxText(SET_ROWS[i][0] === 'fx' ? 'PARTICLES ' + (weather.on ? 'ON' : 'OFF') : SET_ROWS[i][1], 135, y + 4, 2, on ? '#101426' : C.dim, 'center');
-        hits.push({ x: 55, y: y, w: 160, h: 21, fn: (function (k) { return function () { setPick(k); }; })(i) });
+        var y = 240 + i * 23, on = i === set.row;
+        box(55, y, 160, 20, on ? C.flame : '#131a33');
+        pxText(SET_ROWS[i][0] === 'fx' ? 'PARTICLES ' + (weather.on ? 'ON' : 'OFF') : SET_ROWS[i][0] === 'shake' ? 'SHAKE ' + (shakeOn ? 'ON' : 'OFF') : SET_ROWS[i][1], 135, y + 4, 2, on ? '#101426' : C.dim, 'center');
+        hits.push({ x: 55, y: y, w: 160, h: 20, fn: (function (k) { return function () { setPick(k); }; })(i) });
       }
     }
     if (set.note) pxText(set.note, 135, 446, 1, C.teal, 'center');
