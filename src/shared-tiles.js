@@ -205,6 +205,63 @@
       for (x = 0; x < w;) { var sw = between(3, 9), sh = between(4, Math.round(h0 * 0.12)); for (i = 0; i < sw; i++) b.fillRect(x + i, 0, 1, Math.max(1, sh - Math.abs(i - sw / 2) * 2)); x += sw + between(0, 10); }
     }
   }
+  // Painted light: a soft disc baked into the static layer under anything that glows. Nothing is computed per frame.
+  function drawGlow(b, cx, cy, rad, rgb, alpha) {
+    var gr = b.createRadialGradient(cx, cy, 1, cx, cy, rad);
+    gr.addColorStop(0, 'rgba(' + rgb + ',' + alpha + ')'); gr.addColorStop(0.5, 'rgba(' + rgb + ',' + (alpha * 0.35) + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+    b.fillStyle = gr; b.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
+  }
+  // Decals: small no-collision props placed by hash wherever the room has a natural spot for them, so every level
+  // gets them without authoring and the same room always gets the same ones. Floor props stand on a wall top, hanging
+  // props drop from a wall bottom, lamps sit on a wall side (and cast a painted glow), backdrop props sit inside a
+  // patch of backdrop. All of it stays dim and desaturated so hazards and pickups keep the brightest colours.
+  // at(c, r) returns the level character of a cell ('#' off the map). Returns the lamps so callers can light them.
+  var DECAL_GLOW = { brick: '255,190,110', frost: '150,220,255', ember: '255,140,70' };
+  function drawDecals(b, cols, rows, at, seed) {
+    var kind = TILE_THEME.tiles, lamps = [], c, r, salt = (seed % 1000) | 0;
+    function wall(cc, rr) { var ch = at(cc, rr); return ch === '#' || ch === 'I'; }
+    function open(cc, rr) { var ch = at(cc, rr); return ch === '.' || ch === 'b'; }
+    function quiet(cc, rr) { for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) { var ch = at(cc + dx, rr + dy); if ('^v<>SEoGu*F='.indexOf(ch) >= 0) return false; } return true; }
+    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
+      if (!open(c, r) || !quiet(c, r)) continue;
+      var v = tileHash(c * 5 + salt, r * 9 + salt * 3), x = c * 10, y = r * 10;
+      if (wall(c, r + 1) && v < 0.07) floorProp(x, y, v / 0.07);
+      else if (wall(c, r - 1) && open(c, r + 1) && v > 0.95) hangProp(x, y, (v - 0.95) / 0.05);
+      else if ((wall(c - 1, r) || wall(c + 1, r)) && open(c, r - 1) && open(c, r + 1) && v > 0.3 && v < 0.325) lamp(x, y, wall(c - 1, r) ? -1 : 1);
+      else if (at(c, r) === 'b' && at(c - 1, r) === 'b' && at(c + 1, r) === 'b' && at(c, r - 1) === 'b' && v > 0.6 && v < 0.65) backProp(x, y, (v - 0.6) / 0.05);
+    }
+    function floorProp(x, y, t) {
+      if (kind === 'frost') {                                 // a crystal cluster, or a drift of snow
+        if (t < 0.5) { b.fillStyle = '#a8d6ee'; b.fillRect(x + 3, y + 5, 2, 5); b.fillRect(x + 6, y + 7, 2, 3); b.fillRect(x + 1, y + 8, 2, 2); b.fillStyle = '#f4fcff'; b.fillRect(x + 3, y + 5, 1, 2); b.fillRect(x + 6, y + 7, 1, 1); }
+        else { b.fillStyle = '#dceef8'; b.fillRect(x + 1, y + 8, 8, 2); b.fillRect(x + 3, y + 7, 4, 1); b.fillStyle = '#f4fcff'; b.fillRect(x + 3, y + 7, 2, 1); }
+      } else if (kind === 'ember') {                         // ember stones, or a cracked slab
+        if (t < 0.5) { b.fillStyle = '#4c1c15'; b.fillRect(x + 2, y + 7, 3, 3); b.fillRect(x + 6, y + 8, 3, 2); b.fillStyle = '#c25a24'; b.fillRect(x + 3, y + 8, 1, 1); b.fillRect(x + 7, y + 9, 1, 1); }
+        else { b.fillStyle = '#5e2419'; b.fillRect(x + 1, y + 8, 7, 2); b.fillStyle = '#2b0f0c'; b.fillRect(x + 4, y + 8, 1, 2); }
+      } else {                                               // loose bricks, or a tuft of weeds
+        if (t < 0.5) { b.fillStyle = '#3a47a8'; b.fillRect(x + 2, y + 7, 4, 3); b.fillRect(x + 6, y + 8, 3, 2); b.fillStyle = '#6d7be6'; b.fillRect(x + 2, y + 7, 4, 1); }
+        else { b.fillStyle = '#4f8a64'; b.fillRect(x + 4, y + 6, 1, 4); b.fillRect(x + 2, y + 8, 1, 2); b.fillRect(x + 6, y + 7, 1, 3); b.fillRect(x + 3, y + 7, 1, 1); b.fillRect(x + 5, y + 8, 1, 1); }
+      }
+    }
+    function hangProp(x, y, t) {
+      var h = 4 + Math.floor(t * 6);
+      if (kind === 'frost') { b.fillStyle = '#86a9c9'; b.fillRect(x + 4, y, 1, h); b.fillStyle = '#dceef8'; b.fillRect(x + 3, y + h - 1, 3, 2); }          // a frozen chain and knot
+      else if (kind === 'ember') { b.fillStyle = '#4c1c15'; for (var i = 0; i < h; i += 2) b.fillRect(x + 4 + (i % 4 ? 1 : 0), y + i, 1, 2); b.fillStyle = '#7a3a2a'; b.fillRect(x + 3, y + h, 3, 2); } // a hanging chain
+      else { b.fillStyle = '#3f7a56'; b.fillRect(x + 3, y, 1, h); b.fillRect(x + 6, y, 1, h - 2); b.fillStyle = '#4f8a64'; b.fillRect(x + 2, y + 2, 1, 1); b.fillRect(x + 7, y + 3, 1, 1); b.fillRect(x + 4, y + h - 1, 1, 1); } // ivy
+    }
+    function lamp(x, y, side) {
+      var lx = side < 0 ? x : x + 7;
+      if (kind === 'frost') { b.fillStyle = '#2a4361'; b.fillRect(lx, y + 2, 3, 1); b.fillRect(lx + 1, y + 3, 1, 1); b.fillStyle = '#9fe3ff'; b.fillRect(lx, y + 4, 3, 3); b.fillStyle = '#f4fcff'; b.fillRect(lx + 1, y + 5, 1, 1); }
+      else if (kind === 'ember') { b.fillStyle = '#2b0f0c'; b.fillRect(lx + 1, y + 3, 1, 5); b.fillStyle = '#e2491f'; b.fillRect(lx, y + 1, 3, 3); b.fillStyle = '#ffe08a'; b.fillRect(lx + 1, y + 1, 1, 2); }
+      else { b.fillStyle = '#161c4a'; b.fillRect(lx, y + 2, 3, 1); b.fillRect(lx + 1, y + 3, 1, 1); b.fillStyle = '#ffb74a'; b.fillRect(lx, y + 4, 3, 3); b.fillStyle = '#fff1c4'; b.fillRect(lx + 1, y + 5, 1, 1); }
+      lamps.push({ x: lx + 1.5, y: y + 5 });
+    }
+    function backProp(x, y, t) {
+      if (kind === 'frost') { b.fillStyle = '#1f4460'; b.fillRect(x + 2, y + 2, 6, 6); b.fillStyle = '#2f6a8a'; b.fillRect(x + 3, y + 3, 4, 4); b.fillStyle = '#5a93b6'; b.fillRect(x + 4, y + 4, 1, 1); }   // a frosted pane
+      else if (kind === 'ember') { b.fillStyle = '#2b0f0c'; b.fillRect(x + 1, y + 2, 8, 6); b.fillStyle = '#4a2119'; for (var i = 0; i < 3; i++) b.fillRect(x + 2, y + 3 + i * 2, 6, 1); }              // a vent grate
+      else { b.fillStyle = '#0f1432'; b.fillRect(x + 2, y + 1, 6, 8); b.fillStyle = t < 0.5 ? '#2d3576' : '#4a3a2a'; b.fillRect(x + 3, y + 2, 4, 6); b.fillStyle = '#0f1432'; b.fillRect(x + 5, y + 2, 1, 6); b.fillRect(x + 3, y + 5, 4, 1); } // a boarded window
+    }
+    return lamps;
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);

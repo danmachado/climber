@@ -378,10 +378,17 @@
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) if (tiles[r][c] === 'b') drawTile(ctx, 'b', c * T, r * T, c, r, false);
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) if (tiles[r][c] === '#' || tiles[r][c] === 'I') drawTile(wb, tiles[r][c], c * T, r * T, c, r, false);
     ctx.drawImage(wl, 0, 0);
+    var at = function (cc, rr) { return rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS ? '#' : tiles[rr][cc]; };
+    var lamps = drawDecals(ctx, COLS, ROWS, at, skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0)));
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       var ch = tiles[r][c];
       if (ch !== '.' && ch !== 'b' && ch !== '#' && ch !== 'I') drawTile(ctx, ch, c * T, r * T, c, r, false);
     }
+    for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {        // painted light, same as the game
+      if (tiles[r][c] === 'F') drawGlow(ctx, c * T + 5, r * T + 6, 22, '255,140,70', 0.3);
+      else if (tiles[r][c] === 'E') drawGlow(ctx, c * T + 5, r * T + 5, 26, '95,230,180', 0.28);
+    }
+    for (var li = 0; li < lamps.length; li++) drawGlow(ctx, lamps[li].x, lamps[li].y, 20, DECAL_GLOW[themeOf(room).tiles] || DECAL_GLOW.brick, 0.26);
     for (c = 1; c < COLS; c++) { ctx.fillStyle = c % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(c * T, 0, px, ROWS * T); }
     for (r = 1; r < ROWS; r++) { ctx.fillStyle = r % 5 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(0, r * T, COLS * T, px); }
     var hi = box || (hover ? { c0: hover.c, r0: hover.r, c1: hover.c, r1: hover.r } : null);
