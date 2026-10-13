@@ -10,10 +10,14 @@
   // Everything not listed by any world is common and can be used anywhere. A new world lists its own pieces here.
   function tileWorld(ch) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].tiles.indexOf(ch) >= 0) return WORLDS[i].id; return 0; }
   function elementWorld(name) { for (var i = 0; i < WORLDS.length; i++) if (WORLDS[i].elements.indexOf(name) >= 0) return WORLDS[i].id; return 0; }
+  // sky is the gradient top to horizon, far is [far band, near band, detail] for the silhouettes, skyline their shape.
   var THEMES = {
-    brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a', accentLo: '#c47f24' },
-    ember: { tiles: 'ember', bg: '#120909', dot: '#3a1714', back: ['#2b1513', '#1b0c0b', '#4a2119'], accent: '#ff8a4a', accentLo: '#c25a24' },
-    frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4' }
+    brick: { tiles: 'brick', bg: '#0a0d1c', dot: '#1b2145', back: ['#171e47', '#0f1432', '#262f68'], accent: '#ffb74a', accentLo: '#c47f24',
+      sky: ['#070a16', '#10153a', '#262d66'], far: ['#141a46', '#0b0f2c', '#2d3576'], skyline: 'town' },
+    ember: { tiles: 'ember', bg: '#120909', dot: '#3a1714', back: ['#2b1513', '#1b0c0b', '#4a2119'], accent: '#ff8a4a', accentLo: '#c25a24',
+      sky: ['#0b0404', '#1e0a08', '#521c12'], far: ['#26110d', '#110504', '#7a2e1c'], skyline: 'cave' },
+    frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4',
+      sky: ['#040b14', '#0d2238', '#204d6c'], far: ['#143148', '#091826', '#5a93b6'], skyline: 'peaks' }
   };
   function worldOf(room) { var n = (room && room.world) | 0; return WORLDS[n - 1] ? n : 1; }
   function themeOf(room) { return THEMES[WORLDS[worldOf(room) - 1].theme] || THEMES.brick; }

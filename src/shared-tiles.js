@@ -94,6 +94,65 @@
     if (!sameAt(c - 1, r)) b.fillRect(x, y, 1, 10);
     if (!sameAt(c + 1, r)) b.fillRect(x + 9, y, 1, 10);
   }
+  // Sky: the layer behind everything. A soft vertical gradient (dark at the top, a faint glow at the horizon),
+  // a few dim stars, and two bands of flat far silhouettes in the world's own shape: rooftops and chimneys for the
+  // Brickyard, snowy peaks for the Icehouse, jagged cave rock with hanging stalactites for the Furnace. It is
+  // painted once per room into the static layer, so it costs nothing per frame. The silhouettes only rise about a
+  // third of one screen (h0), so a tall room opens into clear sky as you climb. seed picks the skyline so rooms
+  // do not all share one. Everything here stays darker than the terrain, which keeps the terrain edge the brightest
+  // line on screen.
+  function skyHash(s) { var h = 7; s = String(s || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0) || 1; }
+  function drawSky(b, w, h, h0, seed) {
+    var th = TILE_THEME, sky = th.sky, far = th.far, i, x;
+    if (!sky) { b.fillStyle = th.bg || '#0a0d1c'; b.fillRect(0, 0, w, h); return; }
+    var gr = b.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, sky[0]); gr.addColorStop(Math.max(0, 1 - h0 / h), sky[1]); gr.addColorStop(1, sky[2]);
+    b.fillStyle = gr; b.fillRect(0, 0, w, h);
+    var s = (Math.abs(seed) % 2147483646) + 1;             // keep the generator in range, or widths could go negative
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
+    function between(a, c) { return a + Math.floor(rnd() * (c - a + 1)); }
+    b.fillStyle = th.dot;                                   // stars (embers in the Furnace), only in the open sky
+    for (i = 0; i < 70 * (h / 480); i++) { var sx = Math.floor(rnd() * w), sy = Math.floor(rnd() * (h - h0 * 0.45)); b.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1); }
+    if (!far) return;
+    var kind = th.skyline || 'town';
+    // heights(top) builds a one-pixel-column heightmap for one band whose tallest point is about top pixels
+    function heights(top) {
+      var hm = [], seg, hh, x0, px;
+      if (kind === 'town') {                               // flat-topped blocks of random width, some with a chimney
+        for (x0 = 0; x0 < w; x0 += seg) {
+          seg = between(8, 30); hh = between(Math.round(top * 0.25), top);
+          var chim = rnd() < 0.5 ? between(1, seg - 4) : -1, cw = between(2, 3), ch = between(4, 9);
+          for (px = 0; px < seg && x0 + px < w; px++) hm[x0 + px] = hh + (px >= chim && px < chim + cw ? ch : 0);
+        }
+      } else if (kind === 'peaks') {                        // straight slopes between random summits
+        var pts = [[0, between(Math.round(top * 0.2), top)]];
+        for (x0 = 0; x0 < w;) { x0 += between(22, 60); pts.push([Math.min(x0, w + 20), between(Math.round(top * 0.15), top)]); }
+        for (i = 0; i + 1 < pts.length; i++) for (x = pts[i][0]; x < pts[i + 1][0] && x < w; x++) hm[x] = Math.round(pts[i][1] + (pts[i + 1][1] - pts[i][1]) * (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0]));
+      } else {                                              // cave: narrow jagged spires
+        for (x0 = 0; x0 < w; x0 += seg) {
+          seg = between(2, 7); hh = between(Math.round(top * 0.15), top);
+          for (px = 0; px < seg && x0 + px < w; px++) hm[x0 + px] = hh - Math.abs(px - seg / 2) * 2;
+        }
+      }
+      return hm;
+    }
+    function band(col, top, cap) {
+      var hm = heights(top);
+      b.fillStyle = col;
+      for (x = 0; x < w; x++) if (hm[x] > 0) b.fillRect(x, h - hm[x], 1, hm[x]);
+      if (!cap) return;
+      b.fillStyle = cap;
+      if (kind === 'peaks') { for (x = 0; x < w; x++) if (hm[x] > top * 0.62) b.fillRect(x, h - hm[x], 1, 1); } // snow on the summits
+      else if (kind === 'town') { for (i = 0; i < w / 9; i++) { x = Math.floor(rnd() * w); var wy = between(4, hm[x] - 3); if (hm[x] > 8 && wy > 0) b.fillRect(x, h - wy, 1, 2); } } // a few dim windows
+      else { for (x = 0; x < w; x++) if (hm[x] > 2) b.fillRect(x, h - 2, 1, 2); }                       // a lip of glow at the cave floor
+    }
+    band(far[0], Math.round(h0 * 0.34), far[2]);
+    band(far[1], Math.round(h0 * 0.2), kind === 'cave' ? far[2] : null);
+    if (kind === 'cave') {                                   // stalactites hang from the top of the room
+      b.fillStyle = far[0];
+      for (x = 0; x < w;) { var sw = between(3, 9), sh = between(4, Math.round(h0 * 0.12)); for (i = 0; i < sw; i++) b.fillRect(x + i, 0, 1, Math.max(1, sh - Math.abs(i - sw / 2) * 2)); x += sw + between(0, 10); }
+    }
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);

@@ -358,11 +358,21 @@
     canvas.width = Math.round(COLS * T * zoom * dpr); canvas.height = Math.round(ROWS * T * zoom * dpr);
     draw();
   }
+  // The sky behind the room, same as the game draws it. Rebuilt only when the room's size, world or name changes.
+  var sky = { key: '', cv: null };
+  function skyLayer() {
+    var key = [COLS, ROWS, room.world | 0, room.level | 0, room.name || ''].join('|');
+    if (key !== sky.key) {
+      sky.key = key; sky.cv = document.createElement('canvas'); sky.cv.width = COLS * T; sky.cv.height = ROWS * T;
+      drawSky(sky.cv.getContext('2d'), COLS * T, ROWS * T, 480, skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0)));
+    }
+    return sky.cv;
+  }
   function draw() {
     var k = canvas.width / (COLS * T), r, c, px = 1 / k;
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, COLS * T, ROWS * T);
+    ctx.drawImage(skyLayer(), 0, 0);
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       var ch = tiles[r][c];
       if (ch !== '.') drawTile(ctx, ch, c * T, r * T, c, r, false);
@@ -583,7 +593,7 @@
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
   $('g-again').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
-  $('name').addEventListener('input', function () { room.name = this.value; room.id = slug(this.value); saveDraft(); });
+  $('name').addEventListener('input', function () { room.name = this.value; room.id = slug(this.value); saveDraft(); draw(); });
   $('diff').addEventListener('change', function () { room.difficulty = +this.value; saveDraft(); });
   // which world and level this room is, and its par time; the world also sets the look
   WORLDS.forEach(function (w) { var o = document.createElement('option'); o.value = w.id; o.textContent = w.id + ' ' + w.name; $('world').appendChild(o); });

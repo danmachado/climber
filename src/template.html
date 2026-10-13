@@ -976,15 +976,8 @@
   function drawTileLayer() {
     tileLayer = document.createElement('canvas');
     tileLayer.width = LW; tileLayer.height = RH; allDirty = true;
-    var b = tileLayer.getContext('2d'), r, c, i, seed = 7;
-    b.fillStyle = C.bg; b.fillRect(0, 0, LW, RH);
-    b.fillStyle = C.dot;
-    for (i = 0; i < 70 * (RH / LH); i++) {
-      seed = (seed * 16807) % 2147483647;
-      var sx = seed % LW;
-      seed = (seed * 16807) % 2147483647;
-      b.fillRect(sx, seed % RH, (i % 5 === 0) ? 2 : 1, (i % 5 === 0) ? 2 : 1);
-    }
+    var b = tileLayer.getContext('2d'), r, c, i;
+    drawSky(b, LW, RH, LH, skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0)));
     var wallAt = function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr][cc] === 1 || grid[rr][cc] === 2; };
     var backAt = function (cc, rr) { return wallAt(cc, rr) || !!backs[rr * cols + cc]; };
     for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) if (backs[r * cols + c]) drawBack(b, c * T, r * T, backAt, c, r);
@@ -1054,7 +1047,7 @@
       if (rf.shown !== on) { rf.shown = on; mark(rf.x - 2, rf.y - 2, 12, 12); }
       g.fillStyle = on ? C.teal : C.tealDim;
       g.fillRect(cx - 1, cy - 4, 2, 8); g.fillRect(cx - 3, cy - 2, 6, 4);
-      if (!on) { g.fillStyle = C.bg; g.fillRect(cx - 1, cy - 2, 2, 4); }
+      if (!on) g.drawImage(tileLayer, cx - 1, cy - 2, 2, 4, cx - 1, cy - 2, 2, 4);
     }
     for (i = 0; i < springs.length; i++) { var sq = springs[i]; drawSpring(g, sq.x, sq.y, sq.t > 0); if (sq.t > 0) mark(sq.x, sq.y - 4, T, T + 4); }
     for (i = 0; i < gems.length; i++) {
