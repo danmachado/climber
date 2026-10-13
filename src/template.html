@@ -30,11 +30,12 @@
   // ---- movement tuning (px and seconds) ----
   var P = {
     maxRun: 90 * K, runAccel: 1000 * K, runReduce: 400 * K, airMult: 0.65,
-    gravity: 900 * K, maxFall: 160 * K, wallSlideMax: 40 * K, halfGravBelow: 40 * K,
+    gravity: 900 * K, maxFall: 160 * K, wallSlideStart: 20 * K, wallSlideTime: 1.2, halfGravBelow: 40 * K,
     jumpSpeed: -105 * K, jumpHBoost: 40 * K, varJumpTime: 0.2,
     coyote: 0.1, jumpBuffer: 0.1, dashBuffer: 0.08,
     dashSpeed: 240 * K, endDashSpeed: 160 * K, dashTime: 0.15, dashCooldown: 0.2, dashFreeze: 0.05,
-    wallJumpH: 130 * K, wallJumpForce: 0.16, wallCheck: 3,
+    wallJumpH: 130 * K, wallJumpForce: 0.16, wallCheck: 3, wallBoostTime: 0.2,
+    bounceH: 170 * K, bounceV: -160 * K, bounceVarTime: 0.25, bounceForce: 0.2, bounceCheck: 5,   // wall bounce: dash up beside a wall, then jump
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
     stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
     cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
@@ -320,7 +321,7 @@
       x: spawn.x, y: spawn.y, w: 8, h: 10, rx: 0, ry: 0, vx: 0, vy: 0, facing: 1,
       state: 'normal', onGround: false, coyote: 0, jumpBuf: 0, dashBuf: 0,
       varJumpTimer: 0, varJumpSpeed: 0, dashes: 1, dashTimer: 0, dashCooldown: 0, dashDirX: 0, dashDirY: 0,
-      freeze: 0, forceMove: 0, forceDir: 0, climbDir: 0, stamina: P.stamina,
+      freeze: 0, forceMove: 0, forceDir: 0, climbDir: 0, stamina: P.stamina, wallSlide: P.wallSlideTime, boostT: 0, boostDir: 0,
       dead: false, prevJump: false, prevDash: false, trail: [], trailTick: 0
     };
     for (var i = 0; i < refills.length; i++) refills[i].timer = 0;
@@ -428,11 +429,23 @@
     pl.vx += P.jumpHBoost * mx + (under ? under.vx : 0); // a moving platform lends its speed to the jump
     pl.vy = P.jumpSpeed; pl.varJumpSpeed = pl.vy;
   }
-  function wallJump(dir) {
-    pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal';
+  // Wall jump. With a direction held it pushes you off the wall for a moment (you cannot steer straight back).
+  // With nothing held it is a neutral jump: same launch, but you can turn back to the wall at once, which lets
+  // you hop up a shaft wall to wall without spending stamina.
+  function wallJump(dir, neutral) {
+    pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal'; pl.boostT = 0;
     pl.varJumpTimer = P.varJumpTime;
     pl.vx = P.wallJumpH * dir; pl.vy = P.jumpSpeed; pl.varJumpSpeed = pl.vy;
-    pl.forceMove = P.wallJumpForce; pl.forceDir = dir; pl.facing = dir;
+    if (!neutral) { pl.forceMove = P.wallJumpForce; pl.forceDir = dir; }
+    pl.facing = dir;
+  }
+  // Wall bounce: jump during an upward dash while beside a wall. A tall launch away from the wall; delaying the
+  // jump makes it taller. The dash it started with is already paid for, so it costs nothing more.
+  function wallBounce(dir) {
+    pl.jumpBuf = 0; pl.coyote = 0; pl.state = 'normal'; pl.boostT = 0;
+    pl.vx = P.bounceH * dir; pl.vy = P.bounceV; pl.varJumpSpeed = pl.vy; pl.varJumpTimer = P.bounceVarTime;
+    pl.forceMove = P.bounceForce; pl.forceDir = dir; pl.facing = dir;
+    addShake(1.5, 0.12);
   }
   function startDash(inp) {
     var dx = inp.x, dy = inp.y;
@@ -492,6 +505,7 @@
     if (pl.onGround) {
       pl.coyote = P.coyote;
       if (pl.state !== 'dash' && pl.dashCooldown <= 0.1) pl.stamina = P.stamina;   // standing on anything refills the meter
+      pl.wallSlide = P.wallSlideTime;
     } else { pl.coyote -= dt; }
 
     pl.dashes = pl.stamina >= P.dashCost ? 1 : 0;          // a dash needs this much of the meter left
@@ -499,6 +513,10 @@
 
     if (pl.state === 'dash') {
       pl.dashTimer -= dt;
+      if (pl.jumpBuf > 0 && pl.dashDirY <= -0.75 && Math.abs(pl.dashDirX) <= 0.2) {   // dashing straight up beside a wall
+        if (touching(1, P.bounceCheck)) wallBounce(-1);
+        else if (touching(-1, P.bounceCheck)) wallBounce(1);
+      }
       if (++pl.trailTick % 2 === 0) pl.trail.push({ x: pl.x, y: pl.y, life: 0.3, facing: pl.facing, dx: pl.dashDirX, dy: pl.dashDirY });
       if (pl.dashTimer <= 0) {
         pl.state = 'normal';
@@ -512,7 +530,7 @@
       var wallAtHands = collide(pl.x + pl.climbDir, pl.y, pl.w, 4);
       if (pl.jumpBuf > 0) {
         if (inp.x === -pl.climbDir) wallJump(-pl.climbDir);
-        else { pl.stamina -= P.climbJumpCost; jump(0); }
+        else { pl.stamina -= P.climbJumpCost; jump(0); pl.boostT = P.wallBoostTime; pl.boostDir = -pl.climbDir; }   // push away soon after and it becomes a free wall jump
       } else if (wallHere && !wallAtHands && inp.y < 0) {
         pl.state = 'normal'; pl.vy = Math.min(pl.vy, P.climbHop);
         pl.forceMove = 0.2; pl.forceDir = pl.climbDir; pl.vx = pl.climbDir * 60;
@@ -526,6 +544,10 @@
       }
     } else {
       var mx = inp.x;
+      if (pl.boostT > 0) {                          // a climb jump turned into a wall jump: stamina refunded, push applied
+        pl.boostT -= dt;
+        if (mx === pl.boostDir) { pl.vx = P.wallJumpH * mx; pl.stamina = Math.min(P.stamina, pl.stamina + P.climbJumpCost); pl.boostT = 0; }
+      }
       if (pl.forceMove > 0) { pl.forceMove -= dt; mx = pl.forceDir; }
       if (mx) pl.facing = mx;
 
@@ -533,7 +555,7 @@
       if (inp.grab && pl.stamina > 0 && pl.vy >= 0 && pl.forceMove <= 0 && touching(grabDir, 2) &&
           surface(grabDir > 0 ? pl.x + pl.w : pl.x - 2, pl.y, 2, pl.h) !== 'ice') {
         addShake(1.5, 0.14, grabDir);              // catching a wall: one soft pull toward it, no rattle
-        pl.state = 'climb'; pl.climbDir = grabDir; pl.facing = grabDir; pl.vx = 0; pl.vy *= 0.2;
+        pl.state = 'climb'; pl.climbDir = grabDir; pl.facing = grabDir; pl.vx = 0; pl.vy *= 0.2; pl.wallSlide = P.wallSlideTime; pl.boostT = 0;
         if (!touching(grabDir, 1)) pl.x += grabDir;
       } else {
         var mult = pl.onGround ? (pl.floor === 'ice' ? P.iceGrip : 1) : P.airMult; // on ice you barely speed up or slow down
@@ -541,7 +563,10 @@
         else pl.vx = approach(pl.vx, P.maxRun * mx, P.runAccel * mult * dt);
 
         if (!pl.onGround) {
-          var maxFall = (inp.x && touching(inp.x, 1) && pl.vy > 0 && surface(inp.x > 0 ? pl.x + pl.w : pl.x - 1, pl.y, 1, pl.h) !== 'ice') ? P.wallSlideMax : P.maxFall;
+          // wall slide: pushing into a wall catches you briefly (slow slide), then the slide speeds up to a full fall
+          var sliding = inp.x && touching(inp.x, 1) && pl.vy > 0 && surface(inp.x > 0 ? pl.x + pl.w : pl.x - 1, pl.y, 1, pl.h) !== 'ice';
+          var maxFall = P.maxFall;
+          if (sliding) { pl.wallSlide = Math.max(0, pl.wallSlide - dt); maxFall = P.maxFall + (P.wallSlideStart - P.maxFall) * (pl.wallSlide / P.wallSlideTime); }
           var g = (Math.abs(pl.vy) < P.halfGravBelow && inp.jump) ? 0.5 : 1;
           pl.vy = approach(pl.vy, maxFall, P.gravity * g * dt);
         }
@@ -551,8 +576,8 @@
         }
         if (pl.jumpBuf > 0) {
           if (pl.coyote > 0) jump(mx);
-          else if (touching(1, P.wallCheck)) wallJump(-1);
-          else if (touching(-1, P.wallCheck)) wallJump(1);
+          else if (touching(1, P.wallCheck)) wallJump(-1, !inp.x);
+          else if (touching(-1, P.wallCheck)) wallJump(1, !inp.x);
         }
       }
     }
