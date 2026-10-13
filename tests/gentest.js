@@ -55,7 +55,7 @@ const fs = require('fs');
             const startX = Math.min(cA, cB) * 10, endX = Math.min(cE, cE2) * 10;
             until(() => ({ x: d }), () => dist(o.t0) <= 9);
             for (let k = 0; k < 8; k++) step({});
-            until(() => ({}), () => { const m = mover(rowY); return m && m.x === startX && m.wait > 0.15; }, 900);
+            until(() => ({}), () => { const m = mover(rowY); return m && m.x === startX && (m.z === 'idle' || m.wait > 0.15); }, 900);   // a zip mover waits at the start on its own
             // straight up first (spikes or a pit start right at the edge), then drift onto the platform
             until((k) => ({ x: s.y + 10 <= rowY ? ((d > 0 ? s.x >= startEdge(o.t0) + 8 : s.x + 8 <= startEdge(o.t0) - 8) ? 0 : d) : 0, jump: k < 1 || s.vy < 0 }), () => s.ground && s.y + 10 === rowY, 200);
             until(() => ({}), () => { const m = mover(rowY); return m && m.x === endX; }, 900);
@@ -106,7 +106,7 @@ const fs = require('fs');
           const bottom = (y - 1) * 10;
           until(() => ({ x: d }), () => dist(FW - 3) <= 26);
           for (let k = 0; k < 8; k++) step({});
-          until(() => ({}), () => { const m = mover(bottom); return m && m.wait > 0.2; }, 1200);
+          until(() => ({}), () => { const m = mover(bottom); return m && (m.z === 'idle' || m.wait > 0.2); }, 1200);
           until((k) => ({ x: d, jump: (dist(FW - 3) <= 1 && s.ground && k % 2 === 0) || s.vy < 0 }), () => s.ground && (d > 0 ? s.x >= startEdge(FW - 3) + 2 : s.x + 8 <= startEdge(FW - 3) - 2) && s.y + 10 <= bottom, 300);
           until(() => ({}), () => s.y + 10 === yN * 10, 900);
           until(() => ({ x: -d }), () => s.ground && s.y + 10 === yN * 10 && (d > 0 ? s.x + 8 <= endEdge(FW - 4) : s.x >= endEdge(FW - 4)), 300);
@@ -144,7 +144,7 @@ const fs = require('fs');
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
       const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1, rows: seed % 5 === 0 ? 96 : 48,
-                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3 } };
+                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }

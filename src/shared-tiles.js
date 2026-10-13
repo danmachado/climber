@@ -120,11 +120,21 @@
     else { b.fillRect(x + 6, y + 2, 1, 2); b.fillRect(x + 5, y + 4, 1, 2); b.fillRect(x + 3, y + 5, 1, 3); }
   }
   // Moving platform: one tile of a plank; left and right say whether it continues on that side.
-  function drawPlank(b, x, y, left, right) {
+  // zip: 0 ordinary plank, 1 a zip mover waiting (amber stripe), 2 a zip mover on the move (stripe lit)
+  function drawPlank(b, x, y, left, right, zip) {
+    var x0 = x + (left ? 0 : 1), w = 10 - (left ? 0 : 1) - (right ? 0 : 1);
+    if (zip) {
+      b.fillStyle = '#2a2016'; b.fillRect(x, y, 10, 10);
+      b.fillStyle = '#6b5236'; b.fillRect(x0, y + 1, w, 7);
+      b.fillStyle = zip === 2 ? '#ffe08a' : '#d9a24a'; b.fillRect(x0, y + 1, w, 1); b.fillRect(x0, y + 4, w, 1);   // stripes
+      b.fillStyle = '#3a2a1e'; b.fillRect(x0, y + 7, w, 1);
+      b.fillStyle = zip === 2 ? '#ffe08a' : '#d9a24a'; b.fillRect(x + 4, y + 2, 2, 1); b.fillRect(x + 3, y + 5, 1, 2); b.fillRect(x + 6, y + 5, 1, 2);   // a wound-up coil
+      return;
+    }
     b.fillStyle = '#3a4258'; b.fillRect(x, y, 10, 10);
-    b.fillStyle = '#9aa5bb'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 7);
-    b.fillStyle = '#e6ebf5'; b.fillRect(x + (left ? 0 : 1), y + 1, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
-    b.fillStyle = '#5c667d'; b.fillRect(x + (left ? 0 : 1), y + 7, 10 - (left ? 0 : 1) - (right ? 0 : 1), 1);
+    b.fillStyle = '#9aa5bb'; b.fillRect(x0, y + 1, w, 7);
+    b.fillStyle = '#e6ebf5'; b.fillRect(x0, y + 1, w, 1);
+    b.fillStyle = '#5c667d'; b.fillRect(x0, y + 7, w, 1);
     b.fillStyle = '#3a4258'; b.fillRect(x + 4, y + 4, 2, 2);
   }
   function drawTrack(b, x, y, vertical) {

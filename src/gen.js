@@ -42,7 +42,8 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, fire: 0, fireballs: 0, springs: 0, gems: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0 };
+    function zipPick() { return EL.zips && (!EL.movers || rnd() < 0.5); }   // a platform spot becomes a zip mover
     var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
     g[ROWS - 3][col(2, d)] = 'S';
 
@@ -55,7 +56,7 @@
           steps: [5, 3, 2, 1, 0.5][D - 1] * (likes('jump') ? 2 : 1),
           open: 2 * (likes('dash') || likes('climb') ? 2 : 1),
           curtain: maxHf >= 7 ? [1, 2, 3, 4, 5][D - 1] * 0.8 * (likes('climb') ? 2 : 1) : 0,
-          lift: EL.movers ? 3 : 0,
+          lift: EL.movers || EL.zips ? 3 : 0,
           spring: EL.springs !== false ? 2.5 : 0                       // bounce up through the opening
         }) };
         conn.W = conn.type === 'steps' ? 7 : (conn.type === 'lift' || conn.type === 'spring' ? 3 : (conn.type === 'curtain' ? ri(3, 5) : ri(3, 4)));
@@ -85,7 +86,7 @@
           icespikes: EL.ice && SP > 0 && room >= TUNE.iceL[0] + 3 ? 3 * ICY : 0,                    // slide in, jump the spikes at the end
           iceblock: EL.ice && SP < 2 && room >= TUNE.iceL[0] + 3 ? (SP ? 1 : 3) * ICY : 0,           // slide into a block to hop
           bridge: EL.crumble && floor > 0 && room >= 4 ? 3 : 0,                                // crumbling stretch of floor
-          ferry: EL.movers && (HZ > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0,    // ride a platform across a gap
+          ferry: (EL.movers || EL.zips) && (HZ > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0,    // ride a platform across a gap
           fireball: EL.fireballs && room >= 2 && headroom >= 6 ? 4 : 0                       // time a run under a fireball on a track
         };
         // "Some" spikes means every floor has at least one; "Lots" removed the harmless options above
@@ -104,7 +105,7 @@
         else if (type === 'icespikes') { o.L = Math.min(rr(TUNE.iceL), room - 3); o.sw = Math.min(rr(TUNE.spikeW), 4, room - o.L - 1); o.w = o.L + o.sw; }
         else if (type === 'iceblock') { o.L = Math.min(rr(TUNE.iceL), room - 3); o.w = o.L + 2; o.h = 2; }
         else if (type === 'bridge') { o.w = Math.min(rr(TUNE.bridgeW), room - 1); }
-        else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = HZ === 0; after = Math.max(3, after); }
+        else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = HZ === 0; o.zip = zipPick(); after = Math.max(3, after); }
         else if (type === 'fireball') { o.w = 1; after = Math.max(3, after); }
         else if (type === 'wall') { o.w = 2; o.h = Math.min(rr(TUNE.wallH), headroom - 3); minHf = Math.max(minHf, o.h + 4); after = 5; }
         else { o.h = 4; o.sw = Math.min(D >= 5 ? ri(3, 4) : ri(2, 3), room - 3); o.w = 2 + o.sw; minHf = Math.max(minHf, 9); }
@@ -152,7 +153,7 @@
           box(ob.t0, e, y, y, d, 'C'); stats.crumble += ob.w;
         } else if (ob.type === 'ferry') {
           if (ob.pit) box(ob.t0, e, y, y, d, '.'); else { box(ob.t0, e, y - 1, y - 1, d, ob.fire ? 'F' : '^'); stats[ob.fire ? 'fire' : 'spikes'] += ob.w; }
-          box(ob.t0, e, y - 2, y - 2, d, '-'); box(ob.t0, ob.t0 + ob.pl - 1, y - 2, y - 2, d, '='); stats.platforms++;
+          box(ob.t0, e, y - 2, y - 2, d, '-'); box(ob.t0, ob.t0 + ob.pl - 1, y - 2, y - 2, d, ob.zip ? 'z' : '='); if (ob.zip) stats.zips++; else stats.platforms++;
         } else if (ob.type === 'fireball') {
           box(ob.t0, ob.t0, y - 5, y - 1, d, '|'); put(ob.t0, d, y - 5, '*'); stats.fireballs++;
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
@@ -201,8 +202,9 @@
         box(F - 7, F - 5, y - 4, y - 4, d, conn.crumble ? 'C' : '#'); if (conn.crumble) stats.crumble += 3;
       } else if (conn.type === 'spring') {                       // a spring under the opening throws you up to the next floor
         put(F - 2, d, y - 1, 'u'); stats.springs++;
-      } else if (conn.type === 'lift') {                         // a platform that rides up through the opening
-        box(F - 3, F - 1, y - 1, y - 1, d, '='); box(F - 3, F - 3, yN, y - 2, d, '|'); stats.platforms++;
+      } else if (conn.type === 'lift') {                         // a platform that rides up through the opening (or a zip mover that shoots up)
+        conn.zip = zipPick();
+        box(F - 3, F - 1, y - 1, y - 1, d, conn.zip ? 'z' : '='); box(F - 3, F - 3, yN, y - 2, d, '|'); if (conn.zip) stats.zips++; else stats.platforms++;
       } else if (EL.refills && Hf >= 8) put(F - 2, d, y - 5, 'o');
 
       if (SHAPE) {                                         // the ceiling hangs down in uneven lumps where the route allows

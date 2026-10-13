@@ -41,7 +41,7 @@
     bounceH: 170 * K, bounceV: -160 * K, bounceVarTime: 0.25, bounceForce: 0.2, bounceCheck: 5,   // wall bounce: dash up beside a wall, then jump
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
     stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
-    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
+    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, zipSpeed: 160, zipWind: 0.1, zipRest: 0.5, zipBack: 45, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
   };
 
   var C = {
@@ -188,12 +188,15 @@
 
   // Moving platforms are painted as a run of '=' tiles. A line of '-' tiles beside it, or '|' tiles above or below it,
   // is the track it shuttles along. With no track it just stays put.
+  // A zip mover ('z') is painted the same way but waits where it is until you stand on it, then shoots to the far end
+  // of its track, rests, and crawls back to wait again.
   function findMovers(t) {
     function at(c, r) { return (r >= 0 && r < rows && c >= 0 && c < cols) ? t[r].charAt(c) : ''; }
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
-      if (at(c, r) !== '=' || at(c - 1, r) === '=') continue;
-      var c1 = c; while (at(c1 + 1, r) === '=') c1++;
-      var m = { x: c * T, y: r * T, w: (c1 - c + 1) * T, h: T, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, vx: 0, vy: 0 };
+      var ch = at(c, r);
+      if ((ch !== '=' && ch !== 'z') || at(c - 1, r) === ch) continue;
+      var c1 = c; while (at(c1 + 1, r) === ch) c1++;
+      var m = { x: c * T, y: r * T, w: (c1 - c + 1) * T, h: T, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, vx: 0, vy: 0, zip: ch === 'z', zs: 'idle' };
       var a = c, b = c1; while (at(a - 1, r) === '-') a--; while (at(b + 1, r) === '-') b++;
       if (a < c || b > c1) { m.axis = 'x'; m.min = a * T; m.max = (b + 1) * T - m.w; m.dir = (b - c1) >= (c - a) ? 1 : -1; }
       else {
@@ -208,7 +211,7 @@
   function resetDynamics() {
     var i;
     for (i = 0; i < crumbles.length; i++) { crumbles[i].state = 'idle'; crumbles[i].t = 0; crumbles[i].dirty = true; }
-    for (i = 0; i < movers.length; i++) { var m = movers[i]; m.x = m.x0; m.y = m.y0; m.dir = m.dir0; m.wait = 0; m.rem = 0; m.vx = 0; m.vy = 0; }
+    for (i = 0; i < movers.length; i++) { var m = movers[i]; m.x = m.x0; m.y = m.y0; m.dir = m.dir0; m.wait = 0; m.rem = 0; m.vx = 0; m.vy = 0; m.zs = 'idle'; }
     for (i = 0; i < fireballs.length; i++) { var f = fireballs[i]; f.x = f.x0; f.y = f.y0; f.dir = f.dir0; f.wait = 0; f.rem = 0; }
     for (i = 0; i < springs.length; i++) springs[i].t = 0;
     for (i = 0; i < gems.length; i++) { gems[i].state = 'idle'; gems[i].fx = gems[i].x; gems[i].fy = gems[i].y; }
@@ -290,13 +293,24 @@
       var m = movers[i];
       m.vx = 0; m.vy = 0;
       if (!m.axis || m.min === m.max) continue;
-      if (m.wait > 0) { m.wait -= dt; continue; }
-      m.rem += P.moverSpeed * dt;
+      var speed = P.moverSpeed;
+      if (m.zip) {
+        if (m.zs === 'idle') { if (!pl.dead && fx.mode === 'none' && riding(m)) { m.zs = 'go'; m.wait = P.zipWind; m.dir = m.dir0; } else continue; }   // armed by standing on it
+        if (m.wait > 0) { m.wait -= dt; if (m.zs === 'rest' && m.wait <= 0) { m.zs = 'back'; m.dir = -m.dir0; } continue; }
+        speed = m.zs === 'go' ? P.zipSpeed : P.zipBack;
+      } else if (m.wait > 0) { m.wait -= dt; continue; }
+      m.rem += speed * dt;
       var n = Math.floor(m.rem); m.rem -= n;
-      if (m.axis === 'x') m.vx = m.dir * P.moverSpeed; else m.vy = m.dir * P.moverSpeed;
+      if (m.axis === 'x') m.vx = m.dir * speed; else m.vy = m.dir * speed;
       while (n-- > 0) {
         var pos = m.axis === 'x' ? m.x : m.y;
-        if ((m.dir > 0 && pos >= m.max) || (m.dir < 0 && pos <= m.min)) { m.dir = -m.dir; m.wait = P.moverWait; m.rem = 0; break; }
+        if ((m.dir > 0 && pos >= m.max) || (m.dir < 0 && pos <= m.min)) {
+          m.rem = 0;
+          if (!m.zip) { m.dir = -m.dir; m.wait = P.moverWait; }
+          else if (m.zs === 'go') { m.zs = 'rest'; m.wait = P.zipRest; }
+          else m.zs = 'idle';
+          break;
+        }
         var dx = m.axis === 'x' ? m.dir : 0, dy = m.axis === 'y' ? m.dir : 0, carry = riding(m);
         m.x += dx; m.y += dy;
         if (pl.dead || fx.mode !== 'none') continue;
@@ -1089,7 +1103,7 @@
     }
     for (i = 0; i < movers.length; i++) {
       var mv = movers[i];
-      for (var px = 0; px < mv.w; px += T) drawPlank(g, mv.x + px, mv.y, px > 0, px + T < mv.w);
+      for (var px = 0; px < mv.w; px += T) drawPlank(g, mv.x + px, mv.y, px > 0, px + T < mv.w, mv.zip ? (mv.zs === 'idle' ? 1 : 2) : 0);
       if (mv.axis) mark(mv.x, mv.y, mv.w, mv.h);
     }
     for (i = 0; i < refills.length; i++) {
@@ -1807,7 +1821,7 @@
     state: function () {
       return { x: pl.x, y: pl.y, vx: Math.round(pl.vx), vy: Math.round(pl.vy), state: pl.state, ground: pl.onGround,
                dashes: pl.dashes, stamina: Math.round(pl.stamina), dead: pl.dead, deaths: run.deaths, won: run.won,
-               movers: movers.map(function (m) { return { x: m.x, y: m.y, wait: m.wait }; }),
+               movers: movers.map(function (m) { return { x: m.x, y: m.y, wait: m.wait, z: m.zip ? m.zs : '' }; }),
                fireballs: fireballs.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, wait: f.wait }; }), gem: gotGem(), cam: cam.y };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
