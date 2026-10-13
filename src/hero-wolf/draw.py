@@ -25,14 +25,14 @@ NAMES = {
 def G(s): return [r for r in s.strip('\n').split('\n')]
 
 # ---- parts (facing right) ----
-HEAD = {
+HEAD = {                                              # no eyes: long hair comes out from under the band and hangs over the face
     'normal': G("""
 ...oooo..
 ..oddDdo.
 .oBBBBBBo
 kobbbbbbo
-koSsssSso
-.oSsseseo
+koSdddddo
+.oSsdsdso
 .oSssssso
 ..oSSSSo.
 """),
@@ -41,8 +41,8 @@ koSsssSso
 ..oddDdo.
 .oBBBBBBo
 kobbbbbbo
-koSsssSso
-.oSssSsSo
+koSdddddo
+.oSsddsdo
 .oSssssso
 ..oSSSSo.
 """),
@@ -51,8 +51,8 @@ koSsssSso
 ..oddDdo.
 .oBBBBBBo
 kobbbbbbo
-koSsseseo
-.oSsssSso
+koSddddso
+.oSsdsdso
 .oSssssso
 ..oSSSSo.
 """),
@@ -61,8 +61,8 @@ koSsseseo
 ..oddDdo.
 .oBBBBBBo
 kobbbbbbo
-koSsssSso
-.oSsssseo
+koSdddddo
+.oSssdsdo
 .oSssssso
 ..oSSSSo.
 """),
@@ -71,8 +71,8 @@ koSsssSso
 ..oddDdo.
 .oBBBBBBo
 kobbbbbbo
-koSsssSso
-.oSSssSSo
+koSdddddo
+.oSdsdsdo
 .oSssssso
 ..oSSSSo.
 """),
