@@ -138,6 +138,7 @@
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="zips" aria-pressed="true">Zip movers</button>
+            <button type="button" data-v="keys" aria-pressed="true">Key and door</button>
             <button type="button" data-v="refills" aria-pressed="true">Stamina pickups</button>
             <button type="button" data-v="springs" aria-pressed="true">Springs</button>
             <button type="button" data-v="gems" aria-pressed="true">Gem</button>
@@ -223,7 +224,7 @@
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
-    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M']]],
+    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
     ['Tools', [['.', 'Erase', 'X']]]
   ];
@@ -515,6 +516,20 @@
     }
     return lamps;
   }
+  // Locked door: a stone block with a lock plate; up and down say whether the door continues (so the plate sits once, in the middle).
+  function drawDoor(b, x, y, up, dn) {
+    b.fillStyle = '#2a2016'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#6b5236'; b.fillRect(x + 1, y + (up ? 0 : 1), 8, 10 - (up ? 0 : 1) - (dn ? 0 : 1));
+    b.fillStyle = '#8c6e48'; b.fillRect(x + 1, y + (up ? 0 : 1), 1, 10 - (up ? 0 : 1) - (dn ? 0 : 1));
+    b.fillStyle = '#4a3624'; for (var i = (up ? 0 : 3); i < 10; i += 3) b.fillRect(x + 2, y + i, 7, 1);
+    if (!up || !dn) { b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + (up ? 2 : 4), 3, 3); b.fillStyle = '#2a2016'; b.fillRect(x + 5, y + (up ? 3 : 5), 1, 1); }   // the lock plate
+  }
+  // Key: gold, bow at the top, two teeth.
+  function drawKey(b, x, y) {
+    b.fillStyle = '#2a2016'; b.fillRect(x + 2, y + 1, 5, 4); b.fillRect(x + 3, y + 5, 3, 4);
+    b.fillStyle = '#ffd27a'; b.fillRect(x + 3, y + 2, 3, 2); b.fillRect(x + 4, y + 4, 1, 4); b.fillRect(x + 5, y + 6, 1, 1); b.fillRect(x + 5, y + 8, 1, 1);
+    b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + 3, 1, 1);
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);
@@ -609,7 +624,7 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0 };
     function zipPick() { return EL.zips && (!EL.movers || rnd() < 0.5); }   // a platform spot becomes a zip mover
     var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
     g[ROWS - 3][col(2, d)] = 'S';
@@ -726,6 +741,8 @@
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
       }
       stats.floors++; stats.obstacles += obs.length;
+      // a key on the landing strip of a middle floor, before the first obstacle; the door then guards the exit
+      if (EL.keys && !top && floor >= 1 && !stats.keys && (rnd() < 0.5 || maxHf < 15)) { put(s0 - 2, d, y - 1, 'k'); stats.keys++; }
 
       // How much open air the route needs above the floor at each column. Anything above that is free to fill.
       var need = [], t;
@@ -738,6 +755,7 @@
 
       if (top) {
         box(21, 22, y - 2, y - 1, d, 'E');
+        if (stats.keys) box(19, 19, y - 2, y - 1, d, 'D');     // the door stands in front of the exit
         if (SHAPE) {                                     // the space above the last floor becomes a lumpy mass of rock
           var lump = ri(0, 2);
           for (t = 0; t <= 24; t++) {
@@ -899,6 +917,8 @@
     else if (ch === 'F') drawFlame(b, x, y, (c + r) % 2);
     else if (ch === 'u') drawSpringIcon(b, x, y);
     else if (ch === 'G') drawGemIcon(b, x, y);
+    else if (ch === 'k') drawKey(b, x, y);
+    else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=' || ch === 'z') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === ch, !icon && c < COLS - 1 && tiles[r][c + 1] === ch, ch === 'z' ? 1 : 0);
@@ -973,17 +993,20 @@
 
   // ---- checks ----
   function runChecks() {
-    var starts = 0, exits = 0, grounded = false, r, c;
+    var starts = 0, exits = 0, nkeys = 0, ndoors = 0, grounded = false, r, c;
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       if (tiles[r][c] === 'S') { starts++; grounded = r < ROWS - 1 && tiles[r + 1][c] === '#'; }
       if (tiles[r][c] === 'E') exits++;
+      if (tiles[r][c] === 'k') nkeys++; if (tiles[r][c] === 'D') ndoors++;
     }
-    return [
+    var out = [
       { ok: starts === 1, text: starts === 1 ? 'One start' : (starts ? 'Only one start is allowed' : 'Add a start') },
       { ok: starts === 1 && grounded, text: 'Start stands on solid ground' },
-      { ok: exits > 0, text: exits ? 'Has an exit' : 'Add an exit' },
+      { ok: exits > 0, text: exits ? 'Has an exit' : 'Add an exit' }];
+    if (ndoors) out.push({ ok: nkeys > 0, text: nkeys ? 'Has a key for its door' : 'A door needs a key' });
+    return out.concat([
       { ok: cleared, text: cleared ? 'Beaten in play test' : 'Not beaten since the last change' }
-    ];
+    ]);
   }
   function refresh() {
     var list = runChecks(), ul = $('checks');
@@ -1172,7 +1195,7 @@
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
-    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers'));
+    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door');
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });

@@ -42,7 +42,7 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0 };
     function zipPick() { return EL.zips && (!EL.movers || rnd() < 0.5); }   // a platform spot becomes a zip mover
     var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
     g[ROWS - 3][col(2, d)] = 'S';
@@ -159,6 +159,8 @@
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
       }
       stats.floors++; stats.obstacles += obs.length;
+      // a key on the landing strip of a middle floor, before the first obstacle; the door then guards the exit
+      if (EL.keys && !top && floor >= 1 && !stats.keys && (rnd() < 0.5 || maxHf < 15)) { put(s0 - 2, d, y - 1, 'k'); stats.keys++; }
 
       // How much open air the route needs above the floor at each column. Anything above that is free to fill.
       var need = [], t;
@@ -171,6 +173,7 @@
 
       if (top) {
         box(21, 22, y - 2, y - 1, d, 'E');
+        if (stats.keys) box(19, 19, y - 2, y - 1, d, 'D');     // the door stands in front of the exit
         if (SHAPE) {                                     // the space above the last floor becomes a lumpy mass of rock
           var lump = ri(0, 2);
           for (t = 0; t <= 24; t++) {

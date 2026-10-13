@@ -272,6 +272,20 @@
     }
     return lamps;
   }
+  // Locked door: a stone block with a lock plate; up and down say whether the door continues (so the plate sits once, in the middle).
+  function drawDoor(b, x, y, up, dn) {
+    b.fillStyle = '#2a2016'; b.fillRect(x, y, 10, 10);
+    b.fillStyle = '#6b5236'; b.fillRect(x + 1, y + (up ? 0 : 1), 8, 10 - (up ? 0 : 1) - (dn ? 0 : 1));
+    b.fillStyle = '#8c6e48'; b.fillRect(x + 1, y + (up ? 0 : 1), 1, 10 - (up ? 0 : 1) - (dn ? 0 : 1));
+    b.fillStyle = '#4a3624'; for (var i = (up ? 0 : 3); i < 10; i += 3) b.fillRect(x + 2, y + i, 7, 1);
+    if (!up || !dn) { b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + (up ? 2 : 4), 3, 3); b.fillStyle = '#2a2016'; b.fillRect(x + 5, y + (up ? 3 : 5), 1, 1); }   // the lock plate
+  }
+  // Key: gold, bow at the top, two teeth.
+  function drawKey(b, x, y) {
+    b.fillStyle = '#2a2016'; b.fillRect(x + 2, y + 1, 5, 4); b.fillRect(x + 3, y + 5, 3, 4);
+    b.fillStyle = '#ffd27a'; b.fillRect(x + 3, y + 2, 3, 2); b.fillRect(x + 4, y + 4, 1, 4); b.fillRect(x + 5, y + 6, 1, 1); b.fillRect(x + 5, y + 8, 1, 1);
+    b.fillStyle = '#d9a24a'; b.fillRect(x + 4, y + 3, 1, 1);
+  }
   // Fire: a flame that sits on the ground. Two shapes that swap slowly so it flickers without flashing.
   function drawFlame(b, x, y, f) {
     b.fillStyle = '#5a1a12'; b.fillRect(x, y + 8, 10, 2);

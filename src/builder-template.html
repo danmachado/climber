@@ -138,6 +138,7 @@
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="zips" aria-pressed="true">Zip movers</button>
+            <button type="button" data-v="keys" aria-pressed="true">Key and door</button>
             <button type="button" data-v="refills" aria-pressed="true">Stamina pickups</button>
             <button type="button" data-v="springs" aria-pressed="true">Springs</button>
             <button type="button" data-v="gems" aria-pressed="true">Gem</button>
@@ -223,7 +224,7 @@
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
-    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M']]],
+    ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
     ['Tools', [['.', 'Erase', 'X']]]
   ];
@@ -328,6 +329,8 @@
     else if (ch === 'F') drawFlame(b, x, y, (c + r) % 2);
     else if (ch === 'u') drawSpringIcon(b, x, y);
     else if (ch === 'G') drawGemIcon(b, x, y);
+    else if (ch === 'k') drawKey(b, x, y);
+    else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=' || ch === 'z') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === ch, !icon && c < COLS - 1 && tiles[r][c + 1] === ch, ch === 'z' ? 1 : 0);
@@ -402,17 +405,20 @@
 
   // ---- checks ----
   function runChecks() {
-    var starts = 0, exits = 0, grounded = false, r, c;
+    var starts = 0, exits = 0, nkeys = 0, ndoors = 0, grounded = false, r, c;
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       if (tiles[r][c] === 'S') { starts++; grounded = r < ROWS - 1 && tiles[r + 1][c] === '#'; }
       if (tiles[r][c] === 'E') exits++;
+      if (tiles[r][c] === 'k') nkeys++; if (tiles[r][c] === 'D') ndoors++;
     }
-    return [
+    var out = [
       { ok: starts === 1, text: starts === 1 ? 'One start' : (starts ? 'Only one start is allowed' : 'Add a start') },
       { ok: starts === 1 && grounded, text: 'Start stands on solid ground' },
-      { ok: exits > 0, text: exits ? 'Has an exit' : 'Add an exit' },
+      { ok: exits > 0, text: exits ? 'Has an exit' : 'Add an exit' }];
+    if (ndoors) out.push({ ok: nkeys > 0, text: nkeys ? 'Has a key for its door' : 'A door needs a key' });
+    return out.concat([
       { ok: cleared, text: cleared ? 'Beaten in play test' : 'Not beaten since the last change' }
-    ];
+    ]);
   }
   function refresh() {
     var list = runChecks(), ul = $('checks');
@@ -601,7 +607,7 @@
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
-    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers'));
+    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door');
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });
