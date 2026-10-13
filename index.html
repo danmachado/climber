@@ -10,7 +10,8 @@
 <style>
   html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
-  #stage { position: relative; background: #0a0d1c; overflow: hidden; }
+  #stage { position: relative; background: #0a0d1c; overflow: hidden; will-change: transform; transform: translate(0px,0px); }
+  #fx { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   #world { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
   #stage canvas { position: absolute; display: block; image-rendering: pixelated; }
 </style>
@@ -1160,6 +1161,42 @@
   // The chunks live in a "world" layer as tall as the room. A tall room scrolls by sliding that layer with a
   // transform (no repainting), the same cheap move the screen shake uses.
   var world = document.createElement('div'); world.id = 'world'; stage.appendChild(world);
+  // ---- weather: a few dim, slow flecks (dust, snow, embers) on one screen-sized layer above the room ----
+  // The only effect with a per-frame cost: one small clear and about twenty one-pixel draws, on its own canvas so the
+  // chunk layer and its dirty tracking are untouched. Off by default until it is measured on the frame; Settings
+  // turns it on, and when it is off the layer is hidden and nothing runs.
+  var wx = makeCanvas(LW, LH, true), wg = wx.getContext('2d'); wx.id = 'fx';
+  var FX_KEY = 'climber.fx.v1', weather = { on: false, list: [], kind: '' };
+  try { weather.on = localStorage.getItem(FX_KEY) === '1'; } catch (e) {}
+  function setWeather(on) {
+    weather.on = on; weather.list = [];
+    try { localStorage.setItem(FX_KEY, on ? '1' : '0'); } catch (e) {}
+    wx.style.display = on ? 'block' : 'none'; wg.clearRect(0, 0, LW, LH);
+  }
+  function newFleck(k, i) {
+    var f = { x: Math.random() * LW, y: Math.random() * LH, t: Math.random() * 100, s: i % 4 === 0 ? 2 : 1 };
+    if (k === 'frost') { f.vx = 0; f.vy = 10 + Math.random() * 10; }            // snow: drifts down with a sway
+    else if (k === 'ember') { f.vx = 0; f.vy = -(9 + Math.random() * 12); }     // embers: rise and flicker
+    else { f.vx = 3 + Math.random() * 3; f.vy = -(2 + Math.random() * 3); }     // dust: barely moves
+    return f;
+  }
+  function drawWeather() {
+    if (!weather.on) return;
+    if (scene !== 'play') { if (weather.list.length) { weather.list = []; wg.clearRect(0, 0, LW, LH); } return; }
+    var k = themeOf(room).tiles, i, f;
+    if (weather.kind !== k || !weather.list.length) { weather.kind = k; weather.list = []; for (i = 0; i < 20; i++) weather.list.push(newFleck(k, i)); }
+    wg.clearRect(0, 0, LW, LH);
+    var col = k === 'frost' ? '220,238,248' : k === 'ember' ? '255,154,60' : '130,140,200';
+    for (i = 0; i < weather.list.length; i++) {
+      f = weather.list[i]; f.t += STEP;
+      f.x += (f.vx + Math.sin(f.t * 1.2 + i) * (k === 'frost' ? 7 : 3)) * STEP; f.y += f.vy * STEP;
+      if (f.y < -3) { f.y = LH + 2; f.x = Math.random() * LW; } else if (f.y > LH + 3) { f.y = -2; f.x = Math.random() * LW; }
+      if (f.x < -3) f.x = LW + 2; else if (f.x > LW + 3) f.x = -2;
+      var a = k === 'ember' ? 0.2 + 0.3 * (0.5 + 0.5 * Math.sin(f.t * 3 + i)) : (k === 'frost' ? 0.5 : 0.3);   // slow fades, never a flash
+      wg.fillStyle = 'rgba(' + col + ',' + a.toFixed(2) + ')';
+      wg.fillRect(Math.round(f.x), Math.round(f.y), f.s, f.s);
+    }
+  }
   function buildChunks() {
     for (var i = 0; i < chunks.length; i++) world.removeChild(chunks[i].c);
     chunks = [];
@@ -1325,7 +1362,7 @@
   function shaky() { return scene === 'play' && !pl.dead && !run.won && !pl.onGround && pl.stamina < P.stamina * TREMBLE; }
   function tremble() { return shaky() && Math.floor(tick / 3) % 2 ? 1 : 0; }
   function applyShake() {
-    var v = '';
+    var v = 'translate(0px,0px)';                   // always a transform, so the stage stays one compositing layer and never gets re-promoted
     if (scene === 'play' && shake.t > 0 && !run.won) {
       shake.n++;
       var k = view.scale / (window.devicePixelRatio || 1), a = shake.size * Math.min(1, shake.t / 0.1);
@@ -1340,8 +1377,9 @@
     tick++; applyShake();
     if (scene === 'play') applyCam();
     if (scene !== 'play') {
-      var ssig = [scene, hero.ready, menuNote, set.row, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, hero.ready, menuNote, set.row, weather.on, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
+      drawWeather();
       return;
     }
     g.drawImage(tileLayer, 0, 0);
@@ -1402,6 +1440,7 @@
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
     var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
+    drawWeather();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
   }
 
@@ -1534,9 +1573,11 @@
       h.font = 'bold ' + (size * u) + 'px Menlo, Consolas, "DejaVu Sans Mono", monospace';
       h.textAlign = align || 'left'; h.fillStyle = color; h.fillText(str, x * u, y * u);
     }
-    h.clearRect(0, 0, hud.width, hud.height);
+    var topH = Math.round(TOP_H * u), botH = Math.round(BOT_H * u);
+    if (run.won || wiz.on || check >= 2) h.clearRect(0, 0, hud.width, hud.height);   // an overlay uses the whole canvas
+    else { h.clearRect(0, 0, hud.width, topH); h.clearRect(0, hud.height - botH, hud.width, botH); }   // in play only the two strips are shown, so only they are cleared
     h.fillStyle = 'rgba(10,13,28,0.84)';
-    h.fillRect(0, 0, hud.width, Math.round(TOP_H * u)); h.fillRect(0, hud.height - Math.round(BOT_H * u), hud.width, Math.round(BOT_H * u));
+    h.fillRect(0, 0, hud.width, topH); h.fillRect(0, hud.height - botH, hud.width, botH);
     var title = (room.name || '').toUpperCase();
     if (title.length > 13) title = title.substring(0, 13);
     t(testMode || demo.on ? title : (mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : run.count) + '  ' + title, 4, 7.5, 7, C.text);
@@ -1680,7 +1721,7 @@
 
   // ---- settings: the controller picture, what each button does, and changing it ----
   var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
-  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['back', 'BACK']];
+  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['fx', 'PARTICLES'], ['back', 'BACK']];
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
     if (!padCfg[gp.id]) { var c = cfgFor(gp); if (!c) return null; padCfg[gp.id] = { layout: c.layout, act: JSON.parse(JSON.stringify(c.act)) }; }
     return padCfg[gp.id];
@@ -1689,6 +1730,7 @@
     var id = SET_ROWS[k][0], gp = firstPad();
     set.row = k; set.note = ''; lastSig = '';
     if (id === 'back') { toMenu(); return; }
+    if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
     if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON. IT SHOWS IN THE TOP BAR WHILE PLAYING.' : 'SPEED READOUT OFF'; return; }
     if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
     if (id === 'redo' || !cfgFor(gp)) { startWiz(gp); return; }
@@ -1786,13 +1828,13 @@
       pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
     } else {
       for (i = 0; i < SET_ROWS.length; i++) {
-        var y = 250 + i * 27, on = i === set.row;
-        box(55, y, 160, 23, on ? C.flame : '#131a33');
-        pxText(SET_ROWS[i][1], 135, y + 5, 2, on ? '#101426' : C.dim, 'center');
-        hits.push({ x: 55, y: y, w: 160, h: 23, fn: (function (k) { return function () { setPick(k); }; })(i) });
+        var y = 248 + i * 24, on = i === set.row;
+        box(55, y, 160, 21, on ? C.flame : '#131a33');
+        pxText(SET_ROWS[i][0] === 'fx' ? 'PARTICLES ' + (weather.on ? 'ON' : 'OFF') : SET_ROWS[i][1], 135, y + 4, 2, on ? '#101426' : C.dim, 'center');
+        hits.push({ x: 55, y: y, w: 160, h: 21, fn: (function (k) { return function () { setPick(k); }; })(i) });
       }
     }
-    if (set.note) pxText(set.note, 135, 442, 1, C.teal, 'center');
+    if (set.note) pxText(set.note, 135, 446, 1, C.teal, 'center');
     pxText(usedPad ? 'UP AND DOWN CHOOSE - JUMP SELECTS' : 'ARROWS CHOOSE - C SELECTS - OR CLICK', 135, 464, 1, C.dim, 'center');
   }
   function nodePos(k) { var row = Math.floor(k / 3), p = k % 3; return { x: 55 + (row % 2 ? 2 - p : p) * 80, y: 392 - row * 76, row: row }; }
@@ -1962,6 +2004,7 @@
     testMode = true; scene = 'play'; demo.on = false; demo.idle = 0; resetRun(); lastSig = ''; window.focus();
   });
   if (embedded) window.parent.postMessage({ type: 'climber-ready' }, '*');
+  setWeather(weather.on);
   layout();
   window.requestAnimationFrame(frame);
 
@@ -1977,6 +2020,7 @@
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
+    weather: function (on) { setWeather(on); return weather.on; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
     startLevel: startLevel,
     demoAll: function () { // plays every recorded demo to the end, to prove the recordings still reach the exit
