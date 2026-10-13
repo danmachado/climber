@@ -1055,18 +1055,6 @@
   document.addEventListener('fullscreenchange', layout);
   document.addEventListener('webkitfullscreenchange', layout);
 
-  function drawSpike(b, tx, ty, dir) {
-    var teeth = [1, 3, 5, 3, 1, 1, 3, 5, 3, 1];
-    b.fillStyle = C.spike;
-    for (var i = 0; i < T; i++) {
-      var n = teeth[i];
-      if (dir === 0) b.fillRect(tx + i, ty + T - n, 1, n);
-      else if (dir === 2) b.fillRect(tx + i, ty, 1, n);
-      else if (dir === 1) b.fillRect(tx, ty + i, n, 1);
-      else b.fillRect(tx + T - n, ty + i, n, 1);
-    }
-  }
-
   function drawTileLayer() {
     tileLayer = document.createElement('canvas');
     tileLayer.width = LW; tileLayer.height = RH; allDirty = true;

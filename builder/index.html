@@ -518,6 +518,16 @@
     }
     return lamps;
   }
+  // Spikes: two teeth per tile with a dark outline, a pale body, a shadowed side and a white tip, so they read against
+  // snow caps and bright walls as well as dark sky. dir: 0 up, 1 right (from the left edge), 2 down, 3 left.
+  var SPIKE_UP = ['..........', '..........', '..........', '..........', '..w....w..', '.owo..owo.', '.oco..oco.', 'osccooscco', 'osccooscco', 'oooooooooo'];
+  var SPIKE_COL = { o: '#0d0f18', w: '#ffffff', c: '#cfd8ee', s: '#8f9bb8' };
+  function drawSpike(b, tx, ty, dir) {
+    for (var y = 0; y < 10; y++) for (var x = 0; x < 10; x++) {
+      var ch = dir === 0 ? SPIKE_UP[y][x] : dir === 2 ? SPIKE_UP[9 - y][x] : dir === 1 ? SPIKE_UP[9 - x][y] : SPIKE_UP[x][y];
+      if (ch !== '.') { b.fillStyle = SPIKE_COL[ch]; b.fillRect(tx + x, ty + y, 1, 1); }
+    }
+  }
   // Locked door: a stone block with a lock plate; up and down say whether the door continues (so the plate sits once, in the middle).
   function drawDoor(b, x, y, up, dn) {
     b.fillStyle = '#2a2016'; b.fillRect(x, y, 10, 10);
@@ -924,17 +934,7 @@
   function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); changed(); }
 
   // ---- drawing (same look as the game) ----
-  function spike(b, tx, ty, ch) {
-    var teeth = [1, 3, 5, 3, 1, 1, 3, 5, 3, 1];
-    b.fillStyle = C.spike;
-    for (var i = 0; i < T; i++) {
-      var n = teeth[i];
-      if (ch === '^') b.fillRect(tx + i, ty + T - n, 1, n);
-      else if (ch === 'v') b.fillRect(tx + i, ty, 1, n);
-      else if (ch === '>') b.fillRect(tx, ty + i, n, 1);
-      else b.fillRect(tx + T - n, ty + i, n, 1);
-    }
-  }
+  function spike(b, tx, ty, ch) { drawSpike(b, tx, ty, ch === '^' ? 0 : ch === '>' ? 1 : ch === 'v' ? 2 : 3); }
   function wallAt(c, r) { return r < 0 || r >= ROWS || c < 0 || c >= COLS || tiles[r][c] === '#' || tiles[r][c] === 'I'; }
   function alone() { return false; }
   function backAt(c, r) { return wallAt(c, r) || tiles[r][c] === 'b'; }

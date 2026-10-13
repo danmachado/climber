@@ -272,6 +272,16 @@
     }
     return lamps;
   }
+  // Spikes: two teeth per tile with a dark outline, a pale body, a shadowed side and a white tip, so they read against
+  // snow caps and bright walls as well as dark sky. dir: 0 up, 1 right (from the left edge), 2 down, 3 left.
+  var SPIKE_UP = ['..........', '..........', '..........', '..........', '..w....w..', '.owo..owo.', '.oco..oco.', 'osccooscco', 'osccooscco', 'oooooooooo'];
+  var SPIKE_COL = { o: '#0d0f18', w: '#ffffff', c: '#cfd8ee', s: '#8f9bb8' };
+  function drawSpike(b, tx, ty, dir) {
+    for (var y = 0; y < 10; y++) for (var x = 0; x < 10; x++) {
+      var ch = dir === 0 ? SPIKE_UP[y][x] : dir === 2 ? SPIKE_UP[9 - y][x] : dir === 1 ? SPIKE_UP[9 - x][y] : SPIKE_UP[x][y];
+      if (ch !== '.') { b.fillStyle = SPIKE_COL[ch]; b.fillRect(tx + x, ty + y, 1, 1); }
+    }
+  }
   // Locked door: a stone block with a lock plate; up and down say whether the door continues (so the plate sits once, in the middle).
   function drawDoor(b, x, y, up, dn) {
     b.fillStyle = '#2a2016'; b.fillRect(x, y, 10, 10);
