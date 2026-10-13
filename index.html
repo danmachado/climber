@@ -1532,6 +1532,8 @@
     for (i = 0; i < len; i++) {
       var tx = px - facing * (back + speed * 0.7), ty = py + (i ? droop : 0.3) - speed * 0.9;   // hangs when still, streams when moving
       n[i].x += (tx - n[i].x) / 2; n[i].y += (ty - n[i].y) / 2;
+      var ddx = n[i].x - px, ddy = n[i].y - py, dd = Math.sqrt(ddx * ddx + ddy * ddy), mx = i < 2 ? 2.2 : 1.8;   // cloth has a length: no segment longer than this
+      if (dd > mx) { n[i].x = px + ddx / dd * mx; n[i].y = py + ddy / dd * mx; }
       n[i].wy = Math.sin(t * (3.5 + speed * 7) + i * 1.15 + ph) * (0.25 + i * 0.4) * (0.7 + speed);   // flutter, more at the tip and at speed
       px = n[i].x; py = n[i].y;
     }
