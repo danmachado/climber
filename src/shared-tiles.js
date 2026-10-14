@@ -487,6 +487,24 @@
     b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y - 20, 2, 25);
     b.fillStyle = '#ffd6ea'; b.fillRect(x + (f ? 4 : 5), y - 20, 1, 25);
   }
+  // Neon Row pieces: a spark that runs along a cable (plays like a fireball) and a holo sign that projects a solid
+  // column while lit (plays like a laser): a base plate, a flickering outline as the warning, then a cyan beam.
+  function drawSpark(b, x, y, f, dx, dy) {
+    b.fillStyle = '#1c7a85'; b.fillRect(x + 2, y + 2, 6, 6);
+    b.fillStyle = '#38f0ff'; b.fillRect(x + 3, y + 3, 4, 4); b.fillRect(x + 4 - dx * 4, y + 4 - dy * 4, 2, 2);
+    b.fillStyle = '#ffffff'; b.fillRect(x + 4 + (f ? 1 : 0), y + 4, 2, 2); if (f) { b.fillRect(x + 1 + dx * 2, y + 2, 1, 1); b.fillRect(x + 8 - dx * 2, y + 7, 1, 1); }
+  }
+  function drawHoloBase(b, x, y) {
+    b.fillStyle = '#1e2236'; b.fillRect(x + 1, y + 6, 8, 4);
+    b.fillStyle = '#565d80'; b.fillRect(x + 2, y + 7, 6, 1);
+    b.fillStyle = '#38f0ff'; b.fillRect(x + 4, y + 6, 2, 1);
+  }
+  function drawHoloWarn(b, x, y, f) { if (f) { b.fillStyle = '#1c7a85'; b.fillRect(x + 2, y - 20, 1, 26); b.fillRect(x + 7, y - 20, 1, 26); } b.fillStyle = '#ffffff'; b.fillRect(x + 4, y + 5, 2, 1); }
+  function drawHolo(b, x, y, f) {
+    b.fillStyle = '#1c7a85'; b.fillRect(x + 2, y - 20, 6, 26);
+    b.fillStyle = '#38f0ff'; b.fillRect(x + 3, y - 20, 4, 26);
+    b.fillStyle = '#d8fbff'; for (var k = 0; k < 26; k += 4) b.fillRect(x + 3 + ((k >> 2) + f) % 4, y - 20 + k, 1, 2);   // scan lines crawling up the column
+  }
   // Patrol drone (Temple): a black saucer with a pink eye that looks the way it moves; fires a burst straight down.
   function drawDrone(b, x, y, dir, f) {
     b.fillStyle = '#1a1408'; b.fillRect(x + 1, y + 3, 8, 4); b.fillRect(x + 3, y + 1, 4, 2); b.fillRect(x + 2, y + 7, 6, 1);

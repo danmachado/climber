@@ -141,6 +141,8 @@
             <button type="button" data-v="lava" aria-pressed="true">Rising lava</button>
             <button type="button" data-v="lasers" aria-pressed="true">Lasers</button>
             <button type="button" data-v="drones" aria-pressed="true">Drones</button>
+            <button type="button" data-v="wires" aria-pressed="true">Sparks</button>
+            <button type="button" data-v="holos" aria-pressed="true">Holo signs</button>
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="zips" aria-pressed="true">Zip movers</button>
@@ -230,6 +232,7 @@
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y'], ['J', 'Fire jet', 'H'], ['~', 'Lava', 'V']]],
     ['Temple', [['L', 'Laser', 'F'], ['O', 'Drone', 'G']]],
+    ['Neon Row', [['w', 'Spark', 'J'], ['%', 'Holo sign', 'O']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
@@ -333,6 +336,8 @@
     else if (ch === '~') drawLava(b, x, y, icon || r === 0 || tiles[r - 1][c] !== '~');
     else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
+    else if (ch === 'w') drawSpark(b, x, y, 0, 0, 0);
+    else if (ch === '%') { drawHoloBase(b, x, y); if (icon) { b.fillStyle = '#38f0ff'; b.fillRect(x + 3, y, 4, 5); } }
     else if (ch === 'b') drawBack(b, x, y, icon ? alone : backAt, c, r);
     else if (ch === '=' || ch === 'z') drawPlank(b, x, y, !icon && c > 0 && tiles[r][c - 1] === ch, !icon && c < COLS - 1 && tiles[r][c + 1] === ch, ch === 'z' ? 1 : 0);
     else if (ch === '-' || ch === '|') drawTrack(b, x, y, ch === '|');
@@ -608,7 +613,7 @@
     var st = out.stats, bits = st.islands ? [st.islands + ' islands', st.spikes + ' spike tiles'] : [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
-    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava'); if (st.lasers) bits.push(st.lasers + (st.lasers === 1 ? ' laser' : ' lasers')); if (st.drones) bits.push(st.drones + (st.drones === 1 ? ' drone' : ' drones'));
+    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava'); if (st.lasers) bits.push(st.lasers + (st.lasers === 1 ? ' laser' : ' lasers')); if (st.drones) bits.push(st.drones + (st.drones === 1 ? ' drone' : ' drones')); if (st.wires) bits.push(st.wires + (st.wires === 1 ? ' spark' : ' sparks')); if (st.holos) bits.push(st.holos + (st.holos === 1 ? ' holo sign' : ' holo signs'));
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });

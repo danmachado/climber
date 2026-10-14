@@ -47,15 +47,15 @@ var SET4 = [
   ['Boss Rush',   { difficulty: 4, obstacles: 2, styles: [],        layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, crumble: true, zips: true, lasers: true, drones: true, gems: true, keys: true } }, 8417],
   ['Final Round', { difficulty: 5, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, lasers: true, drones: true, gems: true, keys: true } }, 8518]
 ];
-// World 5, Neon Row: the night city. Common pieces only for now, half of them island rooms.
+// World 5, Neon Row: the night city. Sparks on cables and holo signs, half of them island rooms.
 var SET5 = [
   ['Night Shift', { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, springs: true } }, 9111],
   ['Afterglow',   { difficulty: 1, obstacles: 1, styles: [],        layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, gems: true } }, 9112],
-  ['Static',      { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { spikes: true, refills: true, zips: true, crumble: true, gems: true } }, 9213],
+  ['Static',      { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { spikes: true, refills: true, zips: true, crumble: true, wires: true, gems: true } }, 9213],
   ['Downpour',    { difficulty: 2, obstacles: 1, styles: ['climb'], layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, springs: true, keys: true } }, 9214],
-  ['Signal',      { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, movers: true, zips: true, gems: true, keys: true } }, 9315],
+  ['Signal',      { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, movers: true, zips: true, holos: true, gems: true, keys: true } }, 9315],
   ['Back Alley',  { difficulty: 3, obstacles: 2, styles: ['jump'],  layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, zips: true, crumble: true, keys: true, gems: true } }, 9316],
-  ['Overpass',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, gems: true, keys: true } }, 9417],
+  ['Overpass',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, wires: true, holos: true, gems: true, keys: true } }, 9417],
   ['Last Train',  { difficulty: 5, obstacles: 2, styles: [],        layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, crumble: true, zips: true, springs: true, gems: true, keys: true } }, 9518]
 ];
 // One tall (two-screen) level per world, so the scrolling camera has something to show.

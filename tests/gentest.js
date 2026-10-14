@@ -254,8 +254,8 @@ const fs = require('fs');
     const process_layout = (seed, ob) => (window.__layout || 'floors');   // islands are work in progress: LAYOUT=islands to sweep them
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
-      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 4 + 1, rows: seed % 5 === 0 ? 96 : 48, layout: process_layout(seed, ob),
-                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0, jets: seed % 4 !== 3, lava: seed % 2 === 1, lasers: seed % 3 !== 1, drones: seed % 4 !== 2 } };
+      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 5 + 1, rows: seed % 7 === 0 ? 96 : 48, layout: process_layout(seed, ob),
+                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0, jets: seed % 4 !== 3, lava: seed % 2 === 1, lasers: seed % 3 !== 1, drones: seed % 4 !== 2, wires: seed % 2 === 0, holos: seed % 3 !== 2 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }
