@@ -51,7 +51,7 @@
                   dash: { 0: { 4: 42, 5: 32, 6: 22, 7: 12, 8: 2 }, 1: { 3: 39, 4: 29, 5: 19, 6: 9 } } };   // rise: { gap: where the feet land, px past the slab's near edge }
     var HOPS = [];                                                       // the pool this difficulty draws from: [rise, gap, recipe, narrowest slab that catches the landing]
     var rises = [[1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [2, 3]][D - 1], minGap = [3, 3, 4, 4, 5][D - 1];
-    function pool(recipe, rr0, gmin) { var gl = REACH[recipe][rr0]; if (!gl) return; for (var gs in gl) { var gp = +gs, o = gl[gs]; if (gp >= gmin && o >= 2) HOPS.push([rr0, gp, recipe, Math.max(3, Math.ceil((o + 10) / 10))]); } }
+    function pool(recipe, rr0, gmin) { var gl = REACH[recipe][rr0]; if (!gl) return; for (var gs in gl) { var gp = +gs, o = gl[gs]; if (gp >= gmin && o >= 2) HOPS.push([rr0, gp, recipe, Math.max(3, Math.ceil((o + 10) / 10)), o]); } }
     for (var hi = 0; hi < rises.length; hi++) pool('jump', rises[hi], minGap);
     if (D >= 3) { pool('dash', 1, 6); if (D >= 4) pool('dash', 0, 6); }
     var plan = [], islands = [];
@@ -86,9 +86,9 @@
     function planMove(move, d, hp) {
       var cand = { tiles: [], needs: [], isl: { move: move, dir: d } }, isl = cand.isl, nw, nx, ny;
       if (move === 'hop') {
-        if (k === 0) hp = [3, 3, 'jump', 3];                                 // the first island: a plain jump up from the floor
+        if (k === 0) hp = [3, 3, 'jump', 3, 14];                             // the first island: a plain jump up from the floor
         var rise = hp[0], gap = hp[1]; nw = ri(hp[3], 6);
-        isl.recipe = hp[2]; isl.gap = gap; isl.rise = rise; isl.land = hp[3];   // land: how many tiles from the near edge the landing can use
+        isl.recipe = hp[2]; isl.gap = gap; isl.rise = rise; isl.land = hp[3]; isl.o = hp[4];   // land: how many tiles from the near edge the landing can use; o: where the feet come down
         nx = d > 0 ? x + w + gap : x - gap - nw; ny = y - rise;
         if (nx < 1 || nx + nw - 1 > 25) { nw = hp[3]; nx = d > 0 ? x + w + gap : x - gap - nw; }
         if (nx < 1 || nx + nw - 1 > 25) return null;
@@ -161,6 +161,17 @@
       }
       if (!cand) break;
       var isl = cand.isl; commit(cand);
+      var hzc = EL.firepits ? 'F' : '^', hzn = EL.firepits ? 'fire' : 'spikes', HZP = [0, 0.3, 0.5, 0.7, 0.9][D - 1];
+      // hazards: a spike on the landing's near lip of a low hop that comes down well past it (clear it or fall), and
+      // spikes on the far part of a slab under a shelf, where the route never walks
+      if (HZ > 0 && k > 0 && isl.move === 'hop' && isl.rise <= 1 && isl.o >= (EL.firepits ? 18 : 14) && rnd() < HZP) { set(d > 0 ? isl.x : isl.x + isl.w - 1, isl.y - 1, hzc); isl.lip = true; stats[hzn]++; }
+      if (HZ > 0 && isl.move === 'shelf' && rnd() < HZP) { var f0 = isl.from > 0 ? isl.stand + 2 : x, f1 = isl.from > 0 ? x + w - 1 : isl.stand - 2; for (c = f0; c <= f1; c++) if (at(c, y - 1) === '.') { set(c, y - 1, hzc); stats[hzn]++; } }
+      // the slab left behind turns to ice or crumble when the route runs straight across it into the next hop
+      var pv = islands[k];
+      if (k > 0 && pv.move === 'hop' && isl.move === 'hop' && isl.dir === pv.dir && !pv.key) {
+        var icy = EL.ice && rnd() < 0.5, crum = !icy && EL.crumble && w <= 4 && rnd() < 0.5;
+        if (icy || crum) { for (c = x; c < x + w; c++) if (at(c, y) === '#') set(c, y, icy ? 'I' : 'C'); pv.run = true; pv[icy ? 'ice' : 'crumble'] = true; stats[icy ? 'ice' : 'crumble'] += w; }
+      }
       if (isl.move === 'zip') { if (isl.zip) stats.zips++; else stats.platforms++; }
       if (isl.move === 'spring') stats.springs++;
       if (isl.move === 'hop' && k > 0) hopGaps.push(isl);

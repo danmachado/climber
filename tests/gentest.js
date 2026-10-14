@@ -169,6 +169,11 @@ const fs = require('fs');
         const isl = out.plan.islands;
         const feetOn = (q) => s.ground && s.y + 10 === q.y * 10 && s.x + 8 > q.x * 10 && s.x < (q.x + q.w) * 10;
         const goTo = (px, tol, max) => { let lastX = -1, same = 0; until(() => { const dx = s.x + 4 < px - tol ? 1 : (s.x + 4 > px + tol ? -1 : 0); if (s.x === lastX) same++; else same = 0; lastX = s.x; return { x: dx, jump: same > 6 && s.ground }; }, () => Math.abs(s.x + 4 - px) <= tol && s.ground, max || 300); };   // hop over anything low in the way
+        const park = (px) => {                           // stop exactly at px: walk near, let momentum die, creep the last pixels
+          goTo(px, 6); until(() => ({}), () => s.vx === 0 && s.ground, 30);
+          for (let n = 0; n < 40 && Math.abs(s.x + 4 - px) > 1; n++) { step({ x: s.x + 4 < px ? 1 : -1 }); step({}); step({}); }
+          until(() => ({}), () => s.vx === 0 && s.ground, 30);
+        };
         const standing = () => { for (let j = isl.length - 1; j >= 0; j--) if (feetOn(isl[j])) return j; return -1; };
         const miss = (q) => { if (s.ground && !feetOn(q)) throw new Error('missed at ' + where + ' at ' + s.x + ',' + s.y + ' want y ' + (q.y * 10 - 10) + ' x ' + q.x * 10 + '-' + (q.x + q.w) * 10); };
         let retries = 0, deaths = 0;
@@ -187,13 +192,13 @@ const fs = require('fs');
               // dash sideways at frame 5 if the recipe says so. The take-off edge is the previous island's far edge, or for
               // the floor, the point gap tiles short of the landing.
               const edgePx = k === 1 ? (d > 0 ? q.x * 10 - q.gap * 10 : (q.x + q.w) * 10 + q.gap * 10) : (d > 0 ? (p.x + p.w) * 10 : p.x * 10);
-              const backPx = k === 1 ? 60 : Math.min(40, p.w * 10 - 12);           // run-up stays on the slab we stand on
-              goTo(edgePx - d * backPx, 3);
+              const backPx = k === 1 ? 60 : Math.min(40, (p.w - (p.lip ? 1 : 0)) * 10 - 12);   // run-up stays on the slab we stand on, short of a lip spike
+              if (!p.run) goTo(edgePx - d * backPx, 3);                              // an ice or crumble slab is run straight across, no stopping
               until(() => ({ x: d }), () => (d > 0 ? s.x + 8 >= edgePx - 1 : s.x <= edgePx + 1), 120);
               s = step({ x: d, jump: true });
               let k2 = 0;
               while (!feetOn(q)) { step({ x: d, jump: k2 < 12, dash: q.recipe === 'dash' && k2 === 5 }); if (k2 > 12) miss(q); if (++k2 > 90) throw new Error('stuck at ' + where); }
-              goTo(landX, 6, 200);
+              if (!q.run) goTo(landX, 6, 200);
             } else if (q.move === 'climb') {
               // stand against the pillar, hold grab and up: the climb pops you onto the top, then walk onto the landing
               const sd = q.side, faceX = sd > 0 ? q.pillar * 10 : (q.pillar + 1) * 10;
@@ -216,7 +221,7 @@ const fs = require('fs');
             } else if (q.move === 'zip') {
               // the mover sits level with the slab at its end: wait for it to be down, walk on, ride up, step off and drop onto the slab
               const tx = q.track * 10 + 5, m0 = () => s.movers.filter(m => m.x === q.track * 10 && m.y >= (q.y - 1) * 10 && m.y <= p.y * 10)[0];   // the mover on this track (another zip may share the column higher up)
-              goTo(tx - d * 12, 3);
+              park(tx - d * 14);                                                     // wait clear of the track: a platform coming down beside you crushes
               until(() => ({}), () => { const m = m0(); return m && m.y >= p.y * 10 - 1 && (m.z === 'idle' || m.wait > 0.15 || (m.axis === 'y' && m.dir < 0 && m.y >= p.y * 10 - 1)); }, 1200);
               until(() => ({ x: s.x + 4 < tx - 2 ? 1 : (s.x + 4 > tx + 2 ? -1 : 0) }), () => Math.abs(s.x + 4 - tx) <= 2, 120);
               until(() => ({}), () => s.ground && s.y + 10 <= (q.y - 1) * 10 + 1, 900);
@@ -226,9 +231,7 @@ const fs = require('fs');
               // the turn: stand at the slab's near end, jump straight up, drift onto the shelf once the jump peaks
               const off = Math.abs((q.from > 0 ? q.x : q.x + q.w - 1) - q.stand);   // one tile off: jump from the tile centre; two: lean toward the shelf
               const standX = q.stand * 10 + 5 + (off > 1 ? q.from * 3 : -q.from * 2);   // one tile off: lean away so the head clears the shelf's corner
-              goTo(standX, 6); until(() => ({}), () => s.vx === 0 && s.ground, 30);
-              for (let n = 0; n < 40 && Math.abs(s.x + 4 - standX) > 1; n++) { step({ x: s.x + 4 < standX ? 1 : -1 }); step({}); step({}); }   // creep the last few pixels so no momentum carries into the jump
-              until(() => ({}), () => s.vx === 0 && s.ground, 30);
+              park(standX);
               s = step({ jump: true });
               let k3 = 0;
               while (!feetOn(q)) { step({ x: s.vy >= -40 ? q.from : 0, jump: k3 < 12 }); if (k3 > 12) miss(q); if (++k3 > 90) throw new Error('stuck at ' + where); }
