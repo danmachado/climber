@@ -226,6 +226,7 @@
     for (i = 0; i < 70 * (h / 480); i++) { var sx = Math.floor(rnd() * w), sy = Math.floor(rnd() * (h - h0 * 0.45)); b.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1); }
     if (!far) return;
     var kind = th.skyline || 'town';
+    SKY_SIGNS = [];
     // heights(top) builds a one-pixel-column heightmap for one band whose tallest point is about top pixels
     function heights(top) {
       var hm = [], seg, hh, x0, px;
@@ -245,7 +246,7 @@
         for (x = 0; x < w;) { x += between(14, 40); if (Math.abs(x - pxc) > pw / 2 + 6 && x < w) { var th = between(Math.round(top * 0.3), Math.round(top * 0.7)); hm[x] = th; hm[x + 1] = th; for (var fr = -5; fr <= 5; fr++) if (x + fr >= 0 && x + fr < w) hm[x + fr] = Math.max(hm[x + fr], th - Math.abs(fr) * 2 + (fr ? 0 : 2)); } }
       } else if (kind === 'towers') {                       // flat-topped towers of many widths, a few with a mast
         for (x0 = 0; x0 < w; x0 += seg) {
-          seg = between(14, 44); hh = between(Math.round(top * 0.3), top);
+          seg = between(14, 44); hh = between(Math.round(top * 0.45), top);
           var mast = rnd() < 0.35 ? between(2, seg - 3) : -1, mh = between(5, 14);
           for (px = 0; px < seg && x0 + px < w; px++) hm[x0 + px] = hh + (px === mast ? mh : 0);
         }
@@ -267,9 +268,8 @@
       else if (kind === 'pyramid') { for (x = 0; x < w; x++) if (hm[x] > 0 && hm[x] !== hm[x - 1]) b.fillRect(x, h - hm[x], 1, hm[x] > 6 ? 2 : 1); }   // the lit edge of each step
       else if (kind === 'town') { for (i = 0; i < w / 9; i++) { x = Math.floor(rnd() * w); var wy = between(4, hm[x] - 3); if (hm[x] > 8 && wy > 0) b.fillRect(x, h - wy, 1, 2); } } // a few dim windows
       else if (kind === 'towers') {                        // pin-dot windows on a 3 px grid, cyan and pink, and room for signs
-        SKY_SIGNS = [];
         for (x = 2; x < w; x += 3) for (var wy2 = 3; wy2 < hm[x] - 2; wy2 += 3) { var dv = rnd(); if (dv < 0.1) { b.fillStyle = dv < 0.06 ? cap : '#ff7ad0'; b.fillRect(x, h - wy2, 1, 1); } }
-        for (i = 0; i < 5; i++) { x = Math.floor(rnd() * (w - 30)); var sy2 = between(8, Math.max(9, hm[x + 12] - 14)); if (hm[x] > 24 && hm[x + 24] > 24 && sy2 < hm[x] - 10) SKY_SIGNS.push([x + 2, h - sy2 - 9]); }
+        for (i = 0; i < 12; i++) { x = Math.floor(rnd() * (w - 30)); var sy2 = between(8, Math.max(9, hm[x + 12] - 14)); if (hm[x] > 24 && hm[x + 24] > 24 && sy2 < hm[x] - 10) SKY_SIGNS.push([x + 2, h - sy2 - 9]); }
       }
       else { for (x = 0; x < w; x++) if (hm[x] > 2) b.fillRect(x, h - 2, 1, 2); }                       // a lip of glow at the cave floor
     }
@@ -278,8 +278,15 @@
       b.fillStyle = 'rgba(120,200,230,0.12)'; b.fillRect(bx, h - bh, bw, bh); b.fillStyle = 'rgba(160,230,255,0.16)'; b.fillRect(bx + 2, h - bh, bw - 4, bh);
       b.fillStyle = 'rgba(255,255,255,0.05)'; for (i = 0; i < 2; i++) { var cy = Math.round(h - h0 * (0.5 + i * 0.3)), cx = between(0, w / 2), cwid = between(60, 150); b.fillRect(cx, cy, cwid, 2); b.fillRect(cx + 10, cy - 2, cwid - 30, 2); }
     }
-    band(far[0], Math.round(h0 * 0.34), far[2]);
-    band(far[1], Math.round(h0 * 0.2), kind === 'cave' || kind === 'towers' ? far[2] : null);
+    if (kind === 'towers') {                                 // the city fills the screen: we are down in it, towers rising past the top
+      band(far[0], Math.round(h0 * 0.75), far[2]);
+      band(far[1], Math.round(h0 * 1.0), far[2]);
+      b.fillStyle = '#07060f';                               // overhead cables sagging across the alley
+      for (i = 0; i < 4; i++) { var cy0 = between(Math.round(h0 * 0.1), Math.round(h0 * 0.6)), cy1 = cy0 + between(-30, 30), sag = between(6, 18); for (x = 0; x < w; x++) { var tt = x / w; b.fillRect(x, Math.round(cy0 + (cy1 - cy0) * tt + Math.sin(tt * Math.PI) * sag), 1, 1); } }
+    } else {
+      band(far[0], Math.round(h0 * 0.34), far[2]);
+      band(far[1], Math.round(h0 * 0.2), kind === 'cave' ? far[2] : null);
+    }
     if (kind === 'towers') {                                 // baked rain: thin diagonal streaks at two densities, still, like a held frame
       b.fillStyle = 'rgba(200,220,255,0.10)';
       for (i = 0; i < 90 * (h / 480); i++) { x = Math.floor(rnd() * w); var ry = Math.floor(rnd() * h), rl = between(5, 10); for (var k = 0; k < rl; k++) b.fillRect(x - (k >> 2), ry + k, 1, 1); }
