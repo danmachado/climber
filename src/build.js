@@ -4,44 +4,42 @@ var generateRoom = new Function(gen + '\nreturn generateRoom;')();
 
 // Built-in starter set: the hand-made first room plus generated rooms (each one is cleared by the auto-player in tests).
 var first = JSON.parse(fs.readFileSync(d + '/starter-01.json', 'utf8'));
-var SET = [
-  ['Low Road',    { difficulty: 1, obstacles: 0, style: 'jump',  spikes: 1, refills: true }, 4101],
-  ['Brickwork',   { difficulty: 1, obstacles: 1, style: 'mixed', spikes: 1, refills: true }, 4102],
-  ['Switchback',  { difficulty: 2, obstacles: 1, style: 'climb', spikes: 1, refills: true }, 4203],
-  ['Long Reach',  { difficulty: 2, obstacles: 1, style: 'dash',  spikes: 1, refills: true }, 4204],
-  ['Needle Row',  { difficulty: 3, obstacles: 2, style: 'jump',  spikes: 2, refills: true }, 4305],
-  ['Updraft',     { difficulty: 3, obstacles: 1, style: 'climb', spikes: 1, refills: true }, 4306],
-  ['High Wire',   { difficulty: 4, obstacles: 2, style: 'mixed', spikes: 2, refills: true }, 4407]
+var SET = [   // Brickyard: the common pieces, introduced one at a time, then all together
+  ['Low Road',    { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, springs: true } }, 4111],
+  ['Brickwork',   { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, crumble: true, gems: true } }, 4112],
+  ['Switchback',  { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, refills: true, movers: true, gems: true } }, 4213],
+  ['Long Reach',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { spikes: true, refills: true, zips: true, gems: true } }, 4214],
+  ['Needle Row',  { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: { spikes: true, refills: true, crumble: true, springs: true, keys: true } }, 4315],
+  ['Updraft',     { difficulty: 3, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, refills: true, zips: true, movers: true, keys: true, gems: true } }, 4316],
+  ['High Wire',   { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, gems: true, keys: true } }, 4417]
 ];
-// World 2 placeholders: ice-heavy rooms from the auto-builder, until hand-made levels are published.
-var ALL = { spikes: true, ice: true, refills: true };
+// World 2: ice, with the common pieces layered in.
 var SET2 = [
-  ['Cold Snap',   { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: ALL }, 5101],
-  ['Glaze',       { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: ALL }, 5102],
-  ['Slipstream',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: ALL }, 5203],
-  ['Rime',        { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: ALL }, 5204],
-  ['Black Ice',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, crumble: true } }, 5305],
-  ['Hard Frost',  { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: ALL }, 5306],
-  ['Whiteout',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, movers: true } }, 5407],
-  ['Deep Freeze', { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, ice: true, refills: true, crumble: true, movers: true } }, 5408]
+  ['Cold Snap',   { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { spikes: true, ice: true, refills: true } }, 5111],
+  ['Glaze',       { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, gems: true } }, 5112],
+  ['Slipstream',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { spikes: true, ice: true, refills: true, zips: true, gems: true } }, 5213],
+  ['Rime',        { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, ice: true, refills: true, springs: true, keys: true } }, 5214],
+  ['Black Ice',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, crumble: true, gems: true } }, 5315],
+  ['Hard Frost',  { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: { spikes: true, ice: true, refills: true, movers: true, zips: true, keys: true } }, 5316],
+  ['Whiteout',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, ice: true, refills: true, movers: true, springs: true, keys: true, gems: true } }, 5417],
+  ['Deep Freeze', { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, ice: true, refills: true, crumble: true, movers: true, zips: true, keys: true, gems: true } }, 5418]
 ];
-// World 3 placeholders: flames and fireballs.
-var HOT = { spikes: true, firepits: true, fireballs: true, refills: true };
+// World 3: flames, fireballs, jets, with the common pieces layered in.
 var SET3 = [
-  ['Pilot Light', { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { firepits: true, refills: true } }, 6101],
-  ['Cinders',     { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: { firepits: true, fireballs: true, refills: true } }, 6102],
-  ['Flashpoint',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: HOT }, 6203],
-  ['Bellows',     { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: HOT }, 6204],
-  ['Slag Run',    { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, refills: true, movers: true } }, 6305],
-  ['Backdraft',   { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: HOT }, 6306],
-  ['Crucible',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true } }, 6407],
-  ['Meltdown',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, firepits: true, fireballs: true, refills: true, crumble: true, movers: true } }, 6408]
+  ['Pilot Light', { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { firepits: true, refills: true } }, 6111],
+  ['Cinders',     { difficulty: 1, obstacles: 1, styles: [],        spikes: 1, elements: { firepits: true, fireballs: true, refills: true, gems: true } }, 6112],
+  ['Flashpoint',  { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { firepits: true, jets: true, refills: true } }, 6213],
+  ['Bellows',     { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { firepits: true, fireballs: true, refills: true, zips: true, keys: true } }, 6214],
+  ['Slag Run',    { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, jets: true, refills: true, movers: true, gems: true } }, 6315],
+  ['Backdraft',   { difficulty: 3, obstacles: 2, styles: ['jump'],  spikes: 2, elements: { firepits: true, jets: true, refills: true, zips: true, keys: true } }, 6316],
+  ['Crucible',    { difficulty: 4, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, firepits: true, fireballs: true, jets: true, refills: true, crumble: true, gems: true, keys: true } }, 6417],
+  ['Meltdown',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, firepits: true, fireballs: true, jets: true, refills: true, crumble: true, movers: true, zips: true, keys: true, gems: true } }, 6418]
 ];
 // One tall (two-screen) level per world, so the scrolling camera has something to show.
 var TALL = [
-  ['The Long Way', { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, refills: true, crumble: true, movers: true, springs: true, gems: true }, world: 1, rows: 96 }, 7101],
-  ['Cold Shaft',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, ice: true, springs: true, gems: true }, world: 2, rows: 96 }, 7202],
-  ['The Chimney',  { difficulty: 3, obstacles: 1, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, firepits: true, fireballs: true, springs: true, gems: true }, world: 3, rows: 96 }, 7303]
+  ['The Long Way', { difficulty: 2, obstacles: 1, styles: ['climb'], spikes: 1, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, gems: true, keys: true }, world: 1, rows: 96 }, 7111],
+  ['Cold Shaft',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, ice: true, springs: true, zips: true, gems: true, keys: true }, world: 2, rows: 96 }, 7212],
+  ['The Chimney',  { difficulty: 3, obstacles: 1, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, firepits: true, fireballs: true, jets: true, lava: true, springs: true, gems: true }, world: 3, rows: 96 }, 7313]
 ];
 first.world = 1; first.level = 1;
 var starters = [first], plans = [null];
