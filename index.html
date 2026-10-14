@@ -1784,15 +1784,19 @@
   // Nothing strobes: the fastest change is the airship's nav light, once a second. Settings, CITY LIFE turns it off
   // (climber.city.v1); off, the city is exactly the still picture it was.
   var CITY_KEY = 'climber.city.v1', cityOn = true, city = null;
+  var ct = 0, cityT = 0;   // the city's own clock, in 60ths of a second of real time: on a slow screen it still keeps its pace
   try { cityOn = localStorage.getItem(CITY_KEY) !== '0'; } catch (e) {}
-  function setCity(on) { cityOn = on; allDirty = true; try { localStorage.setItem(CITY_KEY, on ? '1' : '0'); } catch (e) {} }
+  function setCity(on) { cityOn = on; allDirty = true; try { localStorage.setItem(CITY_KEY, on ? '1' : '0'); } catch (e) {} if (city && tileLayer) drawTileLayer(); }   // rebuild: off leaves the plain still city, with nothing frozen mid-flight
   var CITY_ORDER = ['sky', '@far', 'far', 'farWin', '@mid', 'near', 'nearWin', '@near', 'cables', 'front'];
   var DEPTH_LVL = { '@far': 1, '@mid': 2, '@near': 3 };                  // what hides each depth in the occlusion map
   function newCity(CL, D) {
-    var c = { L: CL, D: D, movers: [], lanes: [], nextWin: tick + 90, nextShip: tick + 600 + Math.floor(Math.random() * 900), last: 0, sway: [], stats: { win: 0, sway: 0, ev: 0 } };
+    var c = { L: CL, D: D, movers: [], lanes: [], nextWin: ct + 90, nextShip: ct + 600 + Math.floor(Math.random() * 900), last: 0, sway: [], stats: { win: 0, sway: 0, ev: 0 } };
     // What is hidden where: the terrain hides everything, the near row hides the cars between the rows, and the far
     // rows hide the far cars too. Nothing is redrawn or marked where it cannot be seen, and lanes go where it can.
-    var fa = CL.front.getContext('2d').getImageData(0, 0, LW, RH).data, na = CL.near.getContext('2d').getImageData(0, 0, LW, RH).data, ra = CL.far.getContext('2d').getImageData(0, 0, LW, RH).data, i, y, x;
+    // Read the layers back through a throwaway canvas: reading a canvas directly can move it off the GPU for good,
+    // which makes every later draw from it slow on the frame.
+    function alphaOf(cv) { var t = document.createElement('canvas'); t.width = LW; t.height = RH; var tg = t.getContext('2d', { willReadFrequently: true }); tg.drawImage(cv, 0, 0); return tg.getImageData(0, 0, LW, RH).data; }
+    var fa = alphaOf(CL.front), na = alphaOf(CL.near), ra = alphaOf(CL.far), i, y, x;
     c.occ = new Uint8Array(LW * RH);
     var hid = 0;
     for (i = 0; i < LW * RH; i++) { c.occ[i] = fa[i * 4 + 3] === 255 ? 3 : (na[i * 4 + 3] === 255 ? 2 : (ra[i * 4 + 3] >= 200 ? 1 : 0)); if (c.occ[i] === 3) hid++; }   // 3 terrain, 2 near row, 1 far rows, 0 sky
@@ -1826,11 +1830,11 @@
     c.shipY = -1; var best = 0;
     for (y = Math.max(14, D.h - D.h0); y < D.h - 60; y += 4) { var lr2 = ((y - 2) % CH + CH) % CH; if (lr2 > CH - 14) continue; var n2 = open(y, 9, 2); if (n2 > best + 10) { best = n2; c.shipY = y; } }
     if (best < 70) c.shipY = -1;                                          // nowhere open enough for the airship in this room
-    c.next = { '@mid': tick + 120 + Math.floor(Math.random() * 240), '@far': tick + 30 + Math.floor(Math.random() * 120) };   // one car at a time per depth
+    c.next = { '@mid': ct + 120 + Math.floor(Math.random() * 240), '@far': ct + 30 + Math.floor(Math.random() * 120) };   // one car at a time per depth
     for (i = 0; i < D.cables.length; i++) c.sway.push(cableOff(D.cables[i]));
     return c;
   }
-  function cableOff(cb) { return [0, 0, 1, 1][Math.floor((tick + cb.ph) / (cb.period * 2.4)) % 4]; }   // the middle dips a pixel and lifts again, every 3 to 4 s
+  function cableOff(cb) { return [0, 0, 1, 1][Math.floor((ct + cb.ph) / (cb.period * 2.4)) % 4]; }   // the middle dips a pixel and lifts again, every 3 to 4 s
   // Paints the city layers for one rectangle into ctx (the static layer, or the frame buffer with the movers in it).
   function cityCompose(ctx, x, y, w, hh, withMovers) {
     x = Math.max(0, Math.floor(x)); y = Math.max(0, Math.floor(y)); w = Math.min(LW - x, Math.ceil(w)); hh = Math.min(RH - y, Math.ceil(hh));
@@ -1854,7 +1858,7 @@
     function px(dx, dy, w, col) { b.fillStyle = col; b.fillRect(d > 0 ? x + dx : x + m.w - dx - w, y + dy, w, 1); }   // drawn facing right, mirrored for left
     if (m.kind === 'far') { px(0, 0, 1, '#ff4a6a'); px(1, 0, 1, '#1d1436'); px(2, 0, 1, '#fff1c0'); return; }
     if (m.kind === 'steam') {                                                          // four puffs rising, spreading and thinning out
-      var qq = Math.floor((tick + m.ph) / 20), bx = x + 3, by = y + 13;
+      var qq = Math.floor((ct + m.ph) / 20), bx = x + 3, by = y + 13;
       b.fillStyle = '#f4f0ff';
       for (i = 0; i < 4; i++) {
         var age = ((qq + i * 4) % 16) / 16, sz = age < 0.35 ? 1 : 2;
@@ -1864,11 +1868,11 @@
       b.globalAlpha = 1; return;
     }
     if (m.kind === 'heli') {                                                           // a small helicopter: rotor, cabin, tail boom, skids
-      y += Math.floor((tick + m.ph) / 45) % 2;                                       // it bobs a pixel as it flies
-      if (Math.floor((tick + m.ph) / 24) % 2) px(0, 0, 9, '#4a4070'); else px(2, 0, 5, '#4a4070');
+      y += Math.floor((ct + m.ph) / 45) % 2;                                       // it bobs a pixel as it flies
+      if (Math.floor((ct + m.ph) / 24) % 2) px(0, 0, 9, '#4a4070'); else px(2, 0, 5, '#4a4070');
       px(5, 1, 1, '#2c2450'); px(0, 1, 1, '#151026');
       px(0, 2, 8, '#151026'); px(7, 2, 1, '#38f0ff'); px(3, 3, 5, '#151026'); px(4, 4, 4, '#2c2450');
-      if (Math.floor((tick + m.ph) / 60) % 2) px(0, 2, 1, '#ff3a5a');
+      if (Math.floor((ct + m.ph) / 60) % 2) px(0, 2, 1, '#ff3a5a');
       return;
     }
     if (m.kind === 'car') {
@@ -1885,21 +1889,30 @@
     var sx = d > 0 ? x + 6 : x + m.w - 6 - 13;                                        // the panel: a dark field between two lit rails, three glyphs
     b.fillStyle = '#07070f'; b.fillRect(sx, y + 1, 13, 5);
     b.fillStyle = '#ff3ab8'; b.fillRect(sx, y, 13, 1); b.fillRect(sx, y + 6, 13, 1);
-    var gl = Math.floor((tick + m.ph) / 75);                                           // the glyphs step along slowly, like a ticker
+    var gl = Math.floor((ct + m.ph) / 75);                                           // the glyphs step along slowly, like a ticker
     for (i = 0; i < 3; i++) { b.fillStyle = '#ff3ab8'; drawGlyph(b, sx + 1 + i * 4, y + 1, m.glyphs[(gl + i) % m.glyphs.length]); }
-    if (Math.floor((tick + m.ph) / 60) % 2) px(23, 3, 1, '#ff3a3a');                    // nav light at the nose, once a second
+    if (Math.floor((ct + m.ph) / 60) % 2) px(23, 3, 1, '#ff3a3a');                    // nav light at the nose, once a second
     px(0, 3, 1, '#e8f4ff');
   }
-  function cityRecompose(r) { cityCompose(tileLayer.getContext('2d'), r[0], r[1], r[2], r[3], false); g.drawImage(tileLayer, r[0], r[1], r[2], r[3], r[0], r[1], r[2], r[3]); mark(r[0], r[1], r[2], r[3]); }
+  // The movers live in the static layer too: when something changes, its rectangle is repainted there (with every
+  // mover in it) and copied to the frame buffer, so a frame where nothing in the city changed costs nothing at all.
+  function cityRepaint(r, show) {
+    var x = Math.max(0, Math.floor(r[0])), y = Math.max(0, Math.floor(r[1])), w = Math.min(LW, Math.ceil(r[0] + r[2])) - x, hh = Math.min(RH, Math.ceil(r[1] + r[3])) - y;
+    if (w <= 0 || hh <= 0) return;
+    cityCompose(tileLayer.getContext('2d'), x, y, w, hh, true);
+    g.drawImage(tileLayer, x, y, w, hh, x, y, w, hh);
+    if (show) mark(x, y, w, hh);
+  }
+  function cityRecompose(r) { cityRepaint(r, true); }
   function cityStep() {
     if (!city || !cityOn) return;
-    var now = performance.now(), dt = city.last ? Math.min(0.1, (now - city.last) / 1000) : 0, D = city.D, i, m;
-    city.last = now;
+    var now = performance.now(), dt = city.last ? Math.min(0.25, (now - city.last) / 1000) : 0, D = city.D, i, m;
+    city.last = now; cityT += dt; ct = Math.floor(cityT * 60);
     var v0 = cam.y - 20, v1 = cam.y + LH + 20;                                       // only what is on screen changes
     var skip = window.__cityDbg || {};                                                // test only: switch parts off to measure each
     // office lights
-    if (!skip.win && tick >= city.nextWin) {
-      city.nextWin = tick + 70 + Math.floor(Math.random() * 90);
+    if (!skip.win && ct >= city.nextWin) {
+      city.nextWin = ct + 70 + Math.floor(Math.random() * 90);
       var pick = [];
       for (i = 0; i < D.floors.length; i++) { var f0 = D.floors[i][0]; if (f0.y > v0 && f0.y < v1 && cityVisible([f0.x, f0.y, D.floors[i][D.floors[i].length - 1].x - f0.x + 2, f0.s], 3)) pick.push(i); }
       if (pick.length) {
@@ -1910,8 +1923,8 @@
           if (to) { ctx.globalAlpha = sl.a; ctx.fillStyle = sl.col; ctx.fillRect(sl.x, sl.y, sl.s, sl.s); ctx.globalAlpha = 1; } else ctx.clearRect(sl.x, sl.y, sl.s, sl.s);
           x0 = Math.min(x0, sl.x); x1 = Math.max(x1, sl.x + sl.s);
         }
-        var wr = [x0, fl[st].y, x1 - x0, fl[st].s];
-        if (cityVisible(wr, 3)) { cityRecompose(wr); city.stats.win++; city.stats.ev++; } else cityCompose(tileLayer.getContext('2d'), wr[0], wr[1], wr[2], wr[3], false);
+        var wr = [x0, fl[st].y, x1 - x0, fl[st].s], wv = cityVisible(wr, 3);
+        cityRepaint(wr, wv); if (wv) { city.stats.win++; city.stats.ev++; }
       }
     }
     // cables bob
@@ -1933,13 +1946,14 @@
         cc.save(); cc.beginPath(); cc.rect(r[0], r[1], r[2], r[3]); cc.clip();
         for (var k = 0; k < D.cables.length; k++) drawCable(cc, D.cables[k], city.sway[k], LW, r[0], r[0] + r[2]);
         cc.restore();
-        if (q.yb + 3 >= v0 && q.ya <= v1 && cityVisible(r, 3)) { cityRecompose(r); city.stats.ev++; } else cityCompose(tileLayer.getContext('2d'), r[0], r[1], r[2], r[3], false);
+        var cv = q.yb + 3 >= v0 && q.ya <= v1 && cityVisible(r, 3);
+        cityRepaint(r, cv); if (cv) city.stats.ev++;
       }
       city.stats.sway++;
     }
     // traffic: each lane sends a car across now and then; the airship comes by every minute or so
     ['@mid', '@far'].forEach(function (dep) {                                        // one flyer at a time per depth, on a lane picked at random
-      if (skip.cars || city.next[dep] < 0 || tick < city.next[dep]) return;
+      if (skip.cars || city.next[dep] < 0 || ct < city.next[dep]) return;
       var ls = city.lanes.filter(function (l) { return l.depth === dep; }); if (!ls.length) return;
       var ln = ls[Math.floor(Math.random() * ls.length)], heli = dep === '@mid' && Math.random() < 0.35;
       city.next[dep] = -1;
@@ -1947,7 +1961,7 @@
       mm.depth = dep; mm.dir = Math.random() < 0.5 ? 1 : -1; mm.y = ln.y; mm.vx = mm.dir * (heli ? 7 + Math.random() * 3 : ln.speed); mm.lane = ln; mm.x = mm.dir > 0 ? -mm.w - 2 : LW + 2; mm.shown = null;
       city.movers.push(mm);
     });
-    if (tick >= city.nextShip && !city.ship && city.shipY >= 0) {
+    if (ct >= city.nextShip && !city.ship && city.shipY >= 0) {
       var dirS = Math.random() < 0.5 ? 1 : -1, sy = city.shipY;
       city.ship = { kind: 'ship', depth: '@mid', w: 24, h: 9, dir: dirS, y: sy, vx: dirS * 4, x: dirS > 0 ? -28 : LW + 4, ph: Math.floor(Math.random() * 600), shown: null, glyphs: [Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16)] };
       city.movers.push(city.ship);
@@ -1955,19 +1969,19 @@
     for (i = city.movers.length - 1; i >= 0; i--) {
       m = city.movers[i]; m.x += m.vx * dt;
       if (m.kind !== 'steam' && (m.x < -40 || m.x > LW + 40)) {
-        if (m.lane) city.next[m.depth] = tick + 180 + Math.floor(Math.random() * 420);   // the next one in 3 to 10 s
-        if (m === city.ship) { city.ship = null; city.nextShip = tick + 2400 + Math.floor(Math.random() * 2400); }
-        city.movers.splice(i, 1); continue;
+        if (m.lane) city.next[m.depth] = ct + 180 + Math.floor(Math.random() * 420);   // the next one in 3 to 10 s
+        if (m === city.ship) { city.ship = null; city.nextShip = ct + 2400 + Math.floor(Math.random() * 2400); }
+        city.movers.splice(i, 1); if (m.was) cityRepaint(m.was, false); continue;   // gone: clear where it was (off screen by now)
       }
-      var mr = moverRect(m), key = Math.round(m.x) + (m.kind === 'ship' ? '/' + Math.floor((tick + m.ph) / 60) % 2 + '/' + Math.floor((tick + m.ph) / 75) : m.kind === 'heli' ? '/' + Math.floor((tick + m.ph) / 24) + '/' + Math.floor((tick + m.ph) / 45) : m.kind === 'steam' ? '/' + Math.floor((tick + m.ph) / 20) : '');
+      var mr = moverRect(m), key = Math.round(m.x) + (m.kind === 'ship' ? '/' + Math.floor((ct + m.ph) / 60) % 2 + '/' + Math.floor((ct + m.ph) / 75) : m.kind === 'heli' ? '/' + Math.floor((ct + m.ph) / 24) + '/' + Math.floor((ct + m.ph) / 45) : m.kind === 'steam' ? '/' + Math.floor((ct + m.ph) / 20) : '');
       if (key !== m.shown) {
         m.shown = key;
         var ur = m.was ? [Math.min(mr[0], m.was[0]), mr[1], Math.max(mr[0] + mr[2], m.was[0] + m.was[2]) - Math.min(mr[0], m.was[0]), mr[3]] : mr;   // where it is and where it was
-        if (ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, DEPTH_LVL[m.depth])) { mark(ur[0], ur[1], ur[2], ur[3]); city.stats.ev++; }
+        var uv = ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, DEPTH_LVL[m.depth]);
+        cityRepaint(ur, uv); if (uv) city.stats.ev++;
         m.was = mr;
       }
     }
-    for (i = 0; i < city.movers.length; i++) { var q = moverRect(city.movers[i]); cityCompose(g, q[0], q[1], q[2], q[3], true); }
   }
   function drawTileLayer() {
     tileLayer = document.createElement('canvas');
@@ -2855,7 +2869,7 @@
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     weather: function (on) { setWeather(on); return weather.on; },
-    city: function (on) { if (on === 'ship') { if (city) city.nextShip = tick; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick }; },
+    city: function (on) { if (on === 'ship') { if (city) city.nextShip = ct; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick, ms: fps.ms, fps: fps.now }; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
     startLevel: startLevel,
     demoAll: function () { // plays every recorded demo to the end, to prove the recordings still reach the exit
