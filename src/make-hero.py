@@ -43,6 +43,7 @@ for i, a in enumerate(rows):
     atlas.paste(im, (0, i * 16))
     meta[a['name']] = {'row': i, 'n': a['frameCount'], 'fps': a['fps'] or 16, 'loop': bool(a['loop'])}
     if a.get('anchors'): meta[a['name']]['anchors'] = a['anchors']
+    if a.get('loopFrom') is not None: meta[a['name']]['from'] = a['loopFrom']   # play once, then loop from this frame
 buf = io.BytesIO(); atlas.save(buf, 'PNG', optimize=True)
 cfg = {
     'enabled': USE_SPRITES,

@@ -1,7 +1,12 @@
 # Draws the lone-climber hero pack (original art) as 16 px strips plus the manifest make-hero.py reads.
-# Frames are composed from parts (head, torso, legs) so a tweak to the head changes every animation at once.
+# Every frame is POSED, not pasted: a hand-drawn head and torso plus limbs drawn as short lines between joints.
+#   - the head always sits directly on the torso (its chin row touches the torso's top row), so it can never float
+#   - the torso always sits on the hips (belt row), and the legs start on the row under the belt
+#   - limbs are layered: far arm, far leg, torso, near leg, head, near arm. Far limbs are a shade darker.
+#   - one outline pass at the end closes the silhouette (the bandana knot is left bare for the tails)
 # The bandana tails are NOT here: the game simulates them as a chain behind the head (see template.html).
-# Run:  python3 draw.py   then in src/:  python3 make-hero.py && node build.js
+# Check:  python3 audit.py  (the quality test; it fails on gaps, loose parts, floating feet, dead idles ...)
+# Run:    python3 draw.py   then in src/:  python3 make-hero.py && node build.js
 import json, os
 from PIL import Image, ImageDraw
 
@@ -13,22 +18,20 @@ C = {
     'e': '#14101A',                                   # eye
     'H': '#606E58', 'h': '#3E483A', 'v': '#2C342A',   # shirt highlight, shirt, shirt shadow
     'y': '#CDAA5A',                                   # buckle
-    'P': '#424858', 'p': '#2A2F3A',                   # pants highlight, pants
+    'Q': '#5C6478', 'P': '#424858', 'p': '#2A2F3A',   # near leg lit, pants highlight, pants
     'c': '#604C3C', 'C': '#80665A',                   # boots, boot highlight
 }
 NAMES = {
     'o': 'Outline', 'd': 'Hair', 'D': 'Hair tuft', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
     's': 'Skin', 'S': 'Skin shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
-    'y': 'Buckle', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
+    'y': 'Buckle', 'Q': 'Pants lit', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
 }
 
 def G(s): return [r for r in s.strip('\n').split('\n')]
 
-# ---- parts (facing right) ----
-# ---- parts (facing right). Built like a heavy: a swept mass of dark hair with the band cutting across it, a small
-# face under a band no wider than the face, hair tufts spiking up and out the back, a nose pixel at the front of the
-# face and no eyes (a squint shadow instead), shoulders wider than the head, bare arms, a wide stance
-# and heavy boots. The dark masses (hair, boots, outline) carry the silhouette. ----
+# ---- head (facing right): swept dark hair, the band across it with the knot at the back (the tails hang from the
+# knot), a squint shadow under the band instead of eyes, a nose pixel that juts past the face at the front. 9 x 8,
+# the last row is the chin and always lands on the row above the torso. ----
 HEAD = {
     'normal': G("""
 ..o.o.o..
@@ -36,18 +39,8 @@ HEAD = {
 oddddddo.
 oddddddo.
 kobBBBBo.
-.oSSSSSo.
-.oSsssSo.
-..oSSSo..
-"""),
-    'blink': G("""
-..o.o.o..
-.odDdddo.
-oddddddo.
-oddddddo.
-kobBBBBo.
-.oSSSSSo.
-.oSsssSo.
+.odSSSSo.
+.oSsssso.
 ..oSSSo..
 """),
     'up': G("""
@@ -56,19 +49,19 @@ kobBBBBo.
 oddddddo.
 oddddddo.
 kobBBBBo.
-.oSSsSSo.
+.odSssso.
 .oSsssSo.
 ..oSSSo..
 """),
-    'profile': G("""
+    'down': G("""
 ..o.o.o..
 .odDdddo.
 oddddddo.
 oddddddo.
 kobBBBBo.
 .odSSSSo.
-.oSsssSo.
-..oSSSo..
+.oSSssSo.
+..oSSsso.
 """),
     'shut': G("""
 ..o.o.o..
@@ -76,108 +69,56 @@ kobBBBBo.
 oddddddo.
 oddddddo.
 kobBBBBo.
-.oSSSSSo.
-.oSSsSSo.
+.odSSSSo.
+.oSSSSso.
+..oSSSo..
+"""),
+    'tuft': G("""
+...o.o.o.
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
+.odSSSSo.
+.oSsssso.
 ..oSSSo..
 """),
 }
-TORSO = {                                             # 10 wide: back arm (shadow skin), tank top, front arm (skin); belt row last
-    'idle': G("""
-osSvhHHsso
-osSvhhHsso
-.osvhhHso.
-.oooooyoo.
-"""),
-    'breath': G("""
-osSvhHHsso
-osSvhhHsso
-.osvhhHso.
-.oooooyoo.
-"""),
-    'reach': G("""
-osSvhHHsso
-osSvhhHsso
-.oovhhHoo.
-.oooooyoo.
-"""),
-    'brace': G("""
-.osvhHHso.
-osSvhhHsso
-osSvhhHsso
-.oooooyoo.
-"""),
-    'squash': G("""
-osSvhhHsso
-.oooooyoo.
-"""),
-    'wall': G("""
-.osvhHHHo.
-osSvhhHHso
-.osvhhHso.
-.oooooyoo.
-"""),
-    'bare': G("""
+HEAD_H = 8
+# ---- torsos: tank top, the belt is the last row and sits on the hips. Width 10, the shirt is cols 3..6. ----
+TORSO = {
+    'mid': G("""
 ..ovhHHo..
 ..ovhhHo..
 ..ovhhHo..
 .oooooyoo.
 """),
-}
-ARM_F = G("""
-os
-ss
-so
-""")                                                  # front arm: bare, skin
-ARM_B = G("""
-oS
-SS
-So
-""")                                                  # back arm, in shadow
-
-LEGS = {                                              # 10 wide, feet apart
-    'stand': G("""
-opPo..oPPo
-oCco..oCco
+    'tall': G("""
+..ovhHHo..
+..ovhHHo..
+..ovhhHo..
+..ovhhHo..
+.oooooyoo.
 """),
-    'run1': G("""
-opPo...oPo
-oCco...oCo
+    'short': G("""
+..ovhHHo..
+..ovhhHo..
+.oooooyoo.
 """),
-    'run2': G("""
-.opPo.oPo.
-.oCo..oCo.
+    'squash': G("""
+.ovhhHHHo.
+.ovhhhHHo.
+oooooooyoo
 """),
-    'run3': G("""
-..opPPPo..
-..oCcCco..
+    'side': G("""
+..ovhHHo..
+..ovhhHo..
+..ovhhHo..
+..oooyoo..
 """),
-    'tuck': G("""
-..opPPPo..
-...oCco...
-"""),
-    'kick': G("""
-opPo...oPo
-oCo....oCo
-"""),
-    'wide': G("""
-opPo....oPPo
-oCco....oCco
-"""),
-    'wall': G("""
-...opPPPo.
-...oCcCco.
-"""),
-    'wallbent': G("""
-....opPPo.
-.....oCco.
-"""),
-    'wallpush': G("""
-..opPPPPo.
-..oCc.Cco.
-"""),
-    'duck': G("""
-opPPo.oPPo
-oCco..oCco
+    'flat': G("""
+.ovhhhHHHo
+oooooooyoo
 """),
 }
 
@@ -186,147 +127,311 @@ def put(fr, part, x, y):
     for r, row in enumerate(part):
         for c, ch in enumerate(row):
             if ch != '.' and 0 <= y + r < 16 and 0 <= x + c < 16: fr[y + r][x + c] = ch
-def pose(head='normal', hy=2, torso='idle', ty=10, legs='stand', ly=14, hx=3, tx=3, lx=3, extra=None):
-    fr = blank()
-    put(fr, LEGS[legs], lx, ly); put(fr, TORSO[torso], tx, ty); put(fr, HEAD[head], hx, hy)
-    if extra: put(fr, G(extra), 0, 0)
+def line(a, b):
+    (x0, y0), (x1, y1) = a, b
+    dx, dy = abs(x1 - x0), -abs(y1 - y0); sx = 1 if x0 < x1 else -1; sy = 1 if y0 < y1 else -1; err = dx + dy; pts = []
+    while True:
+        pts.append((x0, y0))
+        if x0 == x1 and y0 == y1: return pts
+        e2 = 2 * err
+        if e2 >= dy: err += dy; x0 += sx
+        if e2 <= dx: err += dx; y0 += sy
+def path(pts):
+    out = []
+    for i in range(len(pts) - 1):
+        for p in line(pts[i], pts[i + 1]):
+            if p not in out: out.append(p)
+    return out or list(pts)
+
+class Pose:
+    def __init__(self): self.fr = blank(); self.mask = {}   # mask: which limb owns a pixel (for separation lines)
+    def px(self, x, y, ch, who=None):
+        if 0 <= x < 16 and 0 <= y < 16:
+            self.fr[y][x] = ch
+            if who: self.mask[(x, y)] = who
+            else: self.mask.pop((x, y), None)
+    def limb(self, pts, cols, who, thick=1, sep=None):
+        # a line through the joints. thick 2 = pants (two columns, the front one lit). sep: outline the pixels of
+        # that other limb which this one covers the edge of, so near and far legs read as two legs, not a blob.
+        cells = []
+        for x, y in path(pts):
+            cells.append((x, y, cols[0]))
+            if thick == 2: cells.append((x + 1, y, cols[1]))
+        mine = {(x, y) for x, y, _ in cells}
+        if sep:
+            for x, y in mine:
+                for ax, ay in ((x - 1, y), (x, y - 1), (x, y + 1)):
+                    if (ax, ay) not in mine and self.mask.get((ax, ay)) == sep: self.px(ax, ay, 'o', None)
+        for x, y, ch in cells: self.px(x, y, ch, who)
+    def boot(self, x, y, near, kind='flat', toe=1):
+        # flat: heel, sole, toe (three wide, the toe points the way the foot faces). toe: two wide, on the ball of the foot.
+        cols = ['C', 'C', 'c'] if near else ['c', 'c', 'c']
+        n = 3 if kind == 'flat' else 2
+        for i in range(n): self.px(x + i * toe, y, cols[i] if n == 3 else cols[i + 1], 'nl' if near else 'fl')
+
+def outline(fr):
+    add = []
+    for y in range(16):
+        for x in range(16):
+            if fr[y][x] != '.': continue
+            for ax, ay in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= ax < 16 and 0 <= ay < 16 and fr[ay][ax] not in '.ok': add.append((x, y)); break
+    for x, y in add: fr[y][x] = 'o'
     return fr
 
-def run_frame(k, bob):                                    # k 0..5: arms swing opposite each other, legs cycle
-    swing = [(9, 9), (10, 10), (8, 11), (4, 11), (3, 10), (5, 11)]
-    legs = ['run1', 'run2', 'run3', 'run1', 'run2', 'run3']
-    ty = 10 - bob
-    fr = pose(hy=2 - bob, ty=ty, torso='bare', legs=legs[k], ly=14 - bob, lx=2 if k % 3 == 0 else 3)
-    bx, by = swing[(k + 3) % 6]; fx_, fy_ = swing[k]
-    put(fr, ARM_B, bx, by - bob)
-    put(fr, ARM_F, fx_, fy_ - bob)
+def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg=None, near_boot=None, far_boot=None,
+         near_arm=None, far_arm=None, hips=True, near_behind=False, shift=0):
+    """hip: the belt row. tx: torso column. Legs and arms are joint lists in frame coords (x right, y down).
+    A boot is (x, y[, kind[, toe]]). The head is placed so its chin row is the row above the torso: it cannot float.
+    near_behind: the near arm goes behind the head (hands at the back of the head). shift: move the whole pose sideways."""
+    P = Pose(); t = TORSO[torso]; ty = hip - len(t) + 1
+    if far_arm: P.limb(far_arm, 'S', 'fa')
+    if far_leg: P.limb(far_leg, 'pP', 'fl', 2)
+    if far_boot: P.boot(*far_boot[:2], False, *far_boot[2:])
+    put(P.fr, t, tx, ty)
+    for x in range(16):
+        for y in range(ty, hip + 1): P.mask.pop((x, y), None)
+    if hips and near_leg and far_leg:                                   # the seat of the pants, joining both legs to the belt
+        xs = [near_leg[0][0], near_leg[0][0] + 1, far_leg[0][0], far_leg[0][0] + 1]
+        for x in range(min(xs), max(xs) + 1): P.px(x, hip + 1, 'p', 'hip')
+    if near_leg: P.limb(near_leg, 'PQ', 'nl', 2, sep='fl')
+    if near_boot: P.boot(*near_boot[:2], True, *near_boot[2:])
+    if near_arm and near_behind: P.limb(near_arm, 's', 'na')
+    put(P.fr, HEAD[head], tx + hdx, ty - HEAD_H)
+    if near_arm and not near_behind: P.limb(near_arm, 's', 'na')
+    fr = outline(P.fr)
+    if shift: fr = [(['.'] * shift + row)[:16] if shift > 0 else (row[-shift:] + ['.'] * -shift) for row in fr]
     return fr
 
-def raw(s):                                            # a whole hand-drawn frame
-    fr = blank(); put(fr, G(s), 0, 0); return fr
+# ---------------------------------------------------------------- idle: breathing, the whole body
+# stand: hips on row 12, legs straight, arms hang. Breathing in lifts the chest (taller torso) and with it the head and
+# shoulders, the arms ride up and swing out a touch. Breathing out the knees give and the body settles a pixel (squash).
+LEGS_STAND = dict(far_leg=[(4, 13), (4, 14)], far_boot=(3, 15), near_leg=[(9, 13), (9, 14)], near_boot=(9, 15))
+LEGS_GIVE = dict(far_leg=[(4, 14)], far_boot=(3, 15), near_leg=[(9, 14)], near_boot=(9, 15))
+def stand(state=0, head='normal', near_arm=None, far_arm=None, near_behind=False):
+    if state == 1:   # in: chest up, shoulders and hands ride up, hands drift out
+        return pose(hip=12, torso='tall', head=head, near_behind=near_behind, **LEGS_STAND,
+                    far_arm=far_arm or [(4, 8), (4, 9), (3, 10)], near_arm=near_arm or [(11, 8), (11, 9), (12, 10)])
+    if state == 2:   # out: knees give, everything settles a pixel
+        return pose(hip=13, torso='mid', head=head, near_behind=near_behind, **LEGS_GIVE,
+                    far_arm=far_arm or [(4, 10), (4, 11), (4, 12)], near_arm=near_arm or [(11, 10), (11, 11), (11, 12)])
+    return pose(hip=12, torso='mid', head=head, near_behind=near_behind, **LEGS_STAND,
+                far_arm=far_arm or [(4, 9), (4, 10), (4, 11)], near_arm=near_arm or [(11, 9), (11, 10), (11, 11)])
 
-# dashes: the body leans into the direction; the game stretches the sprite along the dash as well
-DASH_SIDE = pose(hy=5, hx=5, ty=12, tx=4, torso='reach', legs='kick', ly=14, lx=1)
-DASH_UP = pose(hy=1, hx=4, ty=9, tx=3, torso='reach', legs='tuck', ly=13, lx=3, extra="""
-..........oo....
-..........so....
-..........so....
-""")
-DASH_DOWN = pose(hy=2, ty=10, torso='brace', legs='wide', ly=14, lx=2)
-DASH_DIAG_UP = pose(hy=2, hx=5, ty=10, tx=4, torso='reach', legs='kick', ly=14, lx=1, extra="""
-...........oo...
-...........so...
-...........so...
-""")
-DASH_DIAG_DOWN = pose(hy=4, hx=5, ty=11, tx=4, torso='brace', legs='kick', ly=14, lx=1)
-def tie_frame(k):                                         # both hands up at the knot behind the head
-    fr = pose(torso='bare', head='blink' if k else 'normal')
-    put(fr, G('oS\noS\noS\nSS'), 2, 7 - k)
-    put(fr, G('.o\nos\nos\nos\nss'), 3, 5 + k)
-    return fr
-def flex_frame(k):                                        # front arm out, hand opening and closing
-    fr = pose(torso='bare')
-    put(fr, ARM_B, 3, 10)
-    put(fr, G('oss\nsso') if k else G('os\nso'), 11, 11)
-    return fr
-COIL = pose(head='normal', hy=4, torso='brace', ty=11, legs='wide', ly=14, lx=2)   # the crouch before any dash
+# idle one-shots, played by the game after a few seconds still
+SHADE = [(11, 8), (12, 7), (12, 6), (11, 5), (10, 5)]                              # hand up to the brow, looking up the climb
+def tie(k):                                                              # both hands at the knot behind the head, tugging
+    return stand(1, near_behind=True, far_arm=[(4, 8), (2, 7), (2, 5 - k)], near_arm=[(11, 8), (12, 6 - k), (10, 4)])
+def flex(k, state=0):                                                    # near hand out front, shaking loose
+    hy = 9 if state == 0 else 8
+    return stand(state, near_arm=[(11, hy), (12, hy + 1), (13, hy + 1 - k), (14, hy + 1 - 2 * k)])
 
-ARM_UP = G("""
-.o
-so
-so
-oo
-""")                                                  # an arm reaching up the wall, hand at the top
-def wall_frame(dy, hand_hi, legs='wall', back_hi=None, hx=3, tx=3):   # facing the wall on the right
-    fr = pose(head='profile', hy=2 + dy, torso='wall', ty=10 + dy, legs=legs, ly=14, lx=4, hx=hx, tx=tx)
-    if back_hi is not None: put(fr, G('.o\nSo\nSo\noo'), 11, back_hi)   # the other hand, lower, in shadow
-    put(fr, ARM_UP, 12, hand_hi)
-    return fr
-# climb: reach high, pull the body up with the knees bent, push with the legs, plant and grip again
-CLIMB = [wall_frame(0, 4, 'wall', 8), wall_frame(-1, 5, 'wallbent', 9), wall_frame(-2, 2, 'wallpush', 6), wall_frame(-1, 3, 'wall', 7)]
-# wall slide: leaning away from the wall, one arm braced straight at it, feet on the wall, knees bent
-def slide_frame(dy):
-    fr = pose(head='profile', hy=2 + dy, hx=2, torso='wall', ty=10 + dy, tx=2, legs='wallbent', ly=14, lx=5)
-    put(fr, G('oss\n.oo'), 11, 9 + dy)                    # arm straight out to the wall
-    return fr
-def fall_frame(k):                                        # arms up at first, then out to brace, body tucking
-    fr = pose(hy=2 + k, ty=10 + k, torso='bare', legs='tuck' if k else 'kick', ly=14, lx=3)
-    if k: put(fr, G('oS\nSo'), 2, 10 + k); put(fr, G('os\nso'), 11, 10 + k)
-    else: put(fr, G('oS\noS\nSS'), 3, 7); put(fr, G('os\nos\nss'), 11, 7)
-    return fr
-HURT = pose(head='shut', hy=3, torso='bare', ty=11, legs='wide', ly=14, lx=2, extra="""
-................
-................
-................
-................
-................
-................
-................
-..oS......so....
-..oS......so....
-..SS......ss....
-""")
-DUCK = pose(hy=5, ty=12, torso='squash', legs='duck', ly=14, lx=3)
-LOOKUP = pose(head='up', hy=1)
-SKID = pose(hy=2, hx=2, ty=10, tx=2, torso='brace', legs='wide', ly=14, lx=3)   # leaning back, feet braced forward
+# ---------------------------------------------------------------- air
+JUMP = [
+    pose(hip=11, torso='mid', far_leg=[(5, 12), (5, 14)], far_boot=(5, 15, 'toe'), near_leg=[(8, 12), (8, 14)], near_boot=(8, 15, 'toe'),
+         far_arm=[(4, 8), (3, 6), (3, 4)], near_arm=[(11, 8), (12, 6), (12, 4)]),                                    # take-off: long, toes pointed, arms thrown up
+    pose(hip=11, torso='mid', far_leg=[(5, 12), (6, 13)], far_boot=(5, 14, 'toe'), near_leg=[(8, 12), (10, 13)], near_boot=(9, 14),
+         far_arm=[(4, 8), (3, 7), (3, 5)], near_arm=[(11, 8), (12, 7), (13, 6)]),                                    # rising: knees come up
+]
+FALL = [
+    pose(hip=12, torso='short', far_leg=[(5, 13), (6, 14)], far_boot=(5, 15, 'toe'), near_leg=[(8, 13), (10, 14)], near_boot=(10, 15),
+         far_arm=[(5, 10), (3, 10), (2, 9)], near_arm=[(10, 10), (12, 10), (13, 9)]),                                # apex: floaty, arms out, knees up
+    pose(hip=12, torso='mid', far_leg=[(5, 13), (5, 14)], far_boot=(4, 15, 'toe'), near_leg=[(8, 13), (8, 14)], near_boot=(8, 15, 'toe'),
+         far_arm=[(4, 9), (3, 7), (3, 5)], near_arm=[(11, 9), (12, 7), (12, 5)]),                                    # dropping: arms up, legs hang
+    pose(hip=12, torso='mid', far_leg=[(5, 13), (4, 14)], far_boot=(3, 15, 'toe'), near_leg=[(8, 13), (9, 14)], near_boot=(9, 15, 'toe'),
+         far_arm=[(4, 9), (2, 8), (2, 6)], near_arm=[(11, 9), (13, 8), (13, 6)]),                                    # dropping: arms flap out
+]
+LAND = [
+    pose(hip=14, torso='squash', head='down', far_leg=[(4, 15)], near_leg=[(9, 15)], far_boot=(2, 15), near_boot=(11, 15),
+         far_arm=[(3, 12), (2, 13), (1, 13)], near_arm=[(12, 12), (13, 13), (14, 13)]),                              # impact: flattened, arms out low
+    pose(hip=13, torso='short', head='down', **LEGS_GIVE, far_arm=[(4, 11), (3, 12)], near_arm=[(11, 11), (12, 12)]),   # coming up
+    stand(1),                                                                                                       # a little overshoot
+]
+HURT = pose(hip=13, torso='squash', head='shut', far_leg=[(4, 14)], far_boot=(2, 15), near_leg=[(9, 14)], near_boot=(11, 15),
+            far_arm=[(3, 11), (2, 9), (1, 8)], near_arm=[(12, 11), (13, 9), (14, 8)])
+DUCK = pose(hip=14, torso='short', head='down', far_leg=[(4, 15)], near_leg=[(9, 15)], far_boot=(2, 15), near_boot=(11, 15),
+            far_arm=[(4, 12), (4, 14)], near_arm=[(11, 12), (11, 14)])                                              # squat, hands on knees
+LOOKUP = stand(1, 'up')
+# skid: facing the new way while the body still slides back, so lean into it and dig both heels in behind
+SKID = pose(hip=13, tx=4, torso='short', hdx=1, far_leg=[(6, 14), (4, 15)], far_boot=(3, 15, 'flat', -1), near_leg=[(8, 14), (7, 15)], near_boot=(6, 15, 'flat', -1),
+            far_arm=[(7, 11), (9, 11), (11, 10)], near_arm=[(12, 11), (14, 10), (15, 9)])
+
+# ---------------------------------------------------------------- dashes: a coil, then the body thrown along the dash
+COIL = pose(hip=13, torso='short', head='down', far_leg=[(5, 14)], far_boot=(3, 15), near_leg=[(9, 14)], near_boot=(9, 15),
+            far_arm=[(5, 11), (3, 12)], near_arm=[(10, 11), (8, 12), (7, 13)])
+DASH_SIDE = pose(hip=13, tx=3, torso='flat', hdx=3, far_leg=[(6, 14), (3, 15)], far_boot=(2, 15, 'toe', -1), near_leg=[(7, 14), (4, 14)], near_boot=(2, 14, 'toe', -1),
+                 far_arm=[(9, 12), (7, 13)], near_arm=[(11, 12), (13, 12), (15, 11)])
+DASH_UP = pose(hip=13, torso='tall', far_leg=[(6, 14)], far_boot=(6, 15, 'toe'), near_leg=[(8, 14)], near_boot=(8, 15, 'toe'),
+               far_arm=[(4, 9), (3, 11), (3, 12)], near_arm=[(11, 9), (12, 6), (12, 3), (12, 1)])
+DASH_DOWN = pose(hip=12, torso='mid', head='down', far_leg=[(4, 13), (3, 14)], far_boot=(2, 15, 'flat', -1), near_leg=[(9, 13), (10, 14)], near_boot=(11, 15),
+                 far_arm=[(4, 9), (3, 7), (3, 6)], near_arm=[(11, 9), (12, 7), (12, 6)])
+DASH_DIAG_UP = pose(hip=13, tx=3, torso='mid', hdx=2, far_leg=[(6, 14), (4, 15)], far_boot=(3, 15, 'toe', -1), near_leg=[(8, 14), (6, 15)], near_boot=(5, 15, 'toe', -1),
+                    far_arm=[(6, 10), (4, 11), (3, 12)], near_arm=[(11, 10), (13, 7), (14, 5), (15, 4)])
+DASH_DIAG_DOWN = pose(hip=12, tx=3, torso='short', head='down', hdx=2, far_leg=[(5, 13), (6, 14)], far_boot=(6, 15), near_leg=[(8, 13), (10, 14)], near_boot=(11, 15),
+                      far_arm=[(5, 10), (3, 9)], near_arm=[(10, 10), (8, 8), (7, 7)])
+
+# ---------------------------------------------------------------- on the wall (the wall is to the right, from column 12)
+# hands grip the wall face at column 11, the feet push on it, the near limbs and the far limbs climb in turn.
+def wall(dy, near_hand, far_hand, near_foot, far_foot, torso='side', tx=2):
+    hip = 12 + dy; top = hip - len(TORSO[torso]) + 1
+    return pose(hip=hip, tx=tx, torso=torso,
+                far_arm=[(7, top), (10, top + 1), (11, far_hand)], near_arm=[(8, top), (11, top - 1), (11, near_hand), (12, near_hand)],
+                far_leg=[(5, hip + 1), (8, far_foot - 1)], far_boot=(10, far_foot, 'toe'), near_leg=[(6, hip + 1), (8, near_foot - 1)], near_boot=(10, near_foot, 'toe'))
+CLIMB = [
+    wall(0, 3, 9, 15, 13),     # near hand high, far knee up
+    wall(-1, 4, 8, 14, 14),    # pull: body rises, hands stay where they gripped
+    wall(0, 9, 3, 13, 15),     # far hand high, near knee up
+    wall(-1, 8, 4, 14, 14),
+]
+HOLD = [wall(0, 5, 9, 15, 14), wall(0, 5, 9, 15, 14, torso='tall')]           # hanging on: breathing
+def slide(k):                                                             # leaning out, one arm straight to the wall, feet scraping
+    hip = 12; top = hip - 3
+    return pose(hip=hip, tx=1, torso='side', far_arm=[(6, top + 1), (9, top + 1), (11, top + 1 + k)], near_arm=[(7, top), (10, top + 1), (12, top + 1 - k)],
+                far_leg=[(5, 13), (8, 14)], far_boot=(10, 14, 'toe'), near_leg=[(6, 13), (8, 15)], near_boot=(10, 15, 'toe'))
+
+def LG(row, s): return (row, G(s))
+RUN_LEGS = [   # per phase: hip (belt) row, lead leg, trail leg
+    (12, LG(13, """
+.......LL.......
+.........LL.....
+..........KKK...
+"""), LG(13, """
+.....LL.........
+....L...........
+..KK............
+""")),                                                                   # contact: lead heel down, trail toe behind
+    (13, LG(14, """
+.......LLL......
+.........KKK....
+"""), LG(13, """
+...KK...........
+.....LL.........
+""")),                                                                   # down: weight on the lead, trail foot kicks up
+    (12, LG(13, """
+......LL........
+......LL........
+......KKK.......
+"""), LG(13, """
+........LL......
+.........KK.....
+""")),                                                                   # pass: trail knee swings through
+    (11, LG(12, """
+......LL........
+.....LL.........
+....LL..........
+..KK............
+"""), LG(12, """
+.......LL.......
+.........LL.....
+..........KK....
+""")),                                                                   # up: lead pushes off on the toe, trail reaches
+]
+RUN_ARMS = [   # per phase, shoulder at (8, torso top): arm on the lead-leg side, the other arm
+    ([(8, 0), (7, 1), (6, 2), (5, 2)], [(8, 0), (9, 1), (10, 1), (11, 0)]),
+    ([(8, 0), (7, 1), (6, 2)], [(8, 0), (9, 1), (10, 1)]),
+    ([(8, 0), (8, 1), (8, 2)], [(8, 0), (8, 1), (8, 2)]),
+    ([(8, 0), (9, 1), (10, 1), (11, 0)], [(8, 0), (7, 1), (6, 2), (5, 2)]),
+]
+def leg_grid(P, lg, near):
+    row, rows = lg; cells = []
+    for r, s in enumerate(rows):
+        for x, ch in enumerate(s):
+            if ch == 'L': cells.append((x, row + r, 'Q' if near else 'P'))
+            elif ch == 'K': cells.append((x, row + r, ('C' if near else 'c')))
+    # the near leg: shade its back column, and cut a dark line into the far leg wherever it lies against it
+    mine = {(x, y) for x, y, _ in cells}
+    if near:
+        for x, y in mine:
+            for ax, ay in ((x - 1, y), (x, y - 1), (x, y + 1)):
+                if (ax, ay) not in mine and P.mask.get((ax, ay)) == 'fl': P.px(ax, ay, 'o')
+        cells = [(x, y, 'P' if ch == 'Q' and (x - 1, y) not in mine else ch) for x, y, ch in cells]
+    for x, y, ch in cells: P.px(x, y, ch, 'nl' if near else 'fl')
+
+def run_frame(k):
+    ph = k % 4; near_leads = k < 4
+    hip, lead, trail = RUN_LEGS[ph]
+    near, far = (lead, trail) if near_leads else (trail, lead)
+    top = hip - 3
+    lead_arm, other_arm = [[(x, top + y) for x, y in a] for a in RUN_ARMS[ph]]
+    near_arm, far_arm = (lead_arm, other_arm) if near_leads else (other_arm, lead_arm)
+    P = Pose(); t = TORSO['side']; ty = hip - len(t) + 1; tx = 3
+    P.limb(far_arm, 'S', 'fa')
+    leg_grid(P, far, False)
+    put(P.fr, t, tx, ty)
+    for x in range(16):
+        for y in range(ty, hip + 1): P.mask.pop((x, y), None)
+    leg_grid(P, near, True)
+    put(P.fr, HEAD['normal'], tx + 1, ty - HEAD_H)
+    P.limb(near_arm, 's', 'na')
+    return outline(P.fr)
+
+
+def exit_frames():
+    a = run_frame(0); b = run_frame(1)
+    c = [(['.'] * 3 + row)[:16] for row in run_frame(2)]
+    return [a, b, c, blank()]
 
 ANIMS = [
-    # name, fps, loop, frames
-    ('idle', 4, True, [pose(), pose(hy=1, ty=10, torso='breath'), pose(head='blink', hy=1), pose()]),
-    ('run', 12, True, [run_frame(0, 0), run_frame(1, 1), run_frame(2, 1), run_frame(3, 0), run_frame(4, 1), run_frame(5, 1)]),
-    # idle one-shots: look up at the climb, retighten the knot, shake out a hand. Played by the game after a few seconds still.
-    ('idle_look', 4, False, [pose(head='up'), pose(head='up'), pose(head='up', hy=1, ty=10), pose(head='up'), pose()]),
-    ('idle_tie', 6, False, [tie_frame(0), tie_frame(1), tie_frame(0), tie_frame(1), pose()]),
-    ('idle_flex', 8, False, [flex_frame(0), flex_frame(1), flex_frame(0), flex_frame(1), pose()]),
-    ('jump_up', 0, False, [pose(hy=1, ty=9, torso='reach', legs='tuck', ly=13), pose(hy=0, ty=8, torso='reach', legs='kick', ly=12)]),
-    ('fall', 0, False, [fall_frame(0), fall_frame(1)]),
-    ('land', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='wide', ly=14, lx=2)]),
+    # name, fps, loop, frames   (loop may be a frame number: play through once, then loop from that frame)
+    ('idle', 6, True, [stand(0), stand(0), stand(1), stand(1), stand(1, 'tuft'), stand(0), stand(2), stand(2, 'tuft')]),
+    ('run', 14, True, [run_frame(k) for k in range(8)]),
+    ('idle_look', 4, False, [stand(1, 'up'), stand(1, 'up', near_arm=SHADE), stand(1, 'up', near_arm=SHADE), stand(1, 'tuft', near_arm=SHADE), stand(1, 'up'), stand(0)]),
+    ('idle_tie', 6, False, [stand(1), tie(0), tie(1), tie(0), tie(1), stand(1), stand(0)]),
+    ('idle_flex', 8, False, [stand(0), flex(0), flex(1), flex(0, 1), flex(1, 1), flex(0), stand(0)]),
+    ('jump_up', 12, False, JUMP),
+    ('fall', 8, 1, FALL),
+    ('land', 18, False, LAND),
     ('dash_side', 0, False, [COIL, DASH_SIDE]),
     ('dash_up', 0, False, [COIL, DASH_UP]),
     ('dash_down', 0, False, [COIL, DASH_DOWN]),
     ('dash_diag_up', 0, False, [COIL, DASH_DIAG_UP]),
     ('dash_diag_down', 0, False, [COIL, DASH_DIAG_DOWN]),
-    ('wall_hold', 4, True, [wall_frame(0, 5, 'wall', 8), wall_frame(1, 5, 'wall', 9)]),
+    ('wall_hold', 3, True, HOLD),
     ('climb', 8, True, CLIMB),
-    ('wall_slide', 8, True, [slide_frame(0), slide_frame(1)]),
+    ('wall_slide', 10, True, [slide(0), slide(1)]),
     ('hurt', 0, False, [HURT]),
     ('duck', 0, False, [DUCK]),
     ('look_up', 0, False, [LOOKUP]),
     ('skid', 0, False, [SKID]),
-    ('spawn', 12, False, [pose(head='shut', hy=5, torso='squash', ty=13, legs='wide', ly=15, lx=2), pose(hy=3, ty=11, torso='brace', legs='stand'), pose(hy=0, ty=8, torso='reach', legs='stand', ly=14), pose(hy=1, ty=9, torso='breath'), pose()]),
-    ('exit', 10, False, [run_frame(0, 0), run_frame(1, 1), pose(hx=6, tx=6, lx=6), blank()]),
+    ('spawn', 12, False, [LAND[0], LAND[1], JUMP[0], stand(1), stand(0)]),
+    ('exit', 10, False, exit_frames()),
 ]
 
 def hexrgb(h): h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-manifest = {'design': 'Lone climber: dark olive shirt, slate pants, red bandana (tails simulated in the game)', 'dashIndicator': {'feature': 'Bandana', 'hex': C['b']},
-            'palette': {k: {'name': NAMES[k], 'hex': C[k]} for k in C}, 'animations': []}
-for name, fps, loop, frames in ANIMS:
-    im = Image.new('RGBA', (16 * len(frames), 16), (0, 0, 0, 0))
-    for i, fr in enumerate(frames):
-        for y in range(16):
-            for x in range(16):
-                ch = fr[y][x]
-                if ch != '.': im.putpixel((i * 16 + x, y), hexrgb(C[ch]))
-    im.save('hero-%s.png' % name)
-    anchors = []                                       # where the bandana chain hangs from: the knot pixels (colour k), per frame
-    for fr in frames:
-        ks = [(x, y) for y in range(16) for x in range(16) if fr[y][x] == 'k']
-        anchors.append([min(x for x, y in ks), round(sum(y for x, y in ks) / len(ks), 1)] if ks else None)
-    manifest['animations'].append({'name': name, 'frameCount': len(frames), 'fps': fps, 'loop': loop, 'anchors': anchors})
-json.dump(manifest, open('hero-animation-manifest.json', 'w'), indent=1)
+def write(anims=None):
+    anims = anims or ANIMS
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    manifest = {'design': 'Lone climber: dark olive shirt, slate pants, red bandana (tails simulated in the game)', 'dashIndicator': {'feature': 'Bandana', 'hex': C['b']},
+                'palette': {k: {'name': NAMES[k], 'hex': C[k]} for k in C}, 'animations': []}
+    for name, fps, loop, frames in anims:
+        im = Image.new('RGBA', (16 * len(frames), 16), (0, 0, 0, 0))
+        for i, fr in enumerate(frames):
+            for y in range(16):
+                for x in range(16):
+                    ch = fr[y][x]
+                    if ch != '.': im.putpixel((i * 16 + x, y), hexrgb(C[ch]))
+        im.save('hero-%s.png' % name)
+        anchors = []                                       # where the bandana chain hangs from: the knot pixels (colour k), per frame
+        for fr in frames:
+            ks = [(x, y) for y in range(16) for x in range(16) if fr[y][x] == 'k']
+            anchors.append([min(x for x, y in ks), round(sum(y for x, y in ks) / len(ks), 1)] if ks else None)
+        row = {'name': name, 'frameCount': len(frames), 'fps': fps, 'loop': loop is True, 'anchors': anchors}
+        if loop is not True and loop is not False: row['loopFrom'] = loop
+        manifest['animations'].append(row)
+    json.dump(manifest, open('hero-animation-manifest.json', 'w'), indent=1)
+    # contact sheet at 8x for review
+    Z = 8; W = 16 * Z * 8 + 120; H = len(anims) * (16 * Z + 14) + 20
+    sheet = Image.new('RGB', (W, H), (10, 13, 28)); d = ImageDraw.Draw(sheet)
+    for r, (name, fps, loop, frames) in enumerate(anims):
+        y0 = 10 + r * (16 * Z + 14); d.text((6, y0 + 4), name, fill=(255, 183, 74))
+        for i, fr in enumerate(frames):
+            x0 = 110 + i * 16 * Z
+            d.rectangle([x0, y0 + 16 * Z - 1, x0 + 16 * Z - 1, y0 + 16 * Z + 2], fill=(74, 90, 208))
+            for y in range(16):
+                for x in range(16):
+                    ch = fr[y][x]
+                    if ch != '.': d.rectangle([x0 + x * Z, y0 + y * Z, x0 + x * Z + Z - 1, y0 + y * Z + Z - 1], fill=hexrgb(C[ch])[:3])
+    sheet.save('sheet.png')
+    print('pack written:', len(anims), 'animations')
 
-# contact sheet at 8x for review
-Z = 8; W = 16 * Z * 6 + 120; H = len(ANIMS) * (16 * Z + 14) + 20
-sheet = Image.new('RGB', (W, H), (10, 13, 28)); d = ImageDraw.Draw(sheet)
-for r, (name, fps, loop, frames) in enumerate(ANIMS):
-    y0 = 10 + r * (16 * Z + 14); d.text((6, y0 + 4), name, fill=(255, 183, 74))
-    for i, fr in enumerate(frames):
-        x0 = 110 + i * 16 * Z
-        d.rectangle([x0, y0 + 16 * Z - 1, x0 + 16 * Z - 1, y0 + 16 * Z + 2], fill=(74, 90, 208))
-        for y in range(16):
-            for x in range(16):
-                ch = fr[y][x]
-                if ch != '.': d.rectangle([x0 + x * Z, y0 + y * Z, x0 + x * Z + Z - 1, y0 + y * Z + Z - 1], fill=hexrgb(C[ch])[:3])
-sheet.save('sheet.png')
-print('pack written:', len(ANIMS), 'animations')
+if __name__ == '__main__': write()

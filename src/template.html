@@ -1305,12 +1305,18 @@
     };
     if (HERO.enabled) img.src = HERO.src; // otherwise the simple lantern character is drawn in code
   })();
+  // Which frame of an animation plays at time t: loop, hold the last frame, or play once and loop from a frame (from).
+  function heroFrame(a, t) {
+    var f = Math.max(0, Math.floor(t * a.fps));
+    if (a.loop) return f % a.n;
+    if (a.from != null && f >= a.n) return a.from + (f - a.from) % (a.n - a.from);
+    return Math.min(a.n - 1, f);
+  }
   // Draws one frame with the feet centred on the collision box. Returns false if that animation is missing.
   function drawHero(name, t, x, y, facing, variant) {
     var a = HERO.anims[name];
     if (!a) return false;
-    var f = Math.floor(t * a.fps);
-    f = a.loop ? ((f % a.n) + a.n) % a.n : Math.max(0, Math.min(a.n - 1, f));
+    var f = heroFrame(a, t);
     var F = HERO.frame, dx = x + pl.w / 2 - F / 2, dy = y + pl.h - F, sheet = hero.sheets[variant || 0];
     var sx = hero.sx, sy = hero.sy;
     if (facing < 0) sx = -sx;
@@ -1342,7 +1348,7 @@
   // Where the bandana knot is in the frame about to be drawn (null for a hero pack without one).
   function heroAnchor(name, t, x, y, facing) {
     var a = HERO.anims[name]; if (!a || !a.anchors) return null;
-    var f = Math.floor(t * a.fps); f = a.loop ? ((f % a.n) + a.n) % a.n : Math.max(0, Math.min(a.n - 1, f));
+    var f = heroFrame(a, t);
     var k = a.anchors[f]; if (!k) return null;
     var F = HERO.frame, dx = x + pl.w / 2 - F / 2, dy = y + pl.h - F, cx = dx + F / 2, fy = dy + F;
     var ax = facing < 0 ? dx + F - 1 - k[0] : dx + k[0], ay = dy + k[1];
@@ -1434,7 +1440,7 @@
     else if (pl.inY < 0 && HERO.anims.look_up) name = 'look_up';
     else name = 'idle';
     if (name === 'wall_slide' && tick % 6 === 0) puff(pl.x + (facing > 0 ? pl.w : 0), pl.y + pl.h - 1, 1, -facing * 8, -12);   // scraping the wall
-    if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += dt;
+    if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += name === 'run' ? dt * Math.max(0.55, Math.min(1, Math.abs(pl.vx) / P.maxRun)) : dt;   // the stride slows with the speed, so a run start does not paddle
     if (name === 'idle' && HERO.anims.idle_look) {                                                // idle one-shots: after 3 s still, one loop in five
       hero.idleT += dt;
       if (hero.os) { hero.osT += dt; var oa = HERO.anims[hero.os]; if (hero.osT >= oa.n / oa.fps) { hero.os = null; hero.idleT = 0; } }
