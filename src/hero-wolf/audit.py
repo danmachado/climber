@@ -11,6 +11,7 @@
 #   run cycle      side-on body; the two boots swap front and back (a real stride), the arms swing against the legs,
 #                  the body bobs, and no two frames in a row are the same
 #   squash/stretch landing and spawn start shorter than standing, take-off is taller or the same
+#   feet           boots are tall and narrow: no boot is more than 2 px wide on any row (no skateboard feet)
 #   wall           on the wall animations the hands reach the wall face and the climb alternates hands
 import json, os, sys
 from PIL import Image
@@ -81,6 +82,18 @@ GROUNDED = ['idle', 'idle_look', 'idle_tie', 'idle_flex', 'run', 'land', 'skid',
 for name in GROUNDED:
     for i, g in enumerate(FR[name]):
         if not is_blank(g) and not [x for x, y in cells(g, 'cC') if y == 15]: bad(name, 'frame %d: no boot on the ground row (feet float)' % i)
+
+# ---- boots: tall and narrow, never a long flat slab ----
+for name, frames in FR.items():
+    for i, g in enumerate(frames):
+        for y in range(16):
+            for colours in ('C', 'c'):                     # near boot and far boot counted apart, so two feet side by side still pass
+                run = 0
+                for x in range(17):
+                    if x < 16 and g[y][x] in colours: run += 1
+                    else:
+                        if run > 2: bad(name, 'frame %d: a boot %d px wide on row %d (feet should be 2 wide)' % (i, run, y))
+                        run = 0
 
 # ---- head always rides on the torso ----
 for name, frames in FR.items():

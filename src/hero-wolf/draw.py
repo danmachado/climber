@@ -163,11 +163,17 @@ class Pose:
                 for ax, ay in ((x - 1, y), (x, y - 1), (x, y + 1)):
                     if (ax, ay) not in mine and self.mask.get((ax, ay)) == sep: self.px(ax, ay, 'o', None)
         for x, y, ch in cells: self.px(x, y, ch, who)
-    def boot(self, x, y, near, kind='flat', toe=1):
-        # flat: heel, sole, toe (three wide, the toe points the way the foot faces). toe: two wide, on the ball of the foot.
-        cols = ['C', 'C', 'c'] if near else ['c', 'c', 'c']
-        n = 3 if kind == 'flat' else 2
-        for i in range(n): self.px(x + i * toe, y, cols[i] if n == 3 else cols[i + 1], 'nl' if near else 'fl')
+    def boot(self, x, y, near, kind='flat', toe=1, leg=None):
+        # Tall, narrow boots (two wide, the width of the leg): a sole on the given row and a cuff on the row above it,
+        # where the boot covers the bottom of the leg. The boot sits under the end of the leg, never more than one
+        # pixel ahead or behind, so a foot never trails off the leg like a board.
+        who = 'nl' if near else 'fl'
+        if leg:
+            lx = leg[-1][0]; x = lx + max(-1, min(1, x - lx))
+        sole, cuff = ('c', 'C') if near else ('c', 'c')
+        for cx in (x, x + 1):
+            if self.mask.get((cx, y - 1)) == who: self.px(cx, y - 1, cuff, who)
+            self.px(cx, y, cuff if near and cx == x + 1 and kind == 'flat' else sole, who)
 
 def outline(fr):
     add = []
@@ -187,7 +193,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
     P = Pose(); t = TORSO[torso]; ty = hip - len(t) + 1
     if far_arm: P.limb(far_arm, 'S', 'fa')
     if far_leg: P.limb(far_leg, 'pP', 'fl', 2)
-    if far_boot: P.boot(*far_boot[:2], False, *far_boot[2:])
+    if far_boot: P.boot(*far_boot[:2], False, *far_boot[2:], leg=far_leg)
     put(P.fr, t, tx, ty)
     for x in range(16):
         for y in range(ty, hip + 1): P.mask.pop((x, y), None)
@@ -195,7 +201,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
         xs = [near_leg[0][0], near_leg[0][0] + 1, far_leg[0][0], far_leg[0][0] + 1]
         for x in range(min(xs), max(xs) + 1): P.px(x, hip + 1, 'p', 'hip')
     if near_leg: P.limb(near_leg, 'PQ', 'nl', 2, sep='fl')
-    if near_boot: P.boot(*near_boot[:2], True, *near_boot[2:])
+    if near_boot: P.boot(*near_boot[:2], True, *near_boot[2:], leg=near_leg)
     if near_arm and near_behind: P.limb(near_arm, 's', 'na')
     put(P.fr, HEAD[head], tx + hdx, ty - HEAD_H)
     if near_arm and not near_behind: P.limb(near_arm, 's', 'na')
@@ -206,7 +212,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
 # ---------------------------------------------------------------- idle: breathing, the whole body
 # stand: hips on row 12, legs straight, arms hang. Breathing in lifts the chest (taller torso) and with it the head and
 # shoulders, the arms ride up and swing out a touch. Breathing out the knees give and the body settles a pixel (squash).
-LEGS_STAND = dict(far_leg=[(4, 13), (4, 14)], far_boot=(3, 15), near_leg=[(9, 13), (9, 14)], near_boot=(9, 15))
+LEGS_STAND = dict(far_leg=[(4, 13), (4, 14)], far_boot=(4, 15), near_leg=[(9, 13), (9, 14)], near_boot=(9, 15))
 LEGS_GIVE = dict(far_leg=[(4, 14)], far_boot=(3, 15), near_leg=[(9, 14)], near_boot=(9, 15))
 def stand(state=0, head='normal', near_arm=None, far_arm=None, near_behind=False):
     if state == 1:   # in: chest up, shoulders and hands ride up, hands drift out
@@ -242,18 +248,18 @@ FALL = [
          far_arm=[(4, 9), (2, 8), (2, 6)], near_arm=[(11, 9), (13, 8), (13, 6)]),                                    # dropping: arms flap out
 ]
 LAND = [
-    pose(hip=14, torso='squash', head='down', far_leg=[(4, 15)], near_leg=[(9, 15)], far_boot=(2, 15), near_boot=(11, 15),
+    pose(hip=14, torso='squash', head='down', far_leg=[(4, 15)], near_leg=[(9, 15)], far_boot=(3, 15), near_boot=(10, 15), hips=False,
          far_arm=[(3, 12), (2, 13), (1, 13)], near_arm=[(12, 12), (13, 13), (14, 13)]),                              # impact: flattened, arms out low
     pose(hip=13, torso='short', head='down', **LEGS_GIVE, far_arm=[(4, 11), (3, 12)], near_arm=[(11, 11), (12, 12)]),   # coming up
     stand(1),                                                                                                       # a little overshoot
 ]
 HURT = pose(hip=13, torso='squash', head='shut', far_leg=[(4, 14)], far_boot=(2, 15), near_leg=[(9, 14)], near_boot=(11, 15),
             far_arm=[(3, 11), (2, 9), (1, 8)], near_arm=[(12, 11), (13, 9), (14, 8)])
-DUCK = pose(hip=14, torso='short', head='down', far_leg=[(4, 15)], near_leg=[(9, 15)], far_boot=(2, 15), near_boot=(11, 15),
-            far_arm=[(4, 12), (4, 14)], near_arm=[(11, 12), (11, 14)])                                              # squat, hands on knees
+DUCK = pose(hip=13, torso='short', head='down', far_leg=[(4, 14)], near_leg=[(9, 14)], far_boot=(3, 15), near_boot=(10, 15),
+            far_arm=[(4, 11), (4, 13)], near_arm=[(11, 11), (11, 13)])                                              # squat, hands on knees
 LOOKUP = stand(1, 'up')
 # skid: facing the new way while the body still slides back, so lean into it and dig both heels in behind
-SKID = pose(hip=13, tx=4, torso='short', hdx=1, far_leg=[(6, 14), (4, 15)], far_boot=(3, 15, 'flat', -1), near_leg=[(8, 14), (7, 15)], near_boot=(6, 15, 'flat', -1),
+SKID = pose(hip=13, tx=4, torso='short', hdx=1, far_leg=[(5, 14)], far_boot=(4, 15), near_leg=[(8, 14)], near_boot=(7, 15),
             far_arm=[(7, 11), (9, 11), (11, 10)], near_arm=[(12, 11), (14, 10), (15, 9)])
 
 # ---------------------------------------------------------------- dashes: a coil, then the body thrown along the dash
@@ -261,12 +267,12 @@ COIL = pose(hip=13, torso='short', head='down', far_leg=[(5, 14)], far_boot=(3, 
             far_arm=[(5, 11), (3, 12)], near_arm=[(10, 11), (8, 12), (7, 13)])
 DASH_SIDE = pose(hip=13, tx=3, torso='flat', hdx=3, far_leg=[(6, 14), (3, 15)], far_boot=(2, 15, 'toe', -1), near_leg=[(7, 14), (4, 14)], near_boot=(2, 14, 'toe', -1),
                  far_arm=[(9, 12), (7, 13)], near_arm=[(11, 12), (13, 12), (15, 11)])
-DASH_UP = pose(hip=13, torso='tall', far_leg=[(6, 14)], far_boot=(6, 15, 'toe'), near_leg=[(8, 14)], near_boot=(8, 15, 'toe'),
+DASH_UP = pose(hip=13, torso='tall', far_leg=[(5, 14)], far_boot=(5, 15, 'toe'), near_leg=[(8, 14)], near_boot=(8, 15, 'toe'),
                far_arm=[(4, 9), (3, 11), (3, 12)], near_arm=[(11, 9), (12, 6), (12, 3), (12, 1)])
 DASH_DOWN = pose(hip=12, torso='mid', head='down', far_leg=[(4, 13), (3, 14)], far_boot=(2, 15, 'flat', -1), near_leg=[(9, 13), (10, 14)], near_boot=(11, 15),
                  far_arm=[(4, 9), (3, 7), (3, 6)], near_arm=[(11, 9), (12, 7), (12, 6)])
-DASH_DIAG_UP = pose(hip=13, tx=3, torso='mid', hdx=2, far_leg=[(6, 14), (4, 15)], far_boot=(3, 15, 'toe', -1), near_leg=[(8, 14), (6, 15)], near_boot=(5, 15, 'toe', -1),
-                    far_arm=[(6, 10), (4, 11), (3, 12)], near_arm=[(11, 10), (13, 7), (14, 5), (15, 4)])
+DASH_DIAG_UP = pose(hip=12, tx=3, torso='mid', hdx=2, far_leg=[(6, 13), (4, 14)], far_boot=(3, 15, 'toe'), near_leg=[(8, 13), (7, 14)], near_boot=(6, 15, 'toe'),
+                    far_arm=[(6, 9), (4, 10), (3, 11)], near_arm=[(11, 9), (13, 6), (14, 4), (15, 3)])
 DASH_DIAG_DOWN = pose(hip=12, tx=3, torso='short', head='down', hdx=2, far_leg=[(5, 13), (6, 14)], far_boot=(6, 15), near_leg=[(8, 13), (10, 14)], near_boot=(11, 15),
                       far_arm=[(5, 10), (3, 9)], near_arm=[(10, 10), (8, 8), (7, 7)])
 
@@ -294,23 +300,23 @@ RUN_LEGS = [   # per phase: hip (belt) row, lead leg, trail leg
     (12, LG(13, """
 .......LL.......
 .........LL.....
-..........KKK...
+..........KK....
 """), LG(13, """
 .....LL.........
-....L...........
-..KK............
+....LL..........
+...KK...........
 """)),                                                                   # contact: lead heel down, trail toe behind
     (13, LG(14, """
 .......LLL......
-.........KKK....
+.........KK.....
 """), LG(13, """
-...KK...........
+....KK..........
 .....LL.........
 """)),                                                                   # down: weight on the lead, trail foot kicks up
     (12, LG(13, """
 ......LL........
 ......LL........
-......KKK.......
+......KK........
 """), LG(13, """
 ........LL......
 .........KK.....
@@ -319,7 +325,7 @@ RUN_LEGS = [   # per phase: hip (belt) row, lead leg, trail leg
 ......LL........
 .....LL.........
 ....LL..........
-..KK............
+...KK...........
 """), LG(12, """
 .......LL.......
 .........LL.....
@@ -334,6 +340,11 @@ RUN_ARMS = [   # per phase, shoulder at (8, torso top): arm on the lead-leg side
 ]
 def leg_grid(P, lg, near):
     row, rows = lg; cells = []
+    rows = [list(r) for r in rows]
+    for r in range(1, len(rows)):                                        # a boot's cuff: the leg pixel above it is boot too
+        for x, ch in enumerate(rows[r]):
+            if ch == 'K' and x < len(rows[r - 1]) and rows[r - 1][x] == 'L': rows[r - 1][x] = 'k'
+    rows = [''.join('K' if c == 'k' else c for c in r) for r in rows]
     for r, s in enumerate(rows):
         for x, ch in enumerate(s):
             if ch == 'L': cells.append((x, row + r, 'Q' if near else 'P'))
