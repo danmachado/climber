@@ -4,7 +4,129 @@
 var fs = require('fs'), d = __dirname;
 var COLS = 27, ROWS = 48, T = 10;
 var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
-  'S': 'start', 'E': 'exit', 'o': 'dash_refill', 'C': 'crumble', 'G': 'gem' };
+  'S': 'start', 'E': 'exit', 'o': 'dash_refill', 'C': 'crumble', 'G': 'gem', 'b': 'backdrop', 'I': 'ice' };
+// Tiles each room's recorded run touches (tests/trialkeep.js writes this). The texture pass keeps clear of them.
+var KEEP = {}; try { KEEP = JSON.parse(fs.readFileSync(d + '/trial-keep.json', 'utf8')); } catch (e) {}
+
+// ---- texture: the layouts are drawn as clean boxes; this pass makes them read as rock ----
+// Everything it does stays a set distance from every tile the recorded run touches, so the run plays the same.
+//  rag:     the frame and big masses grow lumpy outcrops into dead air (low-frequency noise, so lumps not specks)
+//  fillet:  inner corners where a wall meets a floor or a ceiling fill in, one or two steps, so joins look worn round
+//  pocket:  deep inside thick rock, hollows open onto the backdrop (sealed in, nothing can reach them)
+//  back:    ragged panels of dim back wall in the open air, clinging to the rock, for depth (scenery only)
+// opts: { rag: depth in tiles (0 = off), clear: tiles kept from the run, back: amount 0..1, pockets: bool }
+function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function hashStr(t) { var h = 2166136261; for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function noise2(seed, scale) {              // smooth value noise on a coarse lattice, 0..1
+  var R = rng(seed), lat = {};
+  function v(i, j) { var k = i + ',' + j; if (lat[k] === undefined) lat[k] = R(); return lat[k]; }
+  function sm(t) { return t * t * (3 - 2 * t); }
+  return function (c, r) {
+    var x = c / scale, y = r / scale, i = Math.floor(x), j = Math.floor(y), fx = sm(x - i), fy = sm(y - j);
+    var a = v(i, j) + (v(i + 1, j) - v(i, j)) * fx, b = v(i, j + 1) + (v(i + 1, j + 1) - v(i, j + 1)) * fx;
+    return a + (b - a) * fy;
+  };
+}
+function texture(g, id, o) {
+  o = o || {};
+  var rows = g.length, cols = g[0].length, seed = hashStr(id), c, r, k;
+  var keepList = KEEP[id] || null, clear = o.clear === undefined ? 2 : o.clear;
+  var near = [];                              // Chebyshev distance (tiles) to the nearest tile the run touches
+  for (r = 0; r < rows; r++) { near.push([]); for (c = 0; c < cols; c++) near[r].push(keepList ? 99 : 0); }
+  if (keepList) keepList.forEach(function (n) {
+    var kr = Math.floor(n / 100), kc = n % 100;
+    for (var rr = Math.max(0, kr - 4); rr <= Math.min(rows - 1, kr + 4); rr++) for (var cc = Math.max(0, kc - 4); cc <= Math.min(cols - 1, kc + 4); cc++)
+      near[rr][cc] = Math.min(near[rr][cc], Math.max(Math.abs(rr - kr), Math.abs(cc - kc)));
+  });
+  function at(c, r) { return r < 0 || r >= rows || c < 0 || c >= cols ? '#' : g[r][c]; }
+  function solid(c, r) { var t = at(c, r); return t === '#'; }
+  function special(c, r) { var t = at(c, r); return t !== '.' && t !== '#' && t !== 'b'; }
+  function nearSpecial(c, r) { for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) if (special(c + dc, r + dr)) return true; return false; }
+  function open(c, r, m) { return at(c, r) === '.' && near[r][c] >= m && !nearSpecial(c, r); }
+  var added = 0;
+  // air over a spike or flame floor is a pit: rock there would be a new place to stand
+  function overPit(c, r) { for (var rr = r + 1; rr < rows; rr++) { var t = g[rr][c]; if (t === '^' || t === 'F') return true; if (t !== '.' && t !== 'b') return false; } return false; }
+  // rag: outcrops grow from rock that is at least two tiles thick, into dead air
+  if (o.rag && keepList) {
+    var N = noise2(seed, 3.2), N2 = noise2(seed + 7, 1.6);
+    for (k = 1; k <= o.rag; k++) {
+      var grow = [];
+      for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++) {
+        if (!open(c, r, clear)) continue;
+        var from = [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]].filter(function (q) { return solid(q[0], q[1]); });
+        if (!from.length) continue;
+        var thick = from.some(function (q) { var dc = q[0] - c, dr = q[1] - r; return solid(q[0] + dc, q[1] + dr) && solid(q[0] + dc * 2, q[1] + dr * 2); });
+        var under = solid(c, r - 1);               // hanging under a shelf or plate: lumps of rock, like it has weathered
+        if (!thick && !under && k === 1) continue;
+        // anything else makes a new ledge top: well away from the route it can stay bare; nearer, or over a pit,
+        // it gets a crown of spikes so it is never a new place to stand
+        var crown = !under && (near[r][c] < 4 || overPit(c, r));
+        if (crown && (o.crown === false || k > 1 || near[r][c] < 3 || at(c, r - 1) !== '.' || near[r - 1][c] < clear || nearSpecial(c, r - 1))) continue;
+        if (0.65 * N(c, r) + 0.35 * N2(c, r) > 0.42 + k * 0.08) grow.push([c, r]);
+      }
+      grow.forEach(function (q) { g[q[1]][q[0]] = '#'; added++; });
+      grow.forEach(function (q) { var c = q[0], r = q[1]; if (at(c, r - 1) === '.' && (near[r][c] < 4 || overPit(c, r))) g[r - 1][c] = '^'; });
+    }
+    // no lone specks: a grown tile with one solid neighbour or none goes back to air
+    for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++) if (g[r][c] === '#' && near[r][c] >= clear) {
+      var n4 = (solid(c - 1, r) ? 1 : 0) + (solid(c + 1, r) ? 1 : 0) + (solid(c, r - 1) ? 1 : 0) + (solid(c, r + 1) ? 1 : 0);
+      if (n4 <= 1 && !special(c, r)) { var orig = o.base && o.base[r][c]; if (orig === '.') { g[r][c] = '.'; added--; } }
+    }
+  }
+  // rounding: the outer corners of thick rock wear away, one or two steps
+  if (o.round !== false && keepList) {
+    for (k = 0; k < 2; k++) {
+      var cut = [];
+      for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++) {
+        if (g[r][c] !== '#' || near[r][c] < clear || nearSpecial(c, r)) continue;
+        [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) {
+          var dx = q[0], dy = q[1];
+          if (at(c + dx, r) !== '.' || at(c, r + dy) !== '.') return;                 // open on both sides of this corner
+          if (!solid(c - dx, r) || !solid(c, r - dy) || !solid(c - dx, r - dy) || !solid(c - 2 * dx, r) || !solid(c, r - 2 * dy)) return;   // and thick behind it
+          if (rng(seed + c * 131 + r * 17 + k)() < (k ? 0.5 : 0.8)) cut.push([c, r]);
+        });
+      }
+      cut.forEach(function (q) { g[q[1]][q[0]] = '.'; });
+    }
+  }
+  // fillets: an inner corner (rock below or above, and rock beside) fills in, then once more a step out
+  if (o.fillet !== false && keepList) {
+    for (k = 0; k < 2; k++) {
+      var fill = [];
+      for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++) {
+        if (!open(c, r, Math.max(2, clear - 1)) || overPit(c, r)) continue;
+        var vert = solid(c, r + 1) || solid(c, r - 1), side = solid(c - 1, r) || solid(c + 1, r);
+        if (vert && side && rng(seed + r * 31 + c * 7 + k)() < (k ? 0.45 : 0.85)) fill.push([c, r]);
+      }
+      fill.forEach(function (q) { g[q[1]][q[0]] = '#'; added++; });
+    }
+  }
+  // pockets: hollows deep inside thick rock
+  if (o.pockets !== false) {
+    var P = noise2(seed + 3, 2.5), hollow = [];
+    for (r = 2; r < rows - 2; r++) for (c = 2; c < cols - 2; c++) {
+      var deep = true;
+      for (var dr = -2; dr <= 2 && deep; dr++) for (var dc = -2; dc <= 2; dc++) if (!solid(c + dc, r + dr)) { deep = false; break; }
+      if (deep && P(c, r) > 0.64) hollow.push([c, r]);
+    }
+    hollow.forEach(function (q) { g[q[1]][q[0]] = 'b'; });
+  }
+  // backdrop: ragged panels of back wall clinging to the rock
+  var amt = o.back === undefined ? 0.5 : o.back;
+  if (amt > 0) {
+    var B = noise2(seed + 11, 4.5), B2 = noise2(seed + 13, 1.8);
+    var dist = [];                            // distance in tiles to the nearest rock, capped
+    for (r = 0; r < rows; r++) { dist.push([]); for (c = 0; c < cols; c++) dist[r].push(solid(c, r) ? 0 : 9); }
+    for (var pass = 0; pass < 8; pass++) for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++)
+      dist[r][c] = Math.min(dist[r][c], dist[r - 1][c] + 1, dist[r + 1][c] + 1, dist[r][c - 1] + 1, dist[r][c + 1] + 1);
+    for (r = 1; r < rows - 1; r++) for (c = 1; c < cols - 1; c++) {
+      if (g[r][c] !== '.') continue;
+      var v = 0.7 * B(c, r) + 0.3 * B2(c, r) + amt * 0.5 - dist[r][c] * 0.07;
+      if (v > 0.62) g[r][c] = 'b';
+    }
+  }
+  return added;
+}
 
 function Room(id, name, world, difficulty) {
   var g = [], r;
@@ -16,7 +138,9 @@ function Room(id, name, world, difficulty) {
     shell: function () { api.fill(0, 26, 0, 0, '#').fill(0, 0, 0, 47, '#').fill(26, 26, 0, 47, '#').fill(0, 26, 46, 47, '#'); return api; },
     // a waypoint in tiles: the hero's feet must pass through columns c0..c1, rows r0..r1 (stand = on the ground there)
     via: function (c0, r0, c1, r1, stand) { var w = [c0 * T, r0 * T, (c1 + 1) * T, (r1 + 1) * T]; if (stand) w.push('g'); api.wp.push(w); return api; },
+    tex: { rag: 2 },
     done: function () {
+      if (api.tex) { api.tex.base = g.map(function (row) { return row.slice(); }); texture(g, id, api.tex); }
       return { room: { format: 1, id: id, name: name, difficulty: difficulty, world: world, trial: true,
         grid: { cols: COLS, rows: ROWS, tile: T }, legend: LEGEND, tiles: g.map(function (row) { return row.join(''); }), entities: [] },
         route: { wp: api.wp, needs: api.needs } };
@@ -93,7 +217,7 @@ var rooms = [];
 // 4. Pinpoint: three tiers of one-tile posts over spikes, each tier under a spiked ceiling just high enough
 // for a short hop. A full jump is death, so every hop is a tap. The steps between tiers are full jumps.
 (function () {
-  var R = Room('trial-pinpoint', 'Pinpoint', 1, 3).shell();
+  var R = Room('trial-pinpoint', 'Pinpoint', 1, 3).shell(); R.tex.rag = 3;
   function posts(top, cols) { cols.forEach(function (c) { R.fill(c, c, top, top + 3, '#'); }); }
   R.fill(1, 25, 45, 45, '^');
   R.fill(1, 2, 41, 45, '#').put(1, 40, 'S');              // start
@@ -123,7 +247,7 @@ var rooms = [];
 // enough below the next wall's top that a jump and a dash fall short: grab the face, climb most of the meter
 // away, then climb-jump over the spikes. The meter is the puzzle: climb too slowly and it runs out.
 (function () {
-  var R = Room('trial-handhold', 'Handhold', 1, 4).shell();
+  var R = Room('trial-handhold', 'Handhold', 1, 4).shell(); R.tex.rag = 3;
   R.fill(1, 25, 45, 45, '^');
   R.fill(1, 3, 42, 45, '#').put(1, 41, 'S');
   R.fill(7, 8, 22, 45, '#').fill(7, 8, 21, 21, '^').put(6, 36, '#');      // first wall, its nub on the near face
@@ -139,7 +263,7 @@ var rooms = [];
 // jump while holding down: long and low), a climb up the far wall, then a pit too wide for a jump and a dash that a
 // super clears (dash along the ledge, jump: long and high). Neither gap can be crossed any other way.
 (function () {
-  var R = Room('trial-kickback', 'Kickback', 2, 5).shell();
+  var R = Room('trial-kickback', 'Kickback', 2, 5).shell(); R.tex.rag = 4;
   R.fill(1, 1, 14, 45, '>');                              // the left wall is spiked: no climbing up to the exit
   R.put(3, 45, 'S');
   R.fill(6, 18, 45, 45, '^');                             // the low pit
