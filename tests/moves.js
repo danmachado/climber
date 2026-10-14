@@ -1,4 +1,4 @@
-// Wall moves: slide ramp, neutral jump, wall bounce, climb-jump stamina refund.
+// Wall moves: slide ramp, neutral jump, wall bounce, climb-jump stamina refund, super and hyper, the mantle onto a one-tile post.
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
@@ -36,10 +36,20 @@ const { chromium } = require('playwright');
     R.superDash = { vx: Math.round(s.vx), vy: Math.round(s.vy) };
     s = fresh(); for (let i = 0; i < 30; i++) s = G.step(I({ x: -1 }), 1); s = G.step(I({ x: 1, dash: true }), 1); for (let i = 0; i < 5; i++) s = G.step(I({ x: 1, y: 1 }), 1); s = G.step(I({ x: 1, y: 1, jump: true }), 1);
     R.hyper = { vx: Math.round(s.vx), vy: Math.round(s.vy) };
+    // 6 mantle: climb a one-tile post from either side holding up and toward it; the hero pulls up and stands on the post
+    R.mantle = [1, -1].map(dir => {
+      const rows = []; for (let r = 0; r < 48; r++) { let t = ''; for (let c = 0; c < 27; c++) t += (r === 0 || r >= 46 || c === 0 || c === 26) ? '#' : (c === 13 && r >= 38 ? '#' : '.'); rows.push(t); }
+      const sc = dir > 0 ? 6 : 20; rows[45] = rows[45].substring(0, sc) + 'S' + rows[45].substring(sc + 1); rows[4] = rows[4].substring(0, 24) + 'E' + rows[4].substring(25);
+      G.load(Object.assign({}, room, { tiles: rows })); let m;
+      for (let i = 0; i < 40; i++) G.step(I({}), 1); for (let i = 0; i < 80; i++) G.step(I({ x: dir }), 1);
+      for (let i = 0; i < 200; i++) { m = G.step(I({ x: dir, y: -1, grab: true }), 1); if (m.ground && m.y < 380) break; }
+      for (let i = 0; i < 10; i++) m = G.step(I({}), 1);
+      return { x: m.x, y: m.y, ground: m.ground, dead: m.dead };
+    });
     return R;
   });
   console.log(JSON.stringify(out));
-  const ok = out.slide[0] < 40 && out.slide[1] > 60 && out.neutral.backTowardWall && out.directional.stillPushedAway && out.bounce.vy <= -190 && out.bounce.vx <= -200 && out.refund.afterJump < out.refund.before && out.refund.afterPushAway >= out.refund.before - 1 && out.superDash.vx >= 300 && out.superDash.vy <= -120 && out.hyper.vx >= 380 && out.hyper.vy > out.superDash.vy;
+  const ok = out.slide[0] < 40 && out.slide[1] > 60 && out.neutral.backTowardWall && out.directional.stillPushedAway && out.bounce.vy <= -190 && out.bounce.vx <= -200 && out.refund.afterJump < out.refund.before && out.refund.afterPushAway >= out.refund.before - 1 && out.superDash.vx >= 300 && out.superDash.vy <= -120 && out.hyper.vx >= 380 && out.hyper.vy > out.superDash.vy && out.mantle.every(m => m.ground && !m.dead && m.y === 370 && m.x >= 130 && m.x <= 132);
   console.log('all good:', ok, 'errors', JSON.stringify(errs));
   await b.close();
 })();
