@@ -37,6 +37,10 @@
    "name": "Skin shadow",
    "hex": "#B2805A"
   },
+  "T": {
+   "name": "Far arm shadow",
+   "hex": "#9A6D4C"
+  },
   "e": {
    "name": "Eye",
    "hex": "#14101A"

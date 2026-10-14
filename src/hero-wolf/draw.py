@@ -14,7 +14,7 @@ C = {
     'o': '#0D0F18',                                   # outline
     'd': '#2E201C', 'D': '#543A30',                   # hair, hair tuft
     'B': '#F05C46', 'b': '#D93A2E', 'k': '#A0261E',   # bandana highlight, main, knot / shadow
-    's': '#D8A77A', 'S': '#B2805A',                   # skin, skin shadow
+    's': '#D8A77A', 'S': '#B2805A', 'T': '#9A6D4C',   # skin, skin shadow, far arm shadow
     'e': '#14101A',                                   # eye
     'H': '#606E58', 'h': '#3E483A', 'v': '#2C342A',   # shirt highlight, shirt, shirt shadow
     'y': '#CDAA5A',                                   # buckle
@@ -23,7 +23,7 @@ C = {
 }
 NAMES = {
     'o': 'Outline', 'd': 'Hair', 'D': 'Hair tuft', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
-    's': 'Skin', 'S': 'Skin shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
+    's': 'Skin', 'S': 'Skin shadow', 'T': 'Far arm shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
     'y': 'Buckle', 'Q': 'Pants lit', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
 }
 
@@ -163,6 +163,30 @@ class Pose:
                 for ax, ay in ((x - 1, y), (x, y - 1), (x, y + 1)):
                     if (ax, ay) not in mine and self.mask.get((ax, ay)) == sep: self.px(ax, ay, 'o', None)
         for x, y, ch in cells: self.px(x, y, ch, who)
+    def arm(self, pts, near):
+        # Arms taper like a real limb instead of a one-pixel line: the upper arm (shoulder to elbow) is two pixels
+        # thick and shaded, the forearm and hand are one pixel, the hand lit. Light comes from the upper front: on an
+        # upright stretch the front column is lit and the back one in shadow, on a level stretch the top row is lit and
+        # the row under it in shadow. An upright upper arm thickens away from the body's middle (column 7.5) so it
+        # never eats into the torso. The far arm is a shade darker all over.
+        lit, shade = ('s', 'S') if near else ('S', 'T')
+        who = 'na' if near else 'fa'; cells = {}
+        for i in range(len(pts) - 1):
+            (x0, y0), (x1, y1) = pts[i], pts[i + 1]
+            upright = abs(y1 - y0) >= abs(x1 - x0)
+            thick = i == 0 and len(pts) > 2
+            for x, y in line(pts[i], pts[i + 1]):
+                if (x, y) in cells and cells[(x, y)] == lit: continue
+                cells[(x, y)] = shade if thick and upright and ((x + 1 if x >= 7.5 else x - 1) > x) else lit
+                if not thick: continue
+                if upright:
+                    ox = x + 1 if x >= 7.5 else x - 1
+                    if ox > x: cells[(ox, y)] = lit                    # front column lit, this one the back
+                    else: cells.setdefault((ox, y), shade)
+                else: cells.setdefault((x, y + 1), shade)
+        cells[pts[-1]] = lit                                          # the hand
+        for (x, y), ch in cells.items(): self.px(x, y, ch, who)
+
     def boot(self, x, y, near, kind='flat', toe=1, leg=None):
         # Tall, narrow boots (two wide, the width of the leg): a sole on the given row and a cuff on the row above it,
         # where the boot covers the bottom of the leg. The boot sits under the end of the leg, never more than one
@@ -191,7 +215,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
     A boot is (x, y[, kind[, toe]]). The head is placed so its chin row is the row above the torso: it cannot float.
     near_behind: the near arm goes behind the head (hands at the back of the head). shift: move the whole pose sideways."""
     P = Pose(); t = TORSO[torso]; ty = hip - len(t) + 1
-    if far_arm: P.limb(far_arm, 'S', 'fa')
+    if far_arm: P.arm(far_arm, False)
     if far_leg: P.limb(far_leg, 'pP', 'fl', 2)
     if far_boot: P.boot(*far_boot[:2], False, *far_boot[2:], leg=far_leg)
     put(P.fr, t, tx, ty)
@@ -202,9 +226,9 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
         for x in range(min(xs), max(xs) + 1): P.px(x, hip + 1, 'p', 'hip')
     if near_leg: P.limb(near_leg, 'PQ', 'nl', 2, sep='fl')
     if near_boot: P.boot(*near_boot[:2], True, *near_boot[2:], leg=near_leg)
-    if near_arm and near_behind: P.limb(near_arm, 's', 'na')
+    if near_arm and near_behind: P.arm(near_arm, True)
     put(P.fr, HEAD[head], tx + hdx, ty - HEAD_H)
-    if near_arm and not near_behind: P.limb(near_arm, 's', 'na')
+    if near_arm and not near_behind: P.arm(near_arm, True)
     fr = outline(P.fr)
     if shift: fr = [(['.'] * shift + row)[:16] if shift > 0 else (row[-shift:] + ['.'] * -shift) for row in fr]
     return fr
@@ -281,7 +305,7 @@ DASH_DIAG_DOWN = pose(hip=12, tx=3, torso='short', head='down', hdx=2, far_leg=[
 def wall(dy, near_hand, far_hand, near_foot, far_foot, torso='side', tx=2):
     hip = 12 + dy; top = hip - len(TORSO[torso]) + 1
     return pose(hip=hip, tx=tx, torso=torso,
-                far_arm=[(7, top), (10, top + 1), (11, far_hand)], near_arm=[(8, top), (11, top - 1), (11, near_hand), (12, near_hand)],
+                far_arm=[(8, top), (10, top + 1), (11, far_hand)], near_arm=[(9, top), (10, top - 1), (11, top - 2), (11, near_hand), (12, near_hand)],
                 far_leg=[(5, hip + 1), (8, far_foot - 1)], far_boot=(10, far_foot, 'toe'), near_leg=[(6, hip + 1), (8, near_foot - 1)], near_boot=(10, near_foot, 'toe'))
 CLIMB = [
     wall(0, 3, 9, 15, 13),     # near hand high, far knee up
@@ -366,14 +390,14 @@ def run_frame(k):
     lead_arm, other_arm = [[(x, top + y) for x, y in a] for a in RUN_ARMS[ph]]
     near_arm, far_arm = (lead_arm, other_arm) if near_leads else (other_arm, lead_arm)
     P = Pose(); t = TORSO['side']; ty = hip - len(t) + 1; tx = 3
-    P.limb(far_arm, 'S', 'fa')
+    P.arm(far_arm, False)
     leg_grid(P, far, False)
     put(P.fr, t, tx, ty)
     for x in range(16):
         for y in range(ty, hip + 1): P.mask.pop((x, y), None)
     leg_grid(P, near, True)
     put(P.fr, HEAD['normal'], tx + 1, ty - HEAD_H)
-    P.limb(near_arm, 's', 'na')
+    P.arm(near_arm, True)
     return outline(P.fr)
 
 

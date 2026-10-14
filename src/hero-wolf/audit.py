@@ -11,6 +11,8 @@
 #   run cycle      side-on body; the two boots swap front and back (a real stride), the arms swing against the legs,
 #                  the body bobs, and no two frames in a row are the same
 #   squash/stretch landing and spawn start shorter than standing, take-off is taller or the same
+#   arms           arms are shaded limbs, not one-pixel lines: in the idle every arm shows a lit and a shadow tone and
+#                  is two pixels thick somewhere (the upper arm)
 #   feet           boots are tall and narrow: no boot is more than 2 px wide on any row (no skateboard feet)
 #   wall           on the wall animations the hands reach the wall face and the climb alternates hands
 import json, os, sys
@@ -82,6 +84,16 @@ GROUNDED = ['idle', 'idle_look', 'idle_tie', 'idle_flex', 'run', 'land', 'skid',
 for name in GROUNDED:
     for i, g in enumerate(FR[name]):
         if not is_blank(g) and not [x for x, y in cells(g, 'cC') if y == 15]: bad(name, 'frame %d: no boot on the ground row (feet float)' % i)
+
+# ---- arms: shaded and with some thickness ----
+for i, g in enumerate(FR['idle']):
+    sk = [(x, y, c) for x, y, c in body(g) if c in 'sST']
+    for side, xs in (('near', range(10, 16)), ('far', range(0, 6))):
+        arm = [(x, y, c) for x, y, c in sk if x in xs]
+        tones = {c for x, y, c in arm}; rows = {}
+        for x, y, c in arm: rows.setdefault(y, []).append(x)
+        if len(tones) < 2: bad('idle', 'frame %d: the %s arm is one flat tone (no shading)' % (i, side))
+        if not any(len(v) >= 2 for v in rows.values()): bad('idle', 'frame %d: the %s arm is a one-pixel line' % (i, side))
 
 # ---- boots: tall and narrow, never a long flat slab ----
 for name, frames in FR.items():
