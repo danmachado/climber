@@ -26,7 +26,7 @@ ROLES = {
         'spentPairs': [['#F05C46', '#6E7382'], ['#D93A2E', '#5A5F6E'], ['#A0261E', '#40444F']],   # every shade of the band, not just one
         'tired': [['#606E58', '#3E483A'], ['#3E483A', '#2C342A'], ['#D8A77A', '#B2805A'], ['#B2805A', '#8C6244']],   # low stamina: shirt and skin drop a tone
         'trail': ['#D93A2E', '#D8A77A'], 'burst': ['#d93a2e', '#d8a77a'],     # afterimages and the death burst: bandana red, then skin
-        'chain': { 'can': ['#D93A2E', '#F05C46'], 'spent': ['#5A5F6E', '#6E7382'], 'tired': ['#C47F24', '#FFB74A'], 'flash': '#FFFFFF' },   # the simulated tails
+        'chain': { 'can': ['#D93A2E', '#F05C46'], 'spent': ['#5A5F6E', '#6E7382'], 'tired': ['#C47F24', '#FFB74A'], 'flash': '#FFFFFF', 'hair': '#543A30' },   # the simulated tails and the lock of hair
     },
 }
 PACK = HERO_CHOICE if HERO_CHOICE != 'lantern' else 'hero-mustache'           # the lantern still carries a sheet, it just is not switched on

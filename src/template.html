@@ -1338,7 +1338,7 @@
   // with a pull down and back, so the tails hang at rest, stream behind a run, streak on a dash and lift in a fall.
   // Their colour is the dash state: red when a dash is available, grey when spent, a white flash on refill, amber
   // pulse when the arms are tired. Cost: five small rects inside the hero's dirty rectangle, widened a little.
-  var chain = { a: [], b: [], flash: 0, can: true };
+  var chain = { a: [], b: [], h: [], flash: 0, can: true };   // a, b: the two bandana tails; h: a lock of hair off the back of the head
   function stepTail(n, len, an, facing, ph, droop, back) {
     var i, t = tick / 60, speed = Math.min(1, (Math.abs(pl.vx) + Math.abs(pl.vy) * 0.6) / 180), up = Math.max(0, pl.vy) / 220;   // up: falling or sliding lifts the cloth
     if (n.length !== len || Math.abs(n[0].x - an.x) > 24 || Math.abs(n[0].y - an.y) > 24) { n.length = 0; for (i = 0; i < len; i++) n.push({ x: an.x - facing * i, y: an.y + i, wy: 0 }); }
@@ -1353,14 +1353,15 @@
     }
   }
   function stepChain(an, facing) {
-    stepTail(chain.a, 4, an, facing, 0, 1.2, 1.1);                          // long tail: streams back (about 6 px)
-    stepTail(chain.b, 3, { x: an.x, y: an.y + 1 }, facing, 2.6, 1.5, 0.5);   // short tail: starts a pixel lower, hangs straighter (about 4 px)
+    stepTail(chain.a, 5, an, facing, 0, 0.7, 1.2);                          // two tails, six pixels each, one pixel tall: stream back, hang a little when still
+    stepTail(chain.b, 5, { x: an.x, y: an.y + 1 }, facing, 2.6, 1.0, 0.8);   // the lower one starts a pixel lower and hangs straighter
+    chain.an3 = { x: an.x + facing, y: an.y - 2 };
+    stepTail(chain.h, 3, chain.an3, facing, 1.3, 0.5, 0.9);               // hair: short, from the back of the head above the knot, streams in a run
     var can = pl.dashes > 0;
     if (can && !chain.can) chain.flash = 0.12;
     chain.can = can; if (chain.flash > 0) chain.flash -= STEP;
   }
-  // A ribbon: pixel lines from the knot through each node, two pixels wide near the head and one at the tip, with a
-  // one pixel dark outline so it reads as cloth against anything. Outlines of both tails first, then the colour.
+  // A ribbon: one pixel lines from the knot through each node (pad widens it, used for nothing now).
   var rib = { x0: 0, y0: 0, x1: 0, y1: 0 };
   function ribbon(an, n, pad) {
     var px = an.x, py = an.y, i, k, steps, x, y, sz;
@@ -1379,8 +1380,8 @@
     var k = HERO.chain; if (!k || !chain.a.length) return;
     var col = chain.flash > 0 ? [k.flash, k.flash] : shaky() ? (Math.floor(tick / 6) % 2 ? k.tired : [k.tired[0], k.tired[0]]) : chain.can ? k.can : k.spent;
     rib.x0 = rib.y0 = 1e9; rib.x1 = rib.y1 = -1e9;
-    var an2 = { x: an.x, y: an.y + 1 };
-    g.fillStyle = '#0d0f18'; ribbon(an2, chain.b, 1); ribbon(an, chain.a, 1);
+    var an2 = { x: an.x, y: an.y + 1 }, an3 = chain.an3 || an;
+    g.fillStyle = k.hair || '#543a30'; ribbon(an3, chain.h, 0);                 // one pixel lines, no outline: two thin tails and a lock of hair
     g.fillStyle = col[0]; ribbon(an2, chain.b, 0); ribbon(an, chain.a, 0);
     g.fillStyle = col[1]; g.fillRect(Math.round(chain.a[0].x), Math.round(chain.a[0].y + chain.a[0].wy), 1, 1);   // one lit pixel where the knot pulls tight
     mark(rib.x0, rib.y0, rib.x1 - rib.x0, rib.y1 - rib.y0);
@@ -1472,7 +1473,7 @@
     if (hero.ready) {
       if (p >= 0.3) {
         var st = (p - 0.3) / 0.7 * (HERO.anims.spawn.n / HERO.anims.spawn.fps), an = heroAnchor('spawn', st, fx.x, fx.y, 1);
-        if (an) { chain.a.length = chain.b.length = 0; stepChain(an, 1); drawChain(an); }     // tails start fresh at the knot
+        if (an) { chain.a.length = chain.b.length = chain.h.length = 0; stepChain(an, 1); drawChain(an); }     // tails start fresh at the knot
         drawHero('spawn', st, fx.x, fx.y, 1, 0);
       }
       return;

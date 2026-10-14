@@ -26,57 +26,58 @@ def G(s): return [r for r in s.strip('\n').split('\n')]
 
 # ---- parts (facing right) ----
 # ---- parts (facing right). Built like a heavy: a swept mass of dark hair with the band cutting across it, a small
-# face under the band with no eyes (a squint shadow instead), shoulders wider than the head, bare arms, a wide stance
+# face under a band no wider than the face, hair tufts spiking up and out the back, a nose pixel at the front of the
+# face and no eyes (a squint shadow instead), shoulders wider than the head, bare arms, a wide stance
 # and heavy boots. The dark masses (hair, boots, outline) carry the silhouette. ----
 HEAD = {
     'normal': G("""
-..ooooo..
-.odddddo.
-odddDdddo
-kodBBBBBo
-.obbbbbbo
+..o.o.o..
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
 .oSSSSSo.
-.oSsssso.
+.oSsssSo.
 ..oSSSo..
 """),
     'blink': G("""
-..ooooo..
-.odddddo.
-odddDdddo
-kodBBBBBo
-.obbbbbbo
+..o.o.o..
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
 .oSSSSSo.
-.oSsssso.
+.oSsssSo.
 ..oSSSo..
 """),
     'up': G("""
-..ooooo..
-.odddddo.
-odddDdddo
-kodBBBBBo
-.obbbbbbo
+..o.o.o..
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
 .oSSsSSo.
-.oSsssso.
+.oSsssSo.
 ..oSSSo..
 """),
     'profile': G("""
-..ooooo..
-.odddddo.
-odddDdddo
-kodBBBBBo
-.obbbbbbo
+..o.o.o..
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
 .odSSSSo.
-.oSsssso.
+.oSsssSo.
 ..oSSSo..
 """),
     'shut': G("""
-..ooooo..
-.odddddo.
-odddDdddo
-kodBBBBBo
-.obbbbbbo
+..o.o.o..
+.odDdddo.
+oddddddo.
+oddddddo.
+kobBBBBo.
 .oSSSSSo.
-.oSSsSso.
+.oSSsSSo.
 ..oSSSo..
 """),
 }
