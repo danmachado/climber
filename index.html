@@ -329,41 +329,64 @@
       else if (kind === 'town') { for (i = 0; i < w / 9; i++) { x = Math.floor(rnd() * w); var wy = between(4, hm[x] - 3); if (hm[x] > 8 && wy > 0) b.fillRect(x, h - wy, 1, 2); } } // a few dim windows
       else { for (x = 0; x < w; x++) if (hm[x] > 2) b.fillRect(x, h - 2, 1, 2); }                       // a lip of glow at the cave floor
     }
+    // The night city reads by value, not by detail: the farthest towers are a pale haze barely darker than the sky,
+    // each nearer row is a clear step darker, and the terrain in front is darkest of all, so the play layer always
+    // stands out. Every row keeps to one hue; its detail (roof edges, ledges, pipes, air-con boxes, balconies, window
+    // panes) is drawn a single tone lighter or darker than its wall, never in a new colour. The saturated colours
+    // (cyan, magenta, gold) belong to the signs, the lit windows and the play layer. The near row catches the neon
+    // as a thin rim of light down its edges. TH.city overrides the palette.
+    var CP = th.city || {
+      haze: { body: '#8a79c9', hi: '#998ad3', lo: '#7b6abc', pane: '#7f6ec0', win: ['#e8defa', '#c9f2ff'], winA: 0.45 },
+      mid: { body: '#6956ad', hi: '#7a68bb', lo: '#5a479e', pane: '#6150a6', win: ['#ffd27a', '#9fe9ff'], winA: 0.6 },
+      near: { body: '#3e3079', hi: '#4d3e8c', lo: '#30245f', pane: '#382b70', win: ['#ffd27a', '#7fe9ff'], winA: 0.9, rimL: 'rgba(86,216,238,0.3)', rimR: 'rgba(255,90,190,0.16)' },
+      beam: ['rgba(214,204,250,0.18)', 'rgba(232,226,255,0.22)'], cloud: 'rgba(255,255,255,0.07)'
+    };
     if (kind === 'towers') {                                 // one pale beam tower far back, and two soft cloud bands
       var bx = between(60, w - 60), bw = between(8, 14), bh = Math.round(h0 * 0.9);
-      b.fillStyle = 'rgba(120,200,230,0.12)'; b.fillRect(bx, h - bh, bw, bh); b.fillStyle = 'rgba(160,230,255,0.16)'; b.fillRect(bx + 2, h - bh, bw - 4, bh);
-      b.fillStyle = 'rgba(255,255,255,0.05)'; for (i = 0; i < 2; i++) { var cy = Math.round(h - h0 * (0.5 + i * 0.3)), cx = between(0, w / 2), cwid = between(60, 150); b.fillRect(cx, cy, cwid, 2); b.fillRect(cx + 10, cy - 2, cwid - 30, 2); }
+      b.fillStyle = CP.beam[0]; b.fillRect(bx, h - bh, bw, bh); b.fillStyle = CP.beam[1]; b.fillRect(bx + 2, h - bh, bw - 4, bh);
+      b.fillStyle = CP.cloud; for (i = 0; i < 2; i++) { var cy = Math.round(h - h0 * (0.5 + i * 0.3)), cx = between(0, w / 2), cwid = between(60, 150); b.fillRect(cx, cy, cwid, 2); b.fillRect(cx + 10, cy - 2, cwid - 30, 2); }
     }
     if (kind === 'towers') {                                 // the city fills the screen: we are down in it, towers rising past the top
-      // Three depths. Each is a row of separate buildings with streets between them, so the band behind shows
-      // through the gaps; the far row is hazed toward the sky, the near row is darkest. Windows come in clusters:
-      // a building picks which floors are lit and a floor is lit as a run, so the lights read as offices, not noise.
-      function cityRow(bc, wc, col, alpha, top, gapMin, gapMax, pitch, warm, cool, winA, roofs, store, floorsOut) {
-        // bc: where the buildings go, wc: where their windows go. floorsOut collects every window slot (lit or not),
-        // a floor at a time, so the game can switch runs of office lights on and off later.
+      // Three rows of separate buildings with streets between them, so the row behind shows through the gaps.
+      // Windows come in clusters: a building picks which floors are lit and a floor is lit as a run, so the lights
+      // read as offices, not noise; every window slot has a dark pane, so a facade reads as a grid even when dark.
+      function cityRow(bc, wc, P, top, gapMin, gapMax, pitch, detail, roofs, store, floorsOut) {
+        // bc: where the buildings go, wc: where their lit windows go. floorsOut collects every window slot (lit or
+        // not), a floor at a time, so the game can switch runs of office lights on and off later.
         var x0 = -between(0, 20), blds = [];
         while (x0 < w) {
-          var bw2 = between(16, 54), bh2 = between(Math.round(top * 0.45), top), gap = between(gapMin, gapMax);
-          bc.globalAlpha = alpha; bc.fillStyle = col; bc.fillRect(x0, h - bh2, bw2, bh2);
-          if (roofs) {                                      // a roofline: a mast, a water tank or a stack of boxes
+          var bw2 = between(16, 54), bh2 = between(Math.round(top * 0.45), top), gap = between(gapMin, gapMax), ty = h - bh2;
+          bc.fillStyle = P.body; bc.fillRect(x0, ty, bw2, bh2);
+          if (roofs) {                                      // a roofline: a mast, a water tank or a stack of boxes, lit on top
             var rv = rnd();
-            if (rv < 0.3) bc.fillRect(x0 + between(2, bw2 - 3), h - bh2 - between(6, 16), 1, 16);
-            else if (rv < 0.55) { bc.fillRect(x0 + between(2, Math.max(2, bw2 - 8)), h - bh2 - 5, 6, 5); }
-            else if (rv < 0.75) { bc.fillRect(x0 + 2, h - bh2 - 3, bw2 - 4, 3); }
+            if (rv < 0.3) { var mx = x0 + between(2, bw2 - 3), mh = between(6, 16); bc.fillRect(mx, ty - mh, 1, mh); bc.fillStyle = P.hi; bc.fillRect(mx, ty - mh, 1, 1); }
+            else if (rv < 0.55) { var tx = x0 + between(2, Math.max(2, bw2 - 8)); bc.fillRect(tx, ty - 5, 6, 5); bc.fillStyle = P.hi; bc.fillRect(tx, ty - 5, 6, 1); bc.fillStyle = P.lo; bc.fillRect(tx + 1, ty - 1, 1, 1); bc.fillRect(tx + 4, ty - 1, 1, 1); }
+            else if (rv < 0.75) { bc.fillRect(x0 + 2, ty - 3, bw2 - 4, 3); bc.fillStyle = P.hi; bc.fillRect(x0 + 2, ty - 3, bw2 - 4, 1); }
           }
-          bc.globalAlpha = 1;
+          bc.fillStyle = P.hi; bc.fillRect(x0, ty, bw2, 1);  // the parapet catches the sky
           var floors = [], f, fy, sz = pitch > 3 ? 2 : 1;
-          for (fy = h - bh2 + 3; fy < h - 3; fy += pitch) floors.push(rnd() < 0.18 ? 0.55 : (rnd() < 0.4 ? 0.12 : 0.015));   // a few lit floors, some quiet ones, most dark
+          for (fy = ty + 3; fy < h - 3; fy += pitch) floors.push(rnd() < 0.18 ? 0.55 : (rnd() < 0.4 ? 0.12 : 0.015));   // a few lit floors, some quiet ones, most dark
           for (f = 0; f < floors.length; f++) {
-            fy = h - bh2 + 3 + f * pitch; var on = rnd() < floors[f] ? 1 : 0, slots = [];
+            fy = ty + 3 + f * pitch; var on = rnd() < floors[f] ? 1 : 0, slots = [];
+            if (detail && f % 4 === 3) { bc.fillStyle = P.hi; bc.fillRect(x0, fy - 2, bw2, 1); bc.fillStyle = P.lo; bc.fillRect(x0, fy - 1, bw2, 1); }   // a ledge every few floors
             for (x = x0 + 2; x < x0 + bw2 - 2; x += pitch) {
               if (rnd() < 0.25) on = rnd() < floors[f] ? 1 : 0;          // lights run in groups along a floor
-              var wcol = rnd() < 0.15 ? cool : warm;
-              if (on) { wc.globalAlpha = winA; wc.fillStyle = wcol; wc.fillRect(x, fy, sz, sz); wc.globalAlpha = 1; }
-              if (floorsOut && x >= 0 && x + sz <= w) slots.push({ x: x, y: fy, s: sz, col: wcol, a: winA, on: !!on });
+              var wcol = rnd() < 0.15 ? P.win[1] : P.win[0];
+              if (P.pane) { bc.fillStyle = P.pane; bc.fillRect(x, fy, sz, sz); }
+              if (on) { wc.globalAlpha = P.winA; wc.fillStyle = wcol; wc.fillRect(x, fy, sz, sz); wc.globalAlpha = 1; }
+              if (floorsOut && x >= 0 && x + sz <= w) slots.push({ x: x, y: fy, s: sz, col: wcol, a: P.winA, on: !!on });
             }
             if (floorsOut && slots.length >= 2) floorsOut.push(slots);
           }
+          if (detail) {                                      // a drainpipe down one side, and a few air-con boxes and balconies on the face
+            var pxp = rnd() < 0.5 ? x0 + 1 : x0 + bw2 - 2; bc.fillStyle = P.lo; bc.fillRect(pxp, ty + 2, 1, bh2 - 2);
+            for (var k = between(1, 3); k > 0; k--) {
+              var ax = x0 + between(2, Math.max(2, bw2 - 6)), ay = ty + 4 + between(0, Math.max(0, bh2 - 12)), bal = rnd() < 0.4;
+              if (bal) { bc.fillStyle = P.hi; bc.fillRect(ax, ay, 5, 1); bc.fillStyle = P.lo; bc.fillRect(ax, ay + 1, 1, 2); bc.fillRect(ax + 2, ay + 1, 1, 2); bc.fillRect(ax + 4, ay + 1, 1, 2); }
+              else { bc.fillStyle = P.hi; bc.fillRect(ax, ay, 3, 2); bc.fillStyle = P.lo; bc.fillRect(ax, ay + 2, 3, 1); bc.fillRect(ax + 1, ay + 1, 1, 1); }
+            }
+          }
+          if (P.rimL) { bc.fillStyle = P.rimL; bc.fillRect(x0, ty + 1, 1, bh2 - 1); bc.fillStyle = P.rimR; bc.fillRect(x0 + bw2 - 1, ty + 1, 1, bh2 - 1); }   // neon catching the edges
           if (store) blds.push([x0, bw2, bh2]);
           x0 += bw2 + gap;
         }
@@ -371,13 +394,13 @@
       }
       var Lf = L ? L.far : b, Lfw = L ? L.farWin : b, Ln = L ? L.near : b, Lnw = L ? L.nearWin : b, Lc = L ? L.cables : b;
       var winFloors = [];
-      cityRow(Lf, Lf, far[0], 0.55, Math.round(h0 * 0.8), 2, 6, 3, '#f0d9a0', '#9fe3ff', 0.2, false, false, null);
-      var mid = cityRow(Lf, Lfw, far[0], 0.85, Math.round(h0 * 0.95), 4, 10, 4, '#ffd27a', '#38f0ff', 0.4, true, true, winFloors), nMid = winFloors.length;
-      var near = cityRow(Ln, Lnw, far[1], 1, Math.round(h0 * 1.05), 8, 16, 4, '#ffd27a', '#38f0ff', 0.6, true, true, winFloors);
+      cityRow(Lf, Lf, CP.haze, Math.round(h0 * 0.8), 2, 6, 3, false, false, false, null);
+      var mid = cityRow(Lf, Lfw, CP.mid, Math.round(h0 * 0.95), 4, 10, 4, true, true, true, winFloors), nMid = winFloors.length;
+      var near = cityRow(Ln, Lnw, CP.near, Math.round(h0 * 1.05), 8, 16, 4, true, true, true, winFloors);
       for (i = 0; i < near.length; i++) {                    // street level: a warm haze at the foot of every gap, and a sign on some faces
         var nb = near[i], gx = nb[0] + nb[1];
         if (i + 1 < near.length) { var gw = near[i + 1][0] - gx; drawGlow(Ln, gx + gw / 2, h, 14 + gw, '255,170,90', 0.22); Ln.fillStyle = '#ffd27a'; Ln.fillRect(gx + Math.floor(gw / 2), h - 18, 1, 1); Ln.fillStyle = '#2a2240'; Ln.fillRect(gx + Math.floor(gw / 2), h - 17, 1, 17); }
-        if (nb[1] >= 24 && rnd() < 0.7) SKY_SIGNS.push([nb[0] + between(2, nb[1] - 22), h - between(14, nb[2] - 10)]);
+        if (nb[1] >= 24 && rnd() < 0.7) SKY_SIGNS.push([nb[0] + between(2, nb[1] - 22), h - between(14, nb[2] - 10), rnd() < 0.35]);
       }
       var cables = [];                                       // overhead cables sagging across the alley; one may carry a string of bulbs
       for (i = 0; i < 4; i++) { var cy0 = between(Math.round(h0 * 0.1), Math.round(h0 * 0.6)), cy1 = cy0 + between(-30, 30), sag = between(6, 18); cables.push({ y0: cy0, y1: cy1, sag: sag, bulbs: false, ph: between(0, 999), period: between(34, 52) }); }
@@ -448,7 +471,7 @@
     b.fillStyle = '#07070f'; b.fillRect(s.x, s.y, s.w, s.h);
     b.fillStyle = frameCol; b.fillRect(s.x, s.y, s.w, 1); b.fillRect(s.x, s.y + s.h - 1, s.w, 1); b.fillRect(s.x, s.y, 1, s.h); b.fillRect(s.x + s.w - 1, s.y, 1, s.h);
     b.fillStyle = dim; b.fillRect(s.x + 1, s.y + 1, s.w - 2, 1);
-    for (i = 0; i < s.n; i++) { if (i === off) continue; b.fillStyle = glyphCol; drawGlyph(b, s.x + 2 + i * 4, s.y + 2, s.g[(i + shift) % s.n]); }
+    for (i = 0; i < s.n; i++) { if (i === off) continue; b.fillStyle = glyphCol; if (s.vert) drawGlyph(b, s.x + 2, s.y + 2 + i * 6, s.g[(i + shift) % s.n]); else drawGlyph(b, s.x + 2 + i * 4, s.y + 2, s.g[(i + shift) % s.n]); }
   }
   function signFrame(s, tick) {
     var t = tick + s.phase;
@@ -466,13 +489,13 @@
     function wall(cc, rr) { var ch = cell(cc, rr); return ch === '#'; }
     function inner(cc, rr) { for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) if (!wall(cc + dx, rr + dy)) return false; return true; }
     function free(cc, rr, n) { for (var k = 0; k < n; k++) if (used[(rr) * 100 + cc + k]) return false; return true; }
-    function add(x, y, n, v, onWall) {
+    function add(x, y, n, v, onWall, vert) {
       var cols2 = ['cyan', 'magenta', 'gold', 'red'], col = cols2[Math.floor(v * 97) % 4], g = [], k;
       for (k = 0; k < n; k++) g.push(Math.floor(tileHash(x * 3 + k, y * 7 + salt) * 16));
       var kv = tileHash(x + salt * 7, y + 13), kind = kv < 0.45 ? 'still' : (kv < 0.6 ? 'buzz' : (kv < 0.75 ? 'pulse' : (kv < 0.9 ? 'scroll' : 'cycle')));
-      var sg = { x: x, y: y, n: n, g: g, col: col, alt: col === 'cyan' ? 'magenta' : 'cyan', kind: kind, phase: Math.floor(v * 1000), period: 120 + Math.floor(v * 240), w: 4 * n + 3, h: 9, wall: onWall };
+      var sg = { x: x, y: y, n: n, g: g, col: col, alt: col === 'cyan' ? 'magenta' : 'cyan', kind: kind, phase: Math.floor(v * 1000), period: 120 + Math.floor(v * 240), w: vert ? 7 : 4 * n + 3, h: vert ? 6 * n + 3 : 9, wall: onWall, vert: !!vert };
       signs.push(sg); drawSign(b, sg, 0);
-      if (!onWall) drawGlow(b, x + sg.w / 2, y + 5, 10, SIGN_COLS[col][3], 0.18);
+      if (!onWall) drawGlow(b, x + sg.w / 2, y + sg.h / 2, vert ? 8 + n * 2 : 10, SIGN_COLS[col][3], 0.18);
       cnt++;
     }
     for (r = 1; r < rows - 2; r++) for (c = 1; c < cols - 1; c++) {
@@ -486,9 +509,9 @@
       }
     }
     for (i = 0; i < SKY_SIGNS.length; i++) {               // on the far towers: smaller, and behind the terrain
-      var p = SKY_SIGNS[i], vv = tileHash(p[0] + salt, p[1]); var nn = 2 + Math.floor(vv * 3);
-      var okSky = true; for (r = Math.floor(p[1] / 10); r <= Math.floor((p[1] + 9) / 10); r++) for (c = Math.floor(p[0] / 10); c <= Math.floor((p[0] + 4 * nn + 3) / 10); c++) if (cell(c, r) !== '.' ) okSky = false;
-      if (okSky) add(p[0], p[1], nn, vv, false);
+      var p = SKY_SIGNS[i], vv = tileHash(p[0] + salt, p[1]); var nn = 2 + Math.floor(vv * 3), vt = !!p[2] && nn >= 3, sw = vt ? 7 : 4 * nn + 3, shh = vt ? 6 * nn + 3 : 9;   // some hang vertically down a facade
+      var okSky = true; for (r = Math.floor(p[1] / 10); r <= Math.floor((p[1] + shh - 1) / 10); r++) for (c = Math.floor(p[0] / 10); c <= Math.floor((p[0] + sw) / 10); c++) if (cell(c, r) !== '.' ) okSky = false;
+      if (okSky) add(p[0], p[1], nn, vv, false, vt);
     }
     for (i = 0; i < 6; i++) {                                // blinking far windows
       var dv = tileHash(i * 17 + salt, salt * 3 + i), dx = Math.floor(dv * (cols * 10 - 20)) + 10, dr = rows - 3 - Math.floor(tileHash(i + salt, dv * 1000) * 8);
@@ -697,8 +720,8 @@
       sky: ['#040b14', '#0d2238', '#204d6c'], far: ['#143148', '#091826', '#5a93b6'], skyline: 'peaks' },
     jungle: { tiles: 'jungle', bg: '#07141a', dot: '#1a3a3c', back: ['#123a2a', '#0a2419', '#1f5a3c'], accent: '#ff4fa3', accentLo: '#b8306f',
       sky: ['#0a2a4a', '#0e5f78', '#3ec6b8'], far: ['#0d3a30', '#071e18', '#2b7a4a'], skyline: 'pyramid' },
-    neon: { tiles: 'neon', bg: '#0c0a1e', dot: '#3a2a5a', back: ['#13112b', '#0b0a1c', '#221e44'], backKind: 'windows', accent: '#ff3ab8', accentLo: '#b01f7c',
-      sky: ['#140828', '#3e1868', '#9a3a8c'], far: ['#241446', '#140b2e', '#38f0ff'], skyline: 'towers' }
+    neon: { tiles: 'neon', bg: '#0c0a1e', dot: '#c4b8f2', back: ['#13112b', '#0b0a1c', '#221e44'], backKind: 'windows', accent: '#ff3ab8', accentLo: '#b01f7c',
+      sky: ['#24194e', '#4f3f94', '#a592dc'], far: ['#241446', '#140b2e', '#38f0ff'], skyline: 'towers' }   // a lavender night: the far city is light haze, the play layer stays darkest
   };
   function worldOf(room) { var n = (room && room.world) | 0; return WORLDS[n - 1] ? n : 1; }
   function themeOf(room) { return THEMES[WORLDS[worldOf(room) - 1].theme] || THEMES.brick; }
@@ -1745,7 +1768,8 @@
     for (var i = 0; i < signs.length; i++) {
       var sg = signs[i], f = signFrame(sg, tick);
       if (f !== sg.shown) { sg.shown = f; mark(sg.x - 1, sg.y - 1, sg.w + 2, sg.h + 2); }
-      if (f) { if (sg.kind === 'dot') drawDot(g, sg, f); else drawSign(g, sg, f); }
+      if (sg.kind === 'dot') { if (!f) drawDot(g, sg, 0); }                       // a far window: lit on frame 0, gone (the baked picture) on 1
+      else if (f) drawSign(g, sg, f);
     }
   }
   // ---- city life (Neon Row): the still city with a few small things moving in it ----

@@ -1091,7 +1091,8 @@
     for (var i = 0; i < signs.length; i++) {
       var sg = signs[i], f = signFrame(sg, tick);
       if (f !== sg.shown) { sg.shown = f; mark(sg.x - 1, sg.y - 1, sg.w + 2, sg.h + 2); }
-      if (f) { if (sg.kind === 'dot') drawDot(g, sg, f); else drawSign(g, sg, f); }
+      if (sg.kind === 'dot') { if (!f) drawDot(g, sg, 0); }                       // a far window: lit on frame 0, gone (the baked picture) on 1
+      else if (f) drawSign(g, sg, f);
     }
   }
   // ---- city life (Neon Row): the still city with a few small things moving in it ----

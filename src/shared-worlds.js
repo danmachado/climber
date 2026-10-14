@@ -22,8 +22,8 @@
       sky: ['#040b14', '#0d2238', '#204d6c'], far: ['#143148', '#091826', '#5a93b6'], skyline: 'peaks' },
     jungle: { tiles: 'jungle', bg: '#07141a', dot: '#1a3a3c', back: ['#123a2a', '#0a2419', '#1f5a3c'], accent: '#ff4fa3', accentLo: '#b8306f',
       sky: ['#0a2a4a', '#0e5f78', '#3ec6b8'], far: ['#0d3a30', '#071e18', '#2b7a4a'], skyline: 'pyramid' },
-    neon: { tiles: 'neon', bg: '#0c0a1e', dot: '#3a2a5a', back: ['#13112b', '#0b0a1c', '#221e44'], backKind: 'windows', accent: '#ff3ab8', accentLo: '#b01f7c',
-      sky: ['#140828', '#3e1868', '#9a3a8c'], far: ['#241446', '#140b2e', '#38f0ff'], skyline: 'towers' }
+    neon: { tiles: 'neon', bg: '#0c0a1e', dot: '#c4b8f2', back: ['#13112b', '#0b0a1c', '#221e44'], backKind: 'windows', accent: '#ff3ab8', accentLo: '#b01f7c',
+      sky: ['#24194e', '#4f3f94', '#a592dc'], far: ['#241446', '#140b2e', '#38f0ff'], skyline: 'towers' }   // a lavender night: the far city is light haze, the play layer stays darkest
   };
   function worldOf(room) { var n = (room && room.world) | 0; return WORLDS[n - 1] ? n : 1; }
   function themeOf(room) { return THEMES[WORLDS[worldOf(room) - 1].theme] || THEMES.brick; }
