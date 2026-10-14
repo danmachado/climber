@@ -7,6 +7,7 @@
     brick: { face: '#4a5ad0', deep: '#2a3590', hi: '#aab6ff', side: '#6d7be6', lo: '#2a348c', line: '#1e2666', core: '#141a3e', infill: '#1b2254', mark: '#5a6ad8', moss: '#5f9a74' },
     frost: { face: '#587a9e', deep: '#345070', hi: '#f4fcff', side: '#86a9c9', lo: '#2a4361', line: '#243d58', core: '#0e1f33', infill: '#14283c', mark: '#7a9ab8', snow: '#f4fcff', snowLo: '#b9d9ec', icicle: '#a8d6ee' },
     ember: { face: '#8c3b2c', deep: '#542016', hi: '#ffb48c', side: '#b9573e', lo: '#4c1c15', line: '#3a1410', core: '#1c0c0a', infill: '#2c1311', mark: '#a84a30', soot: '#2b0f0c', drip: '#d4531f', dripHi: '#ff9a3c' },
+    jungle: { face: '#d9c23a', deep: '#a8922a', hi: '#fff39a', side: '#e8d45a', lo: '#6b5a14', line: '#1a1408', core: '#2a2410', infill: '#3a3214', mark: '#c4ad30', vine: '#2fa84f', vineLo: '#1c6b32', glyph: '#1a1408' },
     ice:   { face: '#86cdee', hi: '#f2fdff', side: '#b9e8fa', lo: '#3f86bd', line: '#5eb0dd', core: '#102c44', infill: '#1b4866' }
   };
   var SOLID_KIND = { '#': 'brick', 'I': 'ice' };
@@ -63,6 +64,8 @@
       var k = Math.floor(v * 4), marks = [], mi;
       if (kind === 'brick') {                               // joints of large stones
         marks = k === 0 ? [[2, 5, 6, 1], [4, 2, 1, 3]] : k === 1 ? [[1, 4, 5, 1], [6, 4, 1, 4]] : k === 2 ? [[3, 6, 5, 1], [5, 3, 1, 3]] : [[4, 1, 1, 6]];
+      } else if (kind === 'jungle') {                       // carved glyph fragments and heavy mortar
+        marks = k === 0 ? [[2, 4, 3, 1], [3, 5, 1, 2], [2, 7, 3, 1]] : k === 1 ? [[5, 3, 1, 4], [4, 5, 3, 1]] : k === 2 ? [[2, 3, 5, 1], [6, 4, 1, 3]] : [[3, 6, 4, 1], [4, 3, 2, 2]];
       } else if (kind === 'frost') {                        // hairline cracks and a frost fleck
         marks = k === 0 ? [[3, 4, 1, 3], [4, 7, 2, 1]] : k === 1 ? [[2, 5, 3, 1], [6, 3, 1, 2]] : k === 2 ? [[5, 2, 1, 4]] : [[3, 6, 4, 1]];
       } else {                                              // cracks running down through the rock
@@ -128,6 +131,10 @@
     } else if (S.moss) {
       if (up && a > 0.62) { var mx = 1 + Math.floor(d * 6); b.fillStyle = S.moss; b.fillRect(x + mx, y, 2 + Math.floor(e * 3), 1); b.fillRect(x + mx + 1, y - 1, 1, 1); }
       if (lf && e > 0.8) { b.fillStyle = S.moss; b.fillRect(x, y + 2 + Math.floor(a * 6), 1, 2); }
+    } else if (S.vine) {
+      if (up && a > 0.55) { var vx = 1 + Math.floor(d * 6); b.fillStyle = S.vine; b.fillRect(x + vx, y, 3, 1); b.fillRect(x + vx + 1, y - 1, 1, 1); b.fillStyle = S.vineLo; b.fillRect(x + vx + 2, y, 1, 1); }
+      if (dn && d > 0.6) { var vy = 2 + Math.floor(e * 4); b.fillStyle = S.vineLo; b.fillRect(x + 2 + Math.floor(a * 6), y + 10, 1, vy); b.fillStyle = S.vine; b.fillRect(x + 2 + Math.floor(a * 6) + (e > 0.5 ? 1 : -1), y + 10 + vy - 1, 1, 1); }
+      if ((lf || rt) && e > 0.75) { b.fillStyle = S.vine; b.fillRect(lf ? x : x + 9, y + 1 + Math.floor(a * 6), 1, 3); }
     } else if (S.soot) {
       if (up && d > 0.5) { var ox = Math.floor(a * 7); b.fillStyle = S.soot; b.fillRect(x + ox, y, 2 + Math.floor(e * 3), 1); }
       if (dn && a > 0.68) { var px = 1 + Math.floor(e * 8), ph = 2 + Math.floor(d * 3); b.fillStyle = S.drip; b.fillRect(x + px, y + 10, 1, ph); b.fillStyle = S.dripHi; b.fillRect(x + px, y + 10, 1, 1); }
@@ -215,6 +222,10 @@
         var pts = [[0, between(Math.round(top * 0.2), top)]];
         for (x0 = 0; x0 < w;) { x0 += between(22, 60); pts.push([Math.min(x0, w + 20), between(Math.round(top * 0.15), top)]); }
         for (i = 0; i + 1 < pts.length; i++) for (x = pts[i][0]; x < pts[i + 1][0] && x < w; x++) hm[x] = Math.round(pts[i][1] + (pts[i + 1][1] - pts[i][1]) * (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0]));
+      } else if (kind === 'pyramid') {                      // one big stepped pyramid and a few palms
+        var pw = between(60, 90), pxc = between(60, w - 60), steps = 6, sh = Math.round(top / steps);
+        for (x = 0; x < w; x++) { var dx = Math.abs(x - pxc), lvl = Math.max(0, steps - Math.ceil(dx / (pw / 2 / steps))); hm[x] = lvl * sh; }
+        for (x = 0; x < w;) { x += between(14, 40); if (Math.abs(x - pxc) > pw / 2 + 6 && x < w) { var th = between(Math.round(top * 0.3), Math.round(top * 0.7)); hm[x] = th; hm[x + 1] = th; for (var fr = -5; fr <= 5; fr++) if (x + fr >= 0 && x + fr < w) hm[x + fr] = Math.max(hm[x + fr], th - Math.abs(fr) * 2 + (fr ? 0 : 2)); } }
       } else {                                              // cave: narrow jagged spires
         for (x0 = 0; x0 < w; x0 += seg) {
           seg = between(2, 7); hh = between(Math.round(top * 0.15), top);
@@ -230,6 +241,7 @@
       if (!cap) return;
       b.fillStyle = cap;
       if (kind === 'peaks') { for (x = 0; x < w; x++) if (hm[x] > top * 0.62) b.fillRect(x, h - hm[x], 1, 1); } // snow on the summits
+      else if (kind === 'pyramid') { for (x = 0; x < w; x++) if (hm[x] > 0 && hm[x] !== hm[x - 1]) b.fillRect(x, h - hm[x], 1, hm[x] > 6 ? 2 : 1); }   // the lit edge of each step
       else if (kind === 'town') { for (i = 0; i < w / 9; i++) { x = Math.floor(rnd() * w); var wy = between(4, hm[x] - 3); if (hm[x] > 8 && wy > 0) b.fillRect(x, h - wy, 1, 2); } } // a few dim windows
       else { for (x = 0; x < w; x++) if (hm[x] > 2) b.fillRect(x, h - 2, 1, 2); }                       // a lip of glow at the cave floor
     }
@@ -251,7 +263,7 @@
   // props drop from a wall bottom, lamps sit on a wall side (and cast a painted glow), backdrop props sit inside a
   // patch of backdrop. All of it stays dim and desaturated so hazards and pickups keep the brightest colours.
   // at(c, r) returns the level character of a cell ('#' off the map). Returns the lamps so callers can light them.
-  var DECAL_GLOW = { brick: '255,190,110', frost: '150,220,255', ember: '255,140,70' };
+  var DECAL_GLOW = { brick: '255,190,110', frost: '150,220,255', ember: '255,140,70', jungle: '255,90,170' };
   function drawDecals(b, cols, rows, at, seed) {
     var kind = TILE_THEME.tiles, lamps = [], c, r, salt = (seed % 1000) | 0;
     function wall(cc, rr) { var ch = at(cc, rr); return ch === '#' || ch === 'I'; }
@@ -269,6 +281,9 @@
       if (kind === 'frost') {                                 // a crystal cluster, or a drift of snow
         if (t < 0.5) { b.fillStyle = '#a8d6ee'; b.fillRect(x + 3, y + 5, 2, 5); b.fillRect(x + 6, y + 7, 2, 3); b.fillRect(x + 1, y + 8, 2, 2); b.fillStyle = '#f4fcff'; b.fillRect(x + 3, y + 5, 1, 2); b.fillRect(x + 6, y + 7, 1, 1); }
         else { b.fillStyle = '#dceef8'; b.fillRect(x + 1, y + 8, 8, 2); b.fillRect(x + 3, y + 7, 4, 1); b.fillStyle = '#f4fcff'; b.fillRect(x + 3, y + 7, 2, 1); }
+      } else if (kind === 'jungle') {                        // a rifle crate, or a clump of leaves
+        if (t < 0.5) { b.fillStyle = '#1a1408'; b.fillRect(x + 2, y + 5, 6, 5); b.fillStyle = '#6b5a14'; b.fillRect(x + 3, y + 6, 4, 3); b.fillStyle = '#1a1408'; b.fillRect(x + 5, y + 6, 1, 3); }
+        else { b.fillStyle = '#1c6b32'; b.fillRect(x + 2, y + 7, 6, 3); b.fillRect(x + 4, y + 5, 2, 2); b.fillStyle = '#2fa84f'; b.fillRect(x + 3, y + 7, 2, 1); b.fillRect(x + 6, y + 8, 2, 1); }
       } else if (kind === 'ember') {                         // ember stones, or a cracked slab
         if (t < 0.5) { b.fillStyle = '#4c1c15'; b.fillRect(x + 2, y + 7, 3, 3); b.fillRect(x + 6, y + 8, 3, 2); b.fillStyle = '#c25a24'; b.fillRect(x + 3, y + 8, 1, 1); b.fillRect(x + 7, y + 9, 1, 1); }
         else { b.fillStyle = '#5e2419'; b.fillRect(x + 1, y + 8, 7, 2); b.fillStyle = '#2b0f0c'; b.fillRect(x + 4, y + 8, 1, 2); }
@@ -280,18 +295,21 @@
     function hangProp(x, y, t) {
       var h = 4 + Math.floor(t * 6);
       if (kind === 'frost') { b.fillStyle = '#86a9c9'; b.fillRect(x + 4, y, 1, h); b.fillStyle = '#dceef8'; b.fillRect(x + 3, y + h - 1, 3, 2); }          // a frozen chain and knot
+      else if (kind === 'jungle') { b.fillStyle = '#1c6b32'; b.fillRect(x + 4, y, 1, h); b.fillStyle = '#2fa84f'; b.fillRect(x + 3, y + 2, 1, 1); b.fillRect(x + 5, y + h - 2, 1, 1); b.fillRect(x + 3, y + h, 3, 1); }   // a hanging vine with leaves
       else if (kind === 'ember') { b.fillStyle = '#4c1c15'; for (var i = 0; i < h; i += 2) b.fillRect(x + 4 + (i % 4 ? 1 : 0), y + i, 1, 2); b.fillStyle = '#7a3a2a'; b.fillRect(x + 3, y + h, 3, 2); } // a hanging chain
       else { b.fillStyle = '#3f7a56'; b.fillRect(x + 3, y, 1, h); b.fillRect(x + 6, y, 1, h - 2); b.fillStyle = '#4f8a64'; b.fillRect(x + 2, y + 2, 1, 1); b.fillRect(x + 7, y + 3, 1, 1); b.fillRect(x + 4, y + h - 1, 1, 1); } // ivy
     }
     function lamp(x, y, side) {
       var lx = side < 0 ? x : x + 7;
       if (kind === 'frost') { b.fillStyle = '#2a4361'; b.fillRect(lx, y + 2, 3, 1); b.fillRect(lx + 1, y + 3, 1, 1); b.fillStyle = '#9fe3ff'; b.fillRect(lx, y + 4, 3, 3); b.fillStyle = '#f4fcff'; b.fillRect(lx + 1, y + 5, 1, 1); }
+      else if (kind === 'jungle') { b.fillStyle = '#1a1408'; b.fillRect(lx + 1, y + 3, 1, 5); b.fillStyle = '#ff4fa3'; b.fillRect(lx, y + 1, 3, 3); b.fillStyle = '#ffd6ea'; b.fillRect(lx + 1, y + 1, 1, 2); }   // a flare torch, pink
       else if (kind === 'ember') { b.fillStyle = '#2b0f0c'; b.fillRect(lx + 1, y + 3, 1, 5); b.fillStyle = '#e2491f'; b.fillRect(lx, y + 1, 3, 3); b.fillStyle = '#ffe08a'; b.fillRect(lx + 1, y + 1, 1, 2); }
       else { b.fillStyle = '#161c4a'; b.fillRect(lx, y + 2, 3, 1); b.fillRect(lx + 1, y + 3, 1, 1); b.fillStyle = '#ffb74a'; b.fillRect(lx, y + 4, 3, 3); b.fillStyle = '#fff1c4'; b.fillRect(lx + 1, y + 5, 1, 1); }
       lamps.push({ x: lx + 1.5, y: y + 5 });
     }
     function backProp(x, y, t) {
       if (kind === 'frost') { b.fillStyle = '#1f4460'; b.fillRect(x + 2, y + 2, 6, 6); b.fillStyle = '#2f6a8a'; b.fillRect(x + 3, y + 3, 4, 4); b.fillStyle = '#5a93b6'; b.fillRect(x + 4, y + 4, 1, 1); }   // a frosted pane
+      else if (kind === 'jungle') { b.fillStyle = '#1a1408'; b.fillRect(x + 1, y + 1, 8, 8); b.fillStyle = '#6b5a14'; b.fillRect(x + 2, y + 2, 6, 6); b.fillStyle = '#1a1408'; b.fillRect(x + 4, y + 3, 2, 1); b.fillRect(x + 3, y + 5, 1, 2); b.fillRect(x + 6, y + 5, 1, 2); }   // a carved glyph block
       else if (kind === 'ember') { b.fillStyle = '#2b0f0c'; b.fillRect(x + 1, y + 2, 8, 6); b.fillStyle = '#4a2119'; for (var i = 0; i < 3; i++) b.fillRect(x + 2, y + 3 + i * 2, 6, 1); }              // a vent grate
       else { b.fillStyle = '#0f1432'; b.fillRect(x + 2, y + 1, 6, 8); b.fillStyle = t < 0.5 ? '#2d3576' : '#4a3a2a'; b.fillRect(x + 3, y + 2, 4, 6); b.fillStyle = '#0f1432'; b.fillRect(x + 5, y + 2, 1, 6); b.fillRect(x + 3, y + 5, 4, 1); } // a boarded window
     }
