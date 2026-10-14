@@ -926,6 +926,7 @@
     return c;
   }
   var buf = makeCanvas(LW, LH), g = buf.getContext('2d');
+  g.imageSmoothingEnabled = false;                      // stretched sprites stay crisp pixel art
   var hud = makeCanvas(LW, LH), h = hud.getContext('2d');
   var CW = 45, CH = 48, chunks = [], dirtyNow = [], dirtyPrev = [], allDirty = true;
   // The chunks live in a "world" layer as tall as the room. A tall room scrolls by sliding that layer with a
@@ -1315,7 +1316,9 @@
     }
   }
   // Squash and stretch: one scale on the whole sprite (tails included) that eases back to 1, Celeste's numbers.
-  function squash(x, y) { hero.sx = x; hero.sy = y; }
+  // Only ever stretch. A 16 px sprite shrunk by 0.6 loses columns, so one-pixel legs vanish and the boots look
+  // detached; a stretch duplicates rows and stays whole. Squash reads as a wider hero, not a shorter one.
+  function squash(x, y) { hero.sx = Math.max(1, x); hero.sy = Math.max(1, y); }
   function easeScale(dt) {
     var r = 1.75 * dt;
     hero.sx += Math.max(-r, Math.min(r, 1 - hero.sx)); hero.sy += Math.max(-r, Math.min(r, 1 - hero.sy));
