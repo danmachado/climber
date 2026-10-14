@@ -467,8 +467,14 @@
   // line on screen.
   var SKY_SIGNS = [];                                      // spots inside the near towers where drawDecals may hang a sign (set by drawSky)
   function skyHash(s) { var h = 7; s = String(s || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0) || 1; }
-  function drawSky(b, w, h, h0, seed) {
+  // L (optional, the game passes it for the towers skyline): separate canvases for the city's depths, so a few small
+  // things can move between them. L.far: the two far rows; L.farWin: the middle row's windows; L.near: the near row;
+  // L.nearWin: its windows; L.cables: the overhead cables; L.rain: the baked rain (the front layer). Without L every
+  // depth is painted straight into b, which is what the builder does. Either way the picture is the same.
+  var CITY = null;                                         // what the game can bring to life (set by drawSky for the towers skyline)
+  function drawSky(b, w, h, h0, seed, L) {
     var th = TILE_THEME, sky = th.sky, far = th.far, i, x;
+    CITY = null;
     if (!sky) { b.fillStyle = th.bg || '#0a0d1c'; b.fillRect(0, 0, w, h); return; }
     var gr = b.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, sky[0]); gr.addColorStop(Math.max(0, 1 - h0 / h), sky[1]); gr.addColorStop(1, sky[2]);
@@ -532,55 +538,83 @@
       // Three depths. Each is a row of separate buildings with streets between them, so the band behind shows
       // through the gaps; the far row is hazed toward the sky, the near row is darkest. Windows come in clusters:
       // a building picks which floors are lit and a floor is lit as a run, so the lights read as offices, not noise.
-      function cityRow(col, alpha, top, gapMin, gapMax, pitch, warm, cool, winA, roofs, store) {
+      function cityRow(bc, wc, col, alpha, top, gapMin, gapMax, pitch, warm, cool, winA, roofs, store, floorsOut) {
+        // bc: where the buildings go, wc: where their windows go. floorsOut collects every window slot (lit or not),
+        // a floor at a time, so the game can switch runs of office lights on and off later.
         var x0 = -between(0, 20), blds = [];
         while (x0 < w) {
           var bw2 = between(16, 54), bh2 = between(Math.round(top * 0.45), top), gap = between(gapMin, gapMax);
-          b.globalAlpha = alpha; b.fillStyle = col; b.fillRect(x0, h - bh2, bw2, bh2);
+          bc.globalAlpha = alpha; bc.fillStyle = col; bc.fillRect(x0, h - bh2, bw2, bh2);
           if (roofs) {                                      // a roofline: a mast, a water tank or a stack of boxes
             var rv = rnd();
-            if (rv < 0.3) b.fillRect(x0 + between(2, bw2 - 3), h - bh2 - between(6, 16), 1, 16);
-            else if (rv < 0.55) { b.fillRect(x0 + between(2, Math.max(2, bw2 - 8)), h - bh2 - 5, 6, 5); }
-            else if (rv < 0.75) { b.fillRect(x0 + 2, h - bh2 - 3, bw2 - 4, 3); }
+            if (rv < 0.3) bc.fillRect(x0 + between(2, bw2 - 3), h - bh2 - between(6, 16), 1, 16);
+            else if (rv < 0.55) { bc.fillRect(x0 + between(2, Math.max(2, bw2 - 8)), h - bh2 - 5, 6, 5); }
+            else if (rv < 0.75) { bc.fillRect(x0 + 2, h - bh2 - 3, bw2 - 4, 3); }
           }
-          b.globalAlpha = 1;
-          var floors = [], f, fy;
+          bc.globalAlpha = 1;
+          var floors = [], f, fy, sz = pitch > 3 ? 2 : 1;
           for (fy = h - bh2 + 3; fy < h - 3; fy += pitch) floors.push(rnd() < 0.18 ? 0.55 : (rnd() < 0.4 ? 0.12 : 0.015));   // a few lit floors, some quiet ones, most dark
           for (f = 0; f < floors.length; f++) {
-            fy = h - bh2 + 3 + f * pitch; var on = rnd() < floors[f] ? 1 : 0;
+            fy = h - bh2 + 3 + f * pitch; var on = rnd() < floors[f] ? 1 : 0, slots = [];
             for (x = x0 + 2; x < x0 + bw2 - 2; x += pitch) {
               if (rnd() < 0.25) on = rnd() < floors[f] ? 1 : 0;          // lights run in groups along a floor
-              if (on) { b.globalAlpha = winA; b.fillStyle = rnd() < 0.15 ? cool : warm; b.fillRect(x, fy, pitch > 3 ? 2 : 1, pitch > 3 ? 2 : 1); b.globalAlpha = 1; }
+              var wcol = rnd() < 0.15 ? cool : warm;
+              if (on) { wc.globalAlpha = winA; wc.fillStyle = wcol; wc.fillRect(x, fy, sz, sz); wc.globalAlpha = 1; }
+              if (floorsOut && x >= 0 && x + sz <= w) slots.push({ x: x, y: fy, s: sz, col: wcol, a: winA, on: !!on });
             }
+            if (floorsOut && slots.length >= 2) floorsOut.push(slots);
           }
           if (store) blds.push([x0, bw2, bh2]);
           x0 += bw2 + gap;
         }
         return blds;
       }
-      cityRow(far[0], 0.55, Math.round(h0 * 0.8), 2, 6, 3, '#f0d9a0', '#9fe3ff', 0.2, false, false);
-      cityRow(far[0], 0.85, Math.round(h0 * 0.95), 4, 10, 4, '#ffd27a', '#38f0ff', 0.4, true, false);
-      var near = cityRow(far[1], 1, Math.round(h0 * 1.05), 8, 16, 4, '#ffd27a', '#38f0ff', 0.6, true, true);
+      var Lf = L ? L.far : b, Lfw = L ? L.farWin : b, Ln = L ? L.near : b, Lnw = L ? L.nearWin : b, Lc = L ? L.cables : b;
+      var winFloors = [];
+      cityRow(Lf, Lf, far[0], 0.55, Math.round(h0 * 0.8), 2, 6, 3, '#f0d9a0', '#9fe3ff', 0.2, false, false, null);
+      var mid = cityRow(Lf, Lfw, far[0], 0.85, Math.round(h0 * 0.95), 4, 10, 4, '#ffd27a', '#38f0ff', 0.4, true, true, winFloors), nMid = winFloors.length;
+      var near = cityRow(Ln, Lnw, far[1], 1, Math.round(h0 * 1.05), 8, 16, 4, '#ffd27a', '#38f0ff', 0.6, true, true, winFloors);
       for (i = 0; i < near.length; i++) {                    // street level: a warm haze at the foot of every gap, and a sign on some faces
         var nb = near[i], gx = nb[0] + nb[1];
-        if (i + 1 < near.length) { var gw = near[i + 1][0] - gx; drawGlow(b, gx + gw / 2, h, 14 + gw, '255,170,90', 0.22); b.fillStyle = '#ffd27a'; b.fillRect(gx + Math.floor(gw / 2), h - 18, 1, 1); b.fillStyle = '#2a2240'; b.fillRect(gx + Math.floor(gw / 2), h - 17, 1, 17); }
+        if (i + 1 < near.length) { var gw = near[i + 1][0] - gx; drawGlow(Ln, gx + gw / 2, h, 14 + gw, '255,170,90', 0.22); Ln.fillStyle = '#ffd27a'; Ln.fillRect(gx + Math.floor(gw / 2), h - 18, 1, 1); Ln.fillStyle = '#2a2240'; Ln.fillRect(gx + Math.floor(gw / 2), h - 17, 1, 17); }
         if (nb[1] >= 24 && rnd() < 0.7) SKY_SIGNS.push([nb[0] + between(2, nb[1] - 22), h - between(14, nb[2] - 10)]);
       }
-      b.fillStyle = '#07060f';                               // overhead cables sagging across the alley
-      for (i = 0; i < 4; i++) { var cy0 = between(Math.round(h0 * 0.1), Math.round(h0 * 0.6)), cy1 = cy0 + between(-30, 30), sag = between(6, 18); for (x = 0; x < w; x++) { var tt = x / w; b.fillRect(x, Math.round(cy0 + (cy1 - cy0) * tt + Math.sin(tt * Math.PI) * sag), 1, 1); } }
+      var cables = [];                                       // overhead cables sagging across the alley; one may carry a string of bulbs
+      for (i = 0; i < 4; i++) { var cy0 = between(Math.round(h0 * 0.1), Math.round(h0 * 0.6)), cy1 = cy0 + between(-30, 30), sag = between(6, 18); cables.push({ y0: cy0, y1: cy1, sag: sag, bulbs: false, ph: between(0, 999), period: between(34, 52) }); }
+      if (rnd() < 0.7) cables[between(0, 3)].bulbs = true;
+      for (i = 0; i < cables.length; i++) drawCable(Lc, cables[i], 0, w);
+      var tallest = 0; for (i = 0; i < mid.length; i++) tallest = Math.max(tallest, mid[i][2]);
+      CITY = { floors: winFloors, nMid: nMid, cables: cables, w: w, h: h, h0: h0, cityTop: h - tallest, near: near, mid: mid };
     } else {
       band(far[0], Math.round(h0 * 0.34), far[2]);
       band(far[1], Math.round(h0 * 0.2), kind === 'cave' ? far[2] : null);
     }
     if (kind === 'towers') {                                 // baked rain: thin diagonal streaks at two densities, still, like a held frame
-      b.fillStyle = 'rgba(200,220,255,0.10)';
-      for (i = 0; i < 90 * (h / 480); i++) { x = Math.floor(rnd() * w); var ry = Math.floor(rnd() * h), rl = between(5, 10); for (var k = 0; k < rl; k++) b.fillRect(x - (k >> 2), ry + k, 1, 1); }
-      b.fillStyle = 'rgba(200,220,255,0.05)';
-      for (i = 0; i < 140 * (h / 480); i++) { x = Math.floor(rnd() * w); ry = Math.floor(rnd() * h); rl = between(3, 6); for (k = 0; k < rl; k++) b.fillRect(x - (k >> 2), ry + k, 1, 1); }
+      var Lr = L ? L.rain : b;
+      Lr.fillStyle = 'rgba(200,220,255,0.10)';
+      for (i = 0; i < 90 * (h / 480); i++) { x = Math.floor(rnd() * w); var ry = Math.floor(rnd() * h), rl = between(5, 10); for (var k = 0; k < rl; k++) Lr.fillRect(x - (k >> 2), ry + k, 1, 1); }
+      Lr.fillStyle = 'rgba(200,220,255,0.05)';
+      for (i = 0; i < 140 * (h / 480); i++) { x = Math.floor(rnd() * w); ry = Math.floor(rnd() * h); rl = between(3, 6); for (k = 0; k < rl; k++) Lr.fillRect(x - (k >> 2), ry + k, 1, 1); }
     }
     if (kind === 'cave') {                                   // stalactites hang from the top of the room
       b.fillStyle = far[0];
       for (x = 0; x < w;) { var sw = between(3, 9), sh = between(4, Math.round(h0 * 0.12)); for (i = 0; i < sw; i++) b.fillRect(x + i, 0, 1, Math.max(1, sh - Math.abs(i - sw / 2) * 2)); x += sw + between(0, 10); }
+    }
+  }
+  // One overhead cable across the room, sagging in the middle. off adds to the sag (the game sways it by a pixel or so
+  // in the wind). A cable with bulbs carries a small light every 7 px, hung a pixel under it, warm and pink in turn.
+  // x0, x1: only the columns in that range are painted (the game repaints just the part that moved).
+  function cableY(cb, x, w, off) { var t = x / w; return Math.round(cb.y0 + (cb.y1 - cb.y0) * t + Math.sin(t * Math.PI) * (cb.sag + off * Math.sin(t * Math.PI))); }
+  function drawCable(b, cb, off, w, x0, x1) {
+    var x, y; x0 = x0 || 0; x1 = x1 === undefined ? w : x1;
+    b.fillStyle = '#07060f';
+    for (x = x0; x < x1; x++) b.fillRect(x, cableY(cb, x, w, off), 1, 1);
+    if (!cb.bulbs) return;
+    for (x = Math.max(3, x0); x < x1; x++) {
+      if ((x - 3) % 7) continue;
+      y = cableY(cb, x, w, off) + 1;
+      b.fillStyle = '#07060f'; b.fillRect(x, y, 1, 1);
+      b.fillStyle = ((x - 3) / 7) % 2 ? '#ff7ad0' : '#ffd27a'; b.fillRect(x, y + 1, 1, 1);
     }
   }
   // Painted light: a soft disc baked into the static layer under anything that glows. Nothing is computed per frame.
