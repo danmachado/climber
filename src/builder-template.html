@@ -137,6 +137,8 @@
             <button type="button" data-v="fireballs" aria-pressed="true">Fireballs</button>
             <button type="button" data-v="jets" aria-pressed="true">Fire jets</button>
             <button type="button" data-v="lava" aria-pressed="true">Rising lava</button>
+            <button type="button" data-v="lasers" aria-pressed="true">Lasers</button>
+            <button type="button" data-v="drones" aria-pressed="true">Drones</button>
             <button type="button" data-v="crumble" aria-pressed="true">Crumble</button>
             <button type="button" data-v="movers" aria-pressed="true">Platforms</button>
             <button type="button" data-v="zips" aria-pressed="true">Zip movers</button>
@@ -225,6 +227,7 @@
     ['Terrain', [['#', 'Solid', '1'], ['I', 'Ice', '2'], ['C', 'Crumble', '3']]],
     ['Spikes', [['^', 'Up', '4'], ['v', 'Down', '5'], ['<', 'Left', '6'], ['>', 'Right', '7']]],
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y'], ['J', 'Fire jet', 'H'], ['~', 'Lava', 'V']]],
+    ['Temple', [['L', 'Laser', 'F'], ['O', 'Drone', 'G']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
@@ -323,6 +326,8 @@
     else if (ch === 'G') drawGemIcon(b, x, y);
     else if (ch === 'k') drawKey(b, x, y);
     else if (ch === 'J') { drawVent(b, x, y); if (icon) drawJetWarn(b, x, y, 1); }
+    else if (ch === 'L') { drawEmitter(b, x, y); if (icon) { b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y, 2, 5); } }
+    else if (ch === 'O') drawDrone(b, x, y, 1, 0);
     else if (ch === '~') drawLava(b, x, y, icon || r === 0 || tiles[r - 1][c] !== '~');
     else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);
@@ -601,7 +606,7 @@
     var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
-    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava');
+    if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava'); if (st.lasers) bits.push(st.lasers + (st.lasers === 1 ? ' laser' : ' lasers')); if (st.drones) bits.push(st.drones + (st.drones === 1 ? ' drone' : ' drones'));
     changed(); say('Built room ' + seed + ': ' + bits.join(', ') + '. Undo brings back what you had.');
   }
   $('g-go').addEventListener('click', function () { autoBuild(Math.floor(Math.random() * 90000) + 10000); });

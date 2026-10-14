@@ -42,7 +42,7 @@
     bounceH: 170 * K, bounceV: -160 * K, bounceVarTime: 0.25, bounceForce: 0.2, bounceCheck: 5,   // wall bounce: dash up beside a wall, then jump
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K,
     stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
-    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, zipSpeed: 160, zipWind: 0.1, zipRest: 0.5, zipBack: 45, jetOff: 1.3, jetWarn: 0.35, jetOn: 0.75, lavaRise: 5, lavaDelay: 15, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
+    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, zipSpeed: 160, zipWind: 0.1, zipRest: 0.5, zipBack: 45, jetOff: 1.3, jetWarn: 0.35, jetOn: 0.75, droneSpeed: 40, droneWait: 0.6, droneFire: 0.3, lavaRise: 5, lavaDelay: 15, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
   };
 
   var C = {
@@ -150,7 +150,7 @@
   }
 
   var room, T, cols, rows, grid, spawn, hazards, exits, refills, tileLayer;
-  var crumbles = [], crumbleAt = {}, movers = [], tracks = [], backs = {}, flames = [], fireballs = [], springs = [], gems = [], roomKeys = [], doors = [], doorAt = {}, jets = [], lava = null;
+  var crumbles = [], crumbleAt = {}, movers = [], tracks = [], backs = {}, flames = [], fireballs = [], springs = [], gems = [], roomKeys = [], doors = [], doorAt = {}, jets = [], drones = [], lava = null;
   var KIND = { '#': 1, 'I': 2, 'C': 3, 'D': 4 }; // 1 brick, 2 ice, 3 crumbling block, 4 locked door
 
   function buildRoom(data) {
@@ -162,7 +162,7 @@
     room = data; T = data.grid.tile; cols = data.grid.cols; rows = data.grid.rows;
     setRoomHeight(rows * T);
     grid = []; hazards = []; exits = []; refills = []; spawn = { x: T, y: T };
-    crumbles = []; crumbleAt = {}; movers = []; tracks = []; backs = {}; flames = []; fireballs = []; springs = []; gems = []; roomKeys = []; doors = []; doorAt = {}; jets = []; lava = null;
+    crumbles = []; crumbleAt = {}; movers = []; tracks = []; backs = {}; flames = []; fireballs = []; springs = []; gems = []; roomKeys = []; doors = []; doorAt = {}; jets = []; drones = []; lava = null;
     for (var r = 0; r < rows; r++) {
       grid.push([]);
       for (var c = 0; c < cols; c++) {
@@ -183,11 +183,12 @@
         else if (ch === 'k') roomKeys.push({ x: x, y: y, state: 'idle', fx: x, fy: y });                 // a key: follows you and opens the first door you touch
         else if (ch === 'D') { var dr = { c: c, r: r, x: x, y: y, open: false, t: 0, dirty: true }; doors.push(dr); doorAt[r * cols + c] = dr; }   // a locked door: solid until a key is brought to it
         else if (ch === 'F') { hazards.push({ x: x + 2, y: y + 4, w: 6, h: 6, dir: 4, tx: x, ty: y }); flames.push({ x: x, y: y }); }   // a flame on the ground
-        else if (ch === 'J') jets.push({ x: x, y: y, ph: (c * 0.55) % (P.jetOff + P.jetWarn + P.jetOn), on: false, warn: false });   // a fire jet: a vent that fires a column on a cycle
+        else if (ch === 'J' || ch === 'L') jets.push({ x: x, y: y, ph: (c * 0.55) % (P.jetOff + P.jetWarn + P.jetOn), on: false, warn: false, laser: ch === 'L' });   // a fire jet (or a laser emitter in the Temple): fires a column on a cycle
+        else if (ch === 'O') drones.push({ x: x, y: y, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, fire: 0 });   // a patrol drone: rides a track, fires straight down at each stop
         else if (ch === '~') { if (!lava) lava = { y0: y, y: y }; else lava.y0 = lava.y = Math.min(lava.y0, y); }                  // lava: everything below the top lava tile, and it rises
       }
     }
-    findMovers(data.tiles); findFireballs(data.tiles);
+    findMovers(data.tiles); findFireballs(data.tiles); findDrones(data.tiles);
     drawTileLayer();
   }
 
@@ -218,6 +219,7 @@
     for (i = 0; i < crumbles.length; i++) { crumbles[i].state = 'idle'; crumbles[i].t = 0; crumbles[i].dirty = true; }
     for (i = 0; i < movers.length; i++) { var m = movers[i]; m.x = m.x0; m.y = m.y0; m.dir = m.dir0; m.wait = 0; m.rem = 0; m.vx = 0; m.vy = 0; m.zs = 'idle'; }
     for (i = 0; i < fireballs.length; i++) { var f = fireballs[i]; f.x = f.x0; f.y = f.y0; f.dir = f.dir0; f.wait = 0; f.rem = 0; }
+    for (i = 0; i < drones.length; i++) { var dn = drones[i]; dn.x = dn.x0; dn.dir = dn.dir0; dn.wait = 0; dn.rem = 0; dn.fire = 0; }
     for (i = 0; i < springs.length; i++) springs[i].t = 0;
     for (i = 0; i < gems.length; i++) { gems[i].state = 'idle'; gems[i].fx = gems[i].x; gems[i].fy = gems[i].y; }
     for (i = 0; i < roomKeys.length; i++) { roomKeys[i].state = 'idle'; roomKeys[i].fx = roomKeys[i].x; roomKeys[i].fy = roomKeys[i].y; }
@@ -293,6 +295,30 @@
       fireballs.push(f);
     }
   }
+  function findDrones(t) {
+    function at(c, r) { return (r >= 0 && r < rows && c >= 0 && c < cols) ? t[r].charAt(c) : ''; }
+    for (var i = 0; i < drones.length; i++) {
+      var f = drones[i], c = f.x / T, r = f.y / T, a = c, b = c;
+      while (at(a - 1, r) === '-') a--; while (at(b + 1, r) === '-') b++;
+      if (a < c || b > c) { f.axis = 'x'; f.min = a * T; f.max = b * T; f.dir = (b - c) >= (c - a) ? 1 : -1; }
+      f.x0 = f.x; f.dir0 = f.dir;
+    }
+  }
+  function stepDrones(dt) {
+    for (var i = 0; i < drones.length; i++) {
+      var f = drones[i];
+      if (f.fire > 0) { f.fire -= dt; continue; }
+      if (f.wait > 0) { f.wait -= dt; if (f.wait <= 0 && f.x === f.x0) f.fire = P.droneFire; continue; }   // at its home end: pause, then a burst downward; the far end is just a pause
+      if (!f.axis || f.min === f.max) continue;
+      f.rem += P.droneSpeed * dt;
+      var n = Math.floor(f.rem); f.rem -= n;
+      while (n-- > 0) {
+        if ((f.dir > 0 && f.x >= f.max) || (f.dir < 0 && f.x <= f.min)) { f.dir = -f.dir; f.wait = P.droneWait; f.rem = 0; break; }
+        f.x += f.dir;
+      }
+    }
+  }
+  function droneBeam(f) { return { x: f.x + 4, y: f.y + T, w: 2, h: 3 * T }; }
   function stepFireballs(dt) {
     for (var i = 0; i < fireballs.length; i++) {
       var f = fireballs[i];
@@ -540,7 +566,7 @@
     if (pl.freeze > 0) { pl.freeze -= dt; return; }
 
     pl.inX = inp.x; pl.inY = inp.y;                       // what is being held, for the pose picker (render only)
-    stepMovers(dt); stepCrumbles(dt); stepFireballs(dt);
+    stepMovers(dt); stepCrumbles(dt); stepFireballs(dt); stepDrones(dt);
     if (pl.dead) return;
     pl.dashCooldown -= dt;
     var wasGround = pl.onGround;
@@ -670,6 +696,7 @@
     }
     for (i = 0; i < doors.length; i++) if (doors[i].t > 0) doors[i].t -= dt;
     for (i = 0; i < jets.length; i++) if (jetPhase(jets[i]).on && overlap(jetRect(jets[i]), pl.x, pl.y, pl.w, pl.h)) { die(); return; }
+    for (i = 0; i < drones.length; i++) { var dn = drones[i]; if (overlap({ x: dn.x + 1, y: dn.y + 1, w: T - 2, h: T - 2 }, pl.x, pl.y, pl.w, pl.h) || (dn.fire > 0 && overlap(droneBeam(dn), pl.x, pl.y, pl.w, pl.h))) { die(); return; } }
     if (lava) { if (run.time > P.lavaDelay) lava.y -= P.lavaRise * dt; if (pl.y + pl.h > lava.y + 2) { die(); return; } }
     if (pl.y > rows * T + 20) { die(); return; }
     for (i = 0; i < refills.length; i++) {
@@ -1074,7 +1101,7 @@
     var lamps = drawDecals(b, cols, rows, function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols ? '#' : room.tiles[rr].charAt(cc); }, seed);
     for (i = 0; i < tracks.length; i++) drawTrack(b, tracks[i].x, tracks[i].y, tracks[i].v);
     for (i = 0; i < hazards.length; i++) if (hazards[i].dir < 4) drawSpike(b, hazards[i].tx, hazards[i].ty, hazards[i].dir);
-    for (i = 0; i < jets.length; i++) drawVent(b, jets[i].x, jets[i].y);
+    for (i = 0; i < jets.length; i++) if (jets[i].laser) drawEmitter(b, jets[i].x, jets[i].y); else drawVent(b, jets[i].x, jets[i].y);
     if (exits.length) {
       var x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0;
       for (i = 0; i < exits.length; i++) {
@@ -1126,7 +1153,10 @@
     for (i = 0; i < jets.length; i++) {
       var jt = jets[i], jp = jetPhase(jt);
       if (jp.on !== jt.on || jp.warn !== jt.warn) { jt.on = jp.on; jt.warn = jp.warn; mark(jt.x, jt.y - 2 * T, T, 3 * T); }
-      if (jp.on) { drawJet(g, jt.x, jt.y, Math.floor(tick / 6) % 2); if (tick % 6 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
+      if (jt.laser) {
+        if (jp.on) { drawLaser(g, jt.x, jt.y, Math.floor(tick / 4) % 2); if (tick % 4 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
+        else if (jp.warn) { drawLaserWarn(g, jt.x, jt.y, Math.floor(tick / 3) % 2); if (tick % 3 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
+      } else if (jp.on) { drawJet(g, jt.x, jt.y, Math.floor(tick / 6) % 2); if (tick % 6 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
       else if (jp.warn) { drawJetWarn(g, jt.x, jt.y, Math.floor(tick / 4) % 2); if (tick % 4 === 0) mark(jt.x, jt.y, T, T); }
     }
     for (i = 0; i < crumbles.length; i++) {
@@ -1155,6 +1185,14 @@
     var flick = Math.floor(tick / 14) % 2;
     // flames swap shape three times a second, each on its own beat, so the screen never repaints every flame at once
     for (i = 0; i < flames.length; i++) { var fph = (tick + i * 7) % 20 < 10 ? 1 : 0; drawFlame(g, flames[i].x, flames[i].y, fph); if ((tick + i * 7) % 10 === 0) mark(flames[i].x, flames[i].y, T, T); }
+    for (i = 0; i < drones.length; i++) {
+      var dn = drones[i];
+      drawDrone(g, dn.x, dn.y, dn.dir, flick);
+      mark(Math.floor(dn.x) - 2, dn.y - 2, T + 5, T + 4);
+      if (dn.fire > 0) { drawDroneBeam(g, dn.x, dn.y, Math.floor(tick / 3) % 2); mark(dn.x, dn.y + T, T, 3 * T + 1); }
+      else if (dn.wasFiring) mark(dn.x, dn.y + T, T, 3 * T + 1);
+      dn.wasFiring = dn.fire > 0;
+    }
     for (i = 0; i < fireballs.length; i++) {
       var fb = fireballs[i];
       drawFireball(g, fb.x, fb.y, flick, fb.axis === 'x' ? fb.dir : 0, fb.axis === 'y' ? fb.dir : 0);
@@ -1901,7 +1939,8 @@
                movers: movers.map(function (m) { return { x: m.x, y: m.y, wait: m.wait, z: m.zip ? m.zs : '' }; }),
                fireballs: fireballs.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, wait: f.wait }; }), gem: gotGem(), cam: cam.y,
                keys: roomKeys.map(function (k) { return k.state; }), doors: doors.map(function (d) { return d.open; }),
-               jets: jets.map(function (j) { var p = jetPhase(j); return { x: j.x, y: j.y, on: p.on, warn: p.warn, left: p.left }; }), lava: lava ? lava.y : null };
+               jets: jets.map(function (j) { var p = jetPhase(j); return { x: j.x, y: j.y, on: p.on, warn: p.warn, left: p.left }; }), lava: lava ? lava.y : null,
+               drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }) };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },

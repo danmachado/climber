@@ -14,7 +14,7 @@
     var styles = opts.styles && opts.styles.length ? opts.styles : (opts.style && opts.style !== 'mixed' ? [opts.style] : []);
     var SHAPE = opts.shape !== false;
     var WORLD = opts.world | 0, ICY = WORLD === 2 ? 4 : 1;                                // a world leans on its own pieces
-    var OWN = { ice: 2, firepits: 3, fireballs: 3 }, own;                                 // pieces that belong to one world
+    var OWN = { ice: 2, firepits: 3, fireballs: 3, jets: 3, lava: 3, lasers: 4, drones: 4 }, own;   // pieces that belong to one world
     if (WORLD) for (own in OWN) if (EL[own] && OWN[own] !== WORLD) { EL = Object.assign({}, EL); EL[own] = false; }
     var HZ = SP > 0 ? SP : (EL.firepits ? 1 : 0);                                        // floor hazards: spikes, or flames in the Furnace                                                    // organic shaping on by default
     function likes(st) { return styles.length && styles.length < 3 && styles.indexOf(st) >= 0; }
@@ -42,7 +42,7 @@
     };
     var target = [1, 2, 9][opts.obstacles];
     var plan = [], y = ROWS - 2, d = rnd() < 0.5 ? 1 : -1, Wprev = 0, prevType = '', off = 0, floor = 0;
-    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0, jets: 0, lava: 0 };
+    var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0, jets: 0, lava: 0, lasers: 0, drones: 0 };
     function zipPick() { return EL.zips && (!EL.movers || rnd() < 0.5); }   // a platform spot becomes a zip mover
     var gemFloor = EL.gems !== false ? ri(0, 2) : -1;                                   // one gem, over a hazard on an early floor
     g[ROWS - 3][col(2, d)] = 'S';
@@ -89,7 +89,8 @@
           bridge: EL.crumble && floor > 0 && room >= 4 ? 3 : 0,                                // crumbling stretch of floor
           ferry: (EL.movers || EL.zips) && (HZ > 0 || floor > 0) && room >= TUNE.ferryW[0] + 1 ? 4 : 0,    // ride a platform across a gap
           fireball: EL.fireballs && room >= 2 && headroom >= 6 ? 4 : 0,                      // time a run under a fireball on a track
-          jet: EL.jets && room >= 2 && headroom >= 6 ? 4 : 0                                // wait for a fire jet to die down, then run past
+          jet: (EL.jets || EL.lasers) && room >= 2 && headroom >= 6 ? 4 : 0,                 // wait for a fire jet (or a laser) to die down, then run past
+          drone: EL.drones && room >= 2 && headroom >= 6 ? 4 : 0                              // time a run under a patrol drone
         };
         // "Some" spikes means every floor has at least one; "Lots" removed the harmless options above
         if (HZ === 1 && SP < 2 && !spiked && (w.spikes || w.wide || w.crown || w.wallspikes || w.icespikes)) { w.block = 0; w.wall = 0; w.iceblock = 0; }
@@ -109,7 +110,8 @@
         else if (type === 'bridge') { o.w = Math.min(rr(TUNE.bridgeW), room - 1); }
         else if (type === 'ferry') { o.w = Math.min(rr(TUNE.ferryW), room - 1); o.pl = D >= 4 ? 2 : 3; o.pit = HZ === 0; o.zip = zipPick(); after = Math.max(3, after); }
         else if (type === 'fireball') { o.w = 1; after = Math.max(3, after); }
-        else if (type === 'jet') { o.w = 1; after = Math.max(3, after); }
+        else if (type === 'jet') { o.w = 1; o.laser = !!EL.lasers; after = Math.max(3, after); }
+        else if (type === 'drone') { o.w = 4; after = Math.max(3, after); }
         else if (type === 'wall') { o.w = 2; o.h = Math.min(rr(TUNE.wallH), headroom - 3); minHf = Math.max(minHf, o.h + 4); after = 5; }
         else { o.h = 4; o.sw = Math.min(D >= 5 ? ri(3, 4) : ri(2, 3), room - 3); o.w = 2 + o.sw; minHf = Math.max(minHf, 9); }
         if (type !== 'block' && type !== 'wall' && type !== 'iceblock' && type !== 'bridge' && !(type === 'ferry' && o.pit)) spiked++;
@@ -160,7 +162,9 @@
         } else if (ob.type === 'fireball') {
           box(ob.t0, ob.t0, y - 5, y - 1, d, '|'); put(ob.t0, d, y - 5, '*'); stats.fireballs++;
         } else if (ob.type === 'jet') {
-          put(ob.t0, d, y - 1, 'J'); stats.jets++;
+          put(ob.t0, d, y - 1, ob.laser ? 'L' : 'J'); if (ob.laser) stats.lasers++; else stats.jets++;
+        } else if (ob.type === 'drone') {                       // a track along the ceiling of the floor, the drone starts at one end
+          box(ob.t0, ob.t0 + 3, y - 5, y - 5, d, '-'); put(ob.t0 + 3, d, y - 5, 'O'); stats.drones++;   // home (firing) end is the far side; you run under while it is away
         } else box(ob.t0, e, y - ob.h, y - 1, d, '#');
       }
       stats.floors++; stats.obstacles += obs.length;
@@ -172,7 +176,7 @@
       for (t = 0; t <= 24; t++) need.push(t < off ? 2 : (t < s0 + 1 ? 6 : 5));
       if (conn && conn.type === 'spring') for (t = Math.max(0, F - 6); t <= F - 1; t++) need[t] = Math.max(need[t], 6);
       for (i = 0; i < obs.length; i++) {
-        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' || q.type === 'jet' ? 6 : 5));
+        var q = obs[i], n = q.type === 'wall' ? q.h + 3 : (q.type === 'wallspikes' ? q.h + 5 : (q.type === 'ferry' || q.type === 'crown' || q.type === 'fireball' || q.type === 'jet' || q.type === 'drone' ? 6 : 5));
         for (t = Math.max(0, q.t0 - 3); t <= Math.min(24, q.t0 + q.w + 2); t++) need[t] = Math.max(need[t], n);
       }
 

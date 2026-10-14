@@ -5,7 +5,7 @@
     { id: 1, name: 'Brickyard', theme: 'brick', tiles: [], elements: [] },
     { id: 2, name: 'Icehouse',  theme: 'frost', tiles: ['I'], elements: ['ice'] },
     { id: 3, name: 'Furnace',   theme: 'ember', tiles: ['F', '*', 'J', '~'], elements: ['firepits', 'fireballs', 'jets', 'lava'] },
-    { id: 4, name: 'Temple',    theme: 'jungle', tiles: [], elements: [] }
+    { id: 4, name: 'Temple',    theme: 'jungle', tiles: ['L', 'O'], elements: ['lasers', 'drones'] }
   ];
   // Pieces that belong to one world only. tiles are level characters, elements are the auto-builder's piece names.
   // Everything not listed by any world is common and can be used anywhere. A new world lists its own pieces here.

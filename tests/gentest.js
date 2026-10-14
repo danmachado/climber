@@ -49,6 +49,19 @@ const fs = require('fs');
             until(() => ({ x: d }), () => past(o.t0, 3), 200);
             continue;
           }
+          if (o.type === 'drone') {             // wait until the drone is parked at the far end and done firing, then run under
+            where = 'floor ' + fi + ' drone t' + o.t0;
+            const rowY = (y - 5) * 10, homeX = col(o.t0 + 3, d) * 10, nearX = col(o.t0, d) * 10;
+            const dr = () => s.drones.filter(q => q.y === rowY && Math.abs(q.x - (homeX + nearX) / 2) <= 25)[0];
+            until(() => ({}), () => s.ground, 200);
+            if (dist(o.t0) < 11) until(() => ({ x: -d }), () => dist(o.t0) >= 12, 200);
+            until(() => ({ x: d }), () => dist(o.t0) <= 14);
+            for (let k = 0; k < 8; k++) step({});
+            // wait until it has just fired at home and is heading toward us: the beam is spent and the whole trip is clear
+            until(() => ({}), () => { const q = dr(); return q && q.fire <= 0 && q.wait <= 0 && q.x === homeX; }, 900);
+            until(() => ({ x: d }), () => past(o.t0 + 3, 3), 300);
+            continue;
+          }
           if (o.type === 'jet') {               // wait beside the vent until it has just gone out, then run past
             where = 'floor ' + fi + ' jet t' + o.t0;
             const jx = col(o.t0, d) * 10;
@@ -155,8 +168,8 @@ const fs = require('fs');
     const styles = ['mixed', 'jump', 'dash', 'climb'];
     for (let seed = 1; seed <= N; seed++) for (let D = 1; D <= (N === 1 ? 1 : 5); D++) for (const style of styles) for (let ob = 0; ob < 3; ob++) for (let sp = 0; sp < 3; sp++) {
       const el = seed % 4;   // rotate which new pieces are switched on
-      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 3 + 1, rows: seed % 5 === 0 ? 96 : 48,
-                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0, jets: seed % 4 !== 3, lava: seed % 2 === 1 } };
+      const opts = { difficulty: D, obstacles: ob, styles: style === 'mixed' ? [] : (seed % 3 === 0 ? [style, 'jump'] : [style]), spikes: Math.max(1, sp), world: seed % 4 + 1, rows: seed % 5 === 0 ? 96 : 48,
+                     elements: { springs: seed % 4 !== 1, gems: true, firepits: seed % 3 !== 1, fireballs: seed % 3 !== 2, spikes: sp > 0, refills: seed % 2 === 0, ice: el === 1 || el === 3, crumble: el === 2 || el === 3, movers: el === 0 || el === 3, zips: seed % 5 !== 2, keys: seed % 3 !== 0, jets: seed % 4 !== 3, lava: seed % 2 === 1, lasers: seed % 3 !== 1, drones: seed % 4 !== 2 } };
       const out = window.generateRoom(opts, seed * 7919 + D * 31 + ob * 7 + sp);
       res.total++;
       try { const r = solve(out); if (!r.ok) res.fail.push([JSON.stringify(opts), r.why]); }

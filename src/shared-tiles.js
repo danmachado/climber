@@ -355,6 +355,31 @@
     b.fillStyle = '#ffe08a'; b.fillRect(x + 4, top + (f ? 8 : 12), 2, 18);
     b.fillStyle = '#e2491f'; b.fillRect(x + (f ? 3 : 5), top, 2, 2); b.fillRect(x + (f ? 6 : 2), top + 1, 1, 1);   // licks at the tip
   }
+  // Laser emitter (Temple): a squat black box with a pink lens; the beam is a one pixel magenta line three tiles tall.
+  function drawEmitter(b, x, y) {
+    b.fillStyle = '#1a1408'; b.fillRect(x + 2, y + 5, 6, 5);
+    b.fillStyle = '#6b5a14'; b.fillRect(x + 3, y + 6, 4, 2);
+    b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y + 5, 2, 1);
+  }
+  function drawLaserWarn(b, x, y, f) { if (f) { b.fillStyle = '#b8306f'; b.fillRect(x + 4, y - 20, 2, 25); } b.fillStyle = '#ffd6ea'; b.fillRect(x + 4, y + 4, 2, 1); }
+  function drawLaser(b, x, y, f) {
+    b.fillStyle = '#b8306f'; b.fillRect(x + 3, y - 20, 4, 25);
+    b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y - 20, 2, 25);
+    b.fillStyle = '#ffd6ea'; b.fillRect(x + (f ? 4 : 5), y - 20, 1, 25);
+  }
+  // Patrol drone (Temple): a black saucer with a pink eye that looks the way it moves; fires a burst straight down.
+  function drawDrone(b, x, y, dir, f) {
+    b.fillStyle = '#1a1408'; b.fillRect(x + 1, y + 3, 8, 4); b.fillRect(x + 3, y + 1, 4, 2); b.fillRect(x + 2, y + 7, 6, 1);
+    b.fillStyle = '#4a4030'; b.fillRect(x + 2, y + 4, 6, 2); b.fillRect(x + 4, y + 2, 2, 1);
+    b.fillStyle = '#ff4fa3'; b.fillRect(x + (dir > 0 ? 6 : 2), y + 4, 2, 2);
+    b.fillStyle = '#ffd6ea'; b.fillRect(x + (dir > 0 ? 6 : 3), y + 4, 1, 1);
+    b.fillStyle = f ? '#ff4fa3' : '#b8306f'; b.fillRect(x + 4, y + 8, 2, 1);
+  }
+  function drawDroneBeam(b, x, y, f) {
+    b.fillStyle = '#b8306f'; b.fillRect(x + 3, y + 10, 4, 30);
+    b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y + 10, 2, 30);
+    b.fillStyle = '#ffd6ea'; b.fillRect(x + (f ? 4 : 5), y + 10, 1, 30);
+  }
   // Lava: a tile for the builder and the static layer, and the rising body the game draws over everything below the surface.
   function drawLava(b, x, y, surface) {
     b.fillStyle = '#c2401c'; b.fillRect(x, y, 10, 10);
