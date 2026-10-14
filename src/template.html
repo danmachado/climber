@@ -85,10 +85,16 @@
   function beaten(r) { return !!prog[r.id]; }
   function worldOpen(w) {
     if (unlockAll || w <= 0) return true;
-    for (var i = 0; i < levels[w - 1].length; i++) if (!beaten(levels[w - 1][i])) return false;
+    for (var i = 0; i < levels[w - 1].length; i++) if (!beaten(levels[w - 1][i]) && !levels[w - 1][i].trial) return false;   // trials never hold the next world back
     return worldOpen(w - 1);
   }
-  function levelOpen(w, i) { return worldOpen(w) && (unlockAll || i === 0 || beaten(levels[w][i - 1])); }
+  // a level opens once the level before it is beaten; a trial in the way is skipped over
+  function levelOpen(w, i) {
+    if (!worldOpen(w)) return false;
+    if (unlockAll) return true;
+    for (var j = i - 1; j >= 0; j--) if (!levels[w][j].trial) return beaten(levels[w][j]);
+    return true;
+  }
   function endlessPool() {
     var out = [];
     for (var w = 0; w < levels.length; w++) if (worldOpen(w)) out = out.concat(levels[w]);
@@ -2076,7 +2082,7 @@
       for (i = 0; i < list.length; i++) {
         var q = nodePos(i), pr = prog[list[i].id], can = levelOpen(w, i), x0 = q.x - 26, y0 = q.y - 19;
         if (i === sel.i) box(x0 - 4, y0 - 4, 60, 46, C.text);
-        box(x0 - 2, y0 - 2, 56, 42, th.bg);
+        box(x0 - 2, y0 - 2, 56, 42, list[i].trial ? th.accentLo : th.bg);   // a trial gets a frame in the world's accent
         box(x0, y0, 52, 38, pr ? th.accent : (can ? '#26315f' : '#141a38'));
         if (can) t(wd.id + '-' + (i + 1), q.x, q.y + 6, 15, pr ? '#101426' : C.text, 'center');
         else { box(q.x - 7, q.y - 3, 14, 12, '#3a4675'); box(q.x - 5, q.y - 10, 10, 3, '#3a4675'); box(q.x - 5, q.y - 10, 3, 8, '#3a4675'); box(q.x + 2, q.y - 10, 3, 8, '#3a4675'); }
@@ -2091,7 +2097,7 @@
       else if (!open) t('Finish World ' + WORLDS[w - 1].id + ' to open this one', 135, 448, 8, C.text, 'center');
       else if (!levelOpen(w, sel.i)) t('Beat ' + wd.id + '-' + sel.i + ' first', 135, 448, 8, C.text, 'center');
       else {
-        t((cur.name || '').toUpperCase().substring(0, 22), 135, 444, 9, C.text, 'center');
+        t(((cur.trial ? 'TRIAL: ' : '') + (cur.name || '')).toUpperCase().substring(0, 22), 135, 444, 9, C.text, 'center');
         t((cp ? 'BEST ' + secs(cp.time) + '   ' : '') + 'PAR ' + secs(parOf(cur)), 135, 456, 7, C.dim, 'center');
       }
       t(usedPad ? 'Jump: play   Dash: menu' : 'Arrows move   C plays   X or Esc: menu   or click', 135, 472, 6.5, C.dim, 'center');
@@ -2220,6 +2226,19 @@
       for (var i = 0; i < 40; i++) step(none);
       return { steps: n, count: run.count, room: room.name, falls: run.deaths, x: pl.x, y: pl.y, pool: pool.length };
     }, load: function (data) { testMode = true; scene = 'play'; buildRoom(data); resetRun(); },
+    tune: function (k, v) { var old = P[k]; if (v !== undefined) P[k] = v; return old; },   // tests only: switch a move off to prove a room needs it
+    // Save and restore everything the physics reads, so a solver can try many inputs from one moment (tests only).
+    snap: function () {
+      var cp = function (a) { return a.map(function (o) { return Object.assign({}, o); }); };
+      return JSON.parse(JSON.stringify({ pl: pl, run: run, fx: fx, cr: cp(crumbles), mv: cp(movers), fb: cp(fireballs), dn: cp(drones), sp: cp(springs),
+        gm: cp(gems), ky: cp(roomKeys), dr: cp(doors), rf: cp(refills), lava: lava ? Object.assign({}, lava) : null }));
+    },
+    restore: function (s) {
+      var put = function (a, b) { for (var i = 0; i < a.length; i++) Object.assign(a[i], b[i]); };
+      pl = JSON.parse(JSON.stringify(s.pl)); run = Object.assign({}, s.run); fx = Object.assign({}, s.fx);
+      put(crumbles, s.cr); put(movers, s.mv); put(fireballs, s.fb); put(drones, s.dn); put(springs, s.sp);
+      put(gems, s.gm); put(roomKeys, s.ky); put(doors, s.dr); put(refills, s.rf); if (lava && s.lava) Object.assign(lava, s.lava);
+    },
     demoRun: function (n) { startDemo(); demo.room = starters[0]; demo.rec = null; resetRun(); for (var i = 0; i < n && !run.won; i++) step(demoInput()); return { steps: i, won: run.won, deaths: run.deaths, stage: demo.stage }; }
   };
 })();

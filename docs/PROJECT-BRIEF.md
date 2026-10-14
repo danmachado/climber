@@ -33,11 +33,15 @@ Repo: danmachado/climber on GitHub, served by GitHub Pages from main.
   auto-player (`tests/gentest.js`), with a large sweep at zero failures before shipping.
 - Reply style: short, casual, bullets for steps, no em dashes, no emoji.
 
-## State as of 2026-10-13
+## State as of 2026-10-14
 
 - Five worlds: Brickyard, Icehouse, Furnace, Temple, Neon Row. Nine levels each (one tall), half of them island
   layouts (floating slabs, pillars, shelves) and half floors.
 - Hero: hero-wolf, the lone climber with the bandana (two one-pixel tails and a lock of hair simulated in code).
-- Not yet seen on the frame: Temple, Neon Row, island layouts, the hero restyle, lasers and drones readability.
+- Six trial rooms (hand-made, one move each): Pinpoint and Handhold close out Brickyard, Kickback Icehouse, Dash Only
+  Furnace, Freefall Temple, Cascade Neon Row. Framed on the map, never block the next world. Each is proven beatable
+  by a recorded run in the real game, and the dash, climb and super rooms are proven unbeatable without that move.
+- Not yet seen on the frame: Temple, Neon Row, island layouts, the hero restyle, lasers and drones readability,
+  the trial rooms.
 - Next up when Dan says so: a smarter auto-player for island rooms (option A), more island hazards (drones,
   lasers on slabs), and whatever he brings.

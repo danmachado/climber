@@ -111,9 +111,32 @@ TALL.forEach(function (s, i) {
 starters.forEach(function (r) { if (times[r.id]) r.par = Math.ceil(times[r.id] * PAR_MARGIN); });
 fs.writeFileSync(d + '/starter-plans.json', JSON.stringify({ rooms: starters, plans: plans }));
 
+// Trial rooms: hand-made rooms built around one move each (src/trials-make.js writes them, tests/trials.js proves each
+// one with a recorded run in src/trial-runs.json). They go after a world's own levels and never hold the next world
+// back. Par is the recorded run's time x TRIAL_MARGIN (the search plays sharper than a person), and the recording
+// joins the idle demo.
+var TRIAL_MARGIN = 2, trialRuns = {};
+try { trialRuns = JSON.parse(fs.readFileSync(d + '/trial-runs.json', 'utf8')); } catch (e) {}
+var trialDemos = {};
+fs.readdirSync(d + '/trials').filter(function (f) { return /\.json$/.test(f); }).map(function (f) { return JSON.parse(fs.readFileSync(d + '/trials/' + f, 'utf8')); })
+  .sort(function (a, b) { return (a.difficulty - b.difficulty) || (a.id < b.id ? -1 : 1); }).forEach(function (r) {   // easier trials first
+  var top = 0;
+  starters.forEach(function (s) { if (worldOfRoom(s) === r.world) top = Math.max(top, s.level || 0); });
+  r.level = top + 1;
+  var rec = trialRuns[r.id];
+  if (rec) {
+    r.par = Math.max(8, Math.ceil(rec.length / 60 * TRIAL_MARGIN));
+    var rl = []; rec.forEach(function (c) { if (rl.length && rl[rl.length - 2] === c) rl[rl.length - 1]++; else rl.push(c, 1); });
+    trialDemos[r.id] = rl;
+  }
+  starters.push(r);
+});
+function worldOfRoom(r) { return r.world || 1; }
+
 var one = JSON.stringify(first), all = JSON.stringify(starters);
 var demos = '{}';
 try { demos = fs.readFileSync(d + '/starter-demos.json', 'utf8'); } catch (e) {}
+demos = JSON.stringify(Object.assign(JSON.parse(demos), trialDemos));
 function fill(t, rooms) {
   return t.split('/*ALL_ROOMS*/').join(all.slice(1, -1)).split('/*DEMOS*/').join(demos).split('/*ROOM_JSON*/').join(rooms).split('/*SHARED_TILES*/').join(tilesJs).split('/*GEN*/').join(gen).split('/*SHARED_CONFIG*/').join(cfg).split('/*SHARED_HERO*/').join(heroJs).split('/*SHARED_WORLDS*/').join(worldsJs);
 }
