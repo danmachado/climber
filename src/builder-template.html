@@ -271,6 +271,7 @@
   function toJSON() {
     var out = toJSONBase();
     out.world = room.world || 1; if (room.level > 0) out.level = room.level; if (room.par > 0) out.par = room.par;
+    if (room.trial) out.trial = true;   // a trial room never holds the next world back on the game's map
     return out;
   }
   function toJSONBase() {
@@ -288,7 +289,7 @@
       return row.split('').map(function (ch) { if (!LEGEND[ch]) throw new Error('Unknown tile "' + ch + '" in row ' + r + '.'); return ch; });
     });
     room = { id: d.id || '', name: d.name || 'Untitled', difficulty: Math.min(5, Math.max(1, d.difficulty | 0 || 1)), entities: d.entities || [],
-             world: worldOf(d), level: Math.max(0, d.level | 0), par: Math.max(0, d.par | 0) };
+             world: worldOf(d), level: Math.max(0, d.level | 0), par: Math.max(0, d.par | 0), trial: !!d.trial };
     tiles = g;
   }
   function snapshot() { return tiles.map(function (r) { return r.join(''); }).join('\n'); }
