@@ -11,6 +11,7 @@
 #   run cycle      side-on body; the two boots swap front and back (a real stride), the arms swing against the legs,
 #                  the body bobs, and no two frames in a row are the same
 #   squash/stretch landing and spawn start shorter than standing, take-off is taller or the same
+#   arm length     every arm is 4 pixels shoulder to hand, 5 when reaching (from the manifest's per-frame arm lengths)
 #   arms           arms are shaded limbs, not one-pixel lines: in the idle every arm shows a lit and a shadow tone and
 #                  is two pixels thick somewhere (the upper arm)
 #   feet           boots are tall and narrow: no boot is more than 2 px wide on any row (no skateboard feet)
@@ -84,6 +85,16 @@ GROUNDED = ['idle', 'idle_look', 'idle_tie', 'idle_flex', 'run', 'land', 'skid',
 for name in GROUNDED:
     for i, g in enumerate(FR[name]):
         if not is_blank(g) and not [x for x, y in cells(g, 'cC') if y == 15]: bad(name, 'frame %d: no boot on the ground row (feet float)' % i)
+
+# ---- arm length: the same limb in every pose ----
+for a in m['animations']:
+    for i, lens in enumerate(a.get('arms') or []):
+        if lens is None:
+            if not is_blank(FR[a['name']][i]): bad(a['name'], 'frame %d: no arm lengths recorded' % i)
+            continue
+        for n in lens:
+            if n not in (4, 5): bad(a['name'], 'frame %d: an arm is %d px long (should be 4, or 5 reaching)' % (i, n))
+if not any('px long' in f for f in fails): ok('arms', 'every arm 4 px, or 5 reaching')
 
 # ---- arms: shaded and with some thickness ----
 for i, g in enumerate(FR['idle']):

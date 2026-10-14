@@ -143,8 +143,10 @@ def path(pts):
             if p not in out: out.append(p)
     return out or list(pts)
 
+class Frame(list): arms = None                                      # a frame, carrying its arm lengths for the audit
+ARM_LEN, ARM_REACH = 4, 5                                         # shoulder to hand, relaxed and reaching
 class Pose:
-    def __init__(self): self.fr = blank(); self.mask = {}   # mask: which limb owns a pixel (for separation lines)
+    def __init__(self): self.fr = blank(); self.mask = {}; self.arm_lengths = []   # mask: which limb owns a pixel (for separation lines)
     def px(self, x, y, ch, who=None):
         if 0 <= x < 16 and 0 <= y < 16:
             self.fr[y][x] = ch
@@ -164,27 +166,37 @@ class Pose:
                     if (ax, ay) not in mine and self.mask.get((ax, ay)) == sep: self.px(ax, ay, 'o', None)
         for x, y, ch in cells: self.px(x, y, ch, who)
     def arm(self, pts, near):
-        # Arms taper like a real limb instead of a one-pixel line: the upper arm (shoulder to elbow) is two pixels
-        # thick and shaded, the forearm and hand are one pixel, the hand lit. Light comes from the upper front: on an
-        # upright stretch the front column is lit and the back one in shadow, on a level stretch the top row is lit and
-        # the row under it in shadow. An upright upper arm thickens away from the body's middle (column 7.5) so it
-        # never eats into the torso. The far arm is a shade darker all over.
+        # Arms are always the same length so they read as the same limb in every pose: 4 pixels from shoulder to hand,
+        # 5 when reaching (any arm drawn longer than 4 is a reach). The joints give the direction; the arm is cut or
+        # extended along them to that length, keeping the shoulder where it is.
+        # They taper like a real limb: the upper arm is two pixels thick and shaded, the forearm one pixel, the hand lit.
+        # Light comes from the upper front: on an upright stretch the front column is lit and the back one in shadow,
+        # on a level stretch the top row is lit and the row under it in shadow. An upright upper arm thickens away from
+        # the body's middle (column 7.5) so it never eats into the torso. The far arm is a shade darker all over.
+        pix = path(pts)
+        want = ARM_REACH if len(pix) > ARM_LEN else ARM_LEN
+        pix = pix[:want]
+        while len(pix) < want:                                         # too short: carry on the way the forearm points
+            (x0, y0), (x1, y1) = pix[-2] if len(pix) > 1 else (pix[-1][0], pix[-1][1] - 1), pix[-1]
+            dx, dy = x1 - x0, y1 - y0
+            step = (0, (dy > 0) - (dy < 0)) if abs(dy) >= abs(dx) else ((dx > 0) - (dx < 0), 0)
+            pix.append((x1 + step[0], y1 + step[1]))
+        self.arm_lengths.append(len(pix))
         lit, shade = ('s', 'S') if near else ('S', 'T')
         who = 'na' if near else 'fa'; cells = {}
-        for i in range(len(pts) - 1):
-            (x0, y0), (x1, y1) = pts[i], pts[i + 1]
-            upright = abs(y1 - y0) >= abs(x1 - x0)
-            thick = i == 0 and len(pts) > 2
-            for x, y in line(pts[i], pts[i + 1]):
-                if (x, y) in cells and cells[(x, y)] == lit: continue
-                cells[(x, y)] = shade if thick and upright and ((x + 1 if x >= 7.5 else x - 1) > x) else lit
-                if not thick: continue
-                if upright:
-                    ox = x + 1 if x >= 7.5 else x - 1
-                    if ox > x: cells[(ox, y)] = lit                    # front column lit, this one the back
-                    else: cells.setdefault((ox, y), shade)
-                else: cells.setdefault((x, y + 1), shade)
-        cells[pts[-1]] = lit                                          # the hand
+        for i, (x, y) in enumerate(pix):
+            if (x, y) in cells and cells[(x, y)] == lit: continue
+            nx, ny = pix[min(i + 1, len(pix) - 1)]; px_, py_ = pix[max(i - 1, 0)]
+            upright = abs(ny - py_) >= abs(nx - px_)
+            thick = i < 2                                              # upper arm: shoulder and elbow
+            ox = x + 1 if x >= 7.5 else x - 1
+            cells[(x, y)] = shade if thick and upright and ox > x else lit
+            if not thick: continue
+            if upright:
+                if ox > x: cells[(ox, y)] = lit
+                else: cells.setdefault((ox, y), shade)
+            else: cells.setdefault((x, y + 1), shade)
+        cells[pix[-1]] = lit                                           # the hand
         for (x, y), ch in cells.items(): self.px(x, y, ch, who)
 
     def boot(self, x, y, near, kind='flat', toe=1, leg=None):
@@ -231,6 +243,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
     if near_arm and not near_behind: P.arm(near_arm, True)
     fr = outline(P.fr)
     if shift: fr = [(['.'] * shift + row)[:16] if shift > 0 else (row[-shift:] + ['.'] * -shift) for row in fr]
+    fr = Frame(fr); fr.arms = P.arm_lengths
     return fr
 
 # ---------------------------------------------------------------- idle: breathing, the whole body
@@ -398,12 +411,13 @@ def run_frame(k):
     leg_grid(P, near, True)
     put(P.fr, HEAD['normal'], tx + 1, ty - HEAD_H)
     P.arm(near_arm, True)
-    return outline(P.fr)
+    fr = Frame(outline(P.fr)); fr.arms = P.arm_lengths
+    return fr
 
 
 def exit_frames():
     a = run_frame(0); b = run_frame(1)
-    c = [(['.'] * 3 + row)[:16] for row in run_frame(2)]
+    r2 = run_frame(2); c = Frame([(['.'] * 3 + row)[:16] for row in r2]); c.arms = r2.arms
     return [a, b, c, blank()]
 
 ANIMS = [
@@ -450,7 +464,8 @@ def write(anims=None):
         for fr in frames:
             ks = [(x, y) for y in range(16) for x in range(16) if fr[y][x] == 'k']
             anchors.append([min(x for x, y in ks), round(sum(y for x, y in ks) / len(ks), 1)] if ks else None)
-        row = {'name': name, 'frameCount': len(frames), 'fps': fps, 'loop': loop is True, 'anchors': anchors}
+        row = {'name': name, 'frameCount': len(frames), 'fps': fps, 'loop': loop is True, 'anchors': anchors,
+               'arms': [getattr(fr, 'arms', None) for fr in frames]}   # arm lengths per frame (shoulder to hand), checked by audit.py
         if loop is not True and loop is not False: row['loopFrom'] = loop
         manifest['animations'].append(row)
     json.dump(manifest, open('hero-animation-manifest.json', 'w'), indent=1)
