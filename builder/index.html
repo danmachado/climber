@@ -521,10 +521,6 @@
       if (kind === 'peaks') { for (x = 0; x < w; x++) if (hm[x] > top * 0.62) b.fillRect(x, h - hm[x], 1, 1); } // snow on the summits
       else if (kind === 'pyramid') { for (x = 0; x < w; x++) if (hm[x] > 0 && hm[x] !== hm[x - 1]) b.fillRect(x, h - hm[x], 1, hm[x] > 6 ? 2 : 1); }   // the lit edge of each step
       else if (kind === 'town') { for (i = 0; i < w / 9; i++) { x = Math.floor(rnd() * w); var wy = between(4, hm[x] - 3); if (hm[x] > 8 && wy > 0) b.fillRect(x, h - wy, 1, 2); } } // a few dim windows
-      else if (kind === 'towers') {                        // pin-dot windows on a 3 px grid, cyan and pink, and room for signs
-        for (x = 2; x < w; x += 3) for (var wy2 = 3; wy2 < hm[x] - 2; wy2 += 3) { var dv = rnd(); if (dv < 0.1) { b.fillStyle = dv < 0.06 ? cap : '#ff7ad0'; b.fillRect(x, h - wy2, 1, 1); } }
-        for (i = 0; i < 12; i++) { x = Math.floor(rnd() * (w - 30)); var sy2 = between(8, Math.max(9, hm[x + 12] - 14)); if (hm[x] > 24 && hm[x + 24] > 24 && sy2 < hm[x] - 10) SKY_SIGNS.push([x + 2, h - sy2 - 9]); }
-      }
       else { for (x = 0; x < w; x++) if (hm[x] > 2) b.fillRect(x, h - 2, 1, 2); }                       // a lip of glow at the cave floor
     }
     if (kind === 'towers') {                                 // one pale beam tower far back, and two soft cloud bands
@@ -533,8 +529,43 @@
       b.fillStyle = 'rgba(255,255,255,0.05)'; for (i = 0; i < 2; i++) { var cy = Math.round(h - h0 * (0.5 + i * 0.3)), cx = between(0, w / 2), cwid = between(60, 150); b.fillRect(cx, cy, cwid, 2); b.fillRect(cx + 10, cy - 2, cwid - 30, 2); }
     }
     if (kind === 'towers') {                                 // the city fills the screen: we are down in it, towers rising past the top
-      band(far[0], Math.round(h0 * 0.75), far[2]);
-      band(far[1], Math.round(h0 * 1.0), far[2]);
+      // Three depths. Each is a row of separate buildings with streets between them, so the band behind shows
+      // through the gaps; the far row is hazed toward the sky, the near row is darkest. Windows come in clusters:
+      // a building picks which floors are lit and a floor is lit as a run, so the lights read as offices, not noise.
+      function cityRow(col, alpha, top, gapMin, gapMax, pitch, warm, cool, winA, roofs, store) {
+        var x0 = -between(0, 20), blds = [];
+        while (x0 < w) {
+          var bw2 = between(16, 54), bh2 = between(Math.round(top * 0.45), top), gap = between(gapMin, gapMax);
+          b.globalAlpha = alpha; b.fillStyle = col; b.fillRect(x0, h - bh2, bw2, bh2);
+          if (roofs) {                                      // a roofline: a mast, a water tank or a stack of boxes
+            var rv = rnd();
+            if (rv < 0.3) b.fillRect(x0 + between(2, bw2 - 3), h - bh2 - between(6, 16), 1, 16);
+            else if (rv < 0.55) { b.fillRect(x0 + between(2, Math.max(2, bw2 - 8)), h - bh2 - 5, 6, 5); }
+            else if (rv < 0.75) { b.fillRect(x0 + 2, h - bh2 - 3, bw2 - 4, 3); }
+          }
+          b.globalAlpha = 1;
+          var floors = [], f, fy;
+          for (fy = h - bh2 + 3; fy < h - 3; fy += pitch) floors.push(rnd() < 0.18 ? 0.55 : (rnd() < 0.4 ? 0.12 : 0.015));   // a few lit floors, some quiet ones, most dark
+          for (f = 0; f < floors.length; f++) {
+            fy = h - bh2 + 3 + f * pitch; var on = rnd() < floors[f] ? 1 : 0;
+            for (x = x0 + 2; x < x0 + bw2 - 2; x += pitch) {
+              if (rnd() < 0.25) on = rnd() < floors[f] ? 1 : 0;          // lights run in groups along a floor
+              if (on) { b.globalAlpha = winA; b.fillStyle = rnd() < 0.15 ? cool : warm; b.fillRect(x, fy, pitch > 3 ? 2 : 1, pitch > 3 ? 2 : 1); b.globalAlpha = 1; }
+            }
+          }
+          if (store) blds.push([x0, bw2, bh2]);
+          x0 += bw2 + gap;
+        }
+        return blds;
+      }
+      cityRow(far[0], 0.55, Math.round(h0 * 0.8), 2, 6, 3, '#f0d9a0', '#9fe3ff', 0.2, false, false);
+      cityRow(far[0], 0.85, Math.round(h0 * 0.95), 4, 10, 4, '#ffd27a', '#38f0ff', 0.4, true, false);
+      var near = cityRow(far[1], 1, Math.round(h0 * 1.05), 8, 16, 4, '#ffd27a', '#38f0ff', 0.6, true, true);
+      for (i = 0; i < near.length; i++) {                    // street level: a warm haze at the foot of every gap, and a sign on some faces
+        var nb = near[i], gx = nb[0] + nb[1];
+        if (i + 1 < near.length) { var gw = near[i + 1][0] - gx; drawGlow(b, gx + gw / 2, h, 14 + gw, '255,170,90', 0.22); b.fillStyle = '#ffd27a'; b.fillRect(gx + Math.floor(gw / 2), h - 18, 1, 1); b.fillStyle = '#2a2240'; b.fillRect(gx + Math.floor(gw / 2), h - 17, 1, 17); }
+        if (nb[1] >= 24 && rnd() < 0.7) SKY_SIGNS.push([nb[0] + between(2, nb[1] - 22), h - between(14, nb[2] - 10)]);
+      }
       b.fillStyle = '#07060f';                               // overhead cables sagging across the alley
       for (i = 0; i < 4; i++) { var cy0 = between(Math.round(h0 * 0.1), Math.round(h0 * 0.6)), cy1 = cy0 + between(-30, 30), sag = between(6, 18); for (x = 0; x < w; x++) { var tt = x / w; b.fillRect(x, Math.round(cy0 + (cy1 - cy0) * tt + Math.sin(tt * Math.PI) * sag), 1, 1); } }
     } else {
