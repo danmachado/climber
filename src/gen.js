@@ -17,6 +17,17 @@
   // bounce up. The route zigzags from island to island; each move is a hop, a climb or a chimney, and the plan
   // records which so the auto-player can follow it. ----
   function generateIslands(opts, seed) {
+    // a route can box itself in near a wall; try a few variations and keep the first that climbs the whole room
+    var best = null;
+    for (var attempt = 0; attempt < 6; attempt++) {
+      var out = generateIslandsOnce(opts, (seed + attempt * 7919) >>> 0);
+      if (!best || out.top < best.top) best = out;
+      if (out.top <= (opts.rows === 96 ? 24 : 12)) break;
+    }
+    best.room.id = 'auto-' + seed; best.room.name = 'Auto ' + seed;
+    return best;
+  }
+  function generateIslandsOnce(opts, seed) {
     var COLS = 27, ROWS = opts.rows === 96 ? 96 : 48, D = Math.max(1, Math.min(5, opts.difficulty | 0)), s = seed >>> 0;
     var EL = opts.elements || { spikes: opts.spikes > 0, refills: !!opts.refills };
     var SP = EL.spikes ? Math.max(1, opts.spikes | 0) : 0;
@@ -33,95 +44,164 @@
     function fill(x0, x1, y0, y1, ch) { for (var yy = y0; yy <= y1; yy++) for (var xx = x0; xx <= x1; xx++) set(xx, yy, ch); }
     function at(x, y) { return (x >= 0 && x <= 26 && y >= 0 && y < ROWS) ? g[y][x] : '#'; }
     var stats = { floors: 0, obstacles: 0, spikes: 0, ice: 0, crumble: 0, platforms: 0, zips: 0, fire: 0, fireballs: 0, springs: 0, gems: 0, keys: 0, jets: 0, lava: 0, lasers: 0, drones: 0, islands: 0 };
-    var HOP = [[3, 4], [3, 5], [4, 5], [4, 6], [5, 6]][D - 1];          // horizontal gap between islands, in tiles (6 needs a dash)
-    var RISE = [[1, 2], [1, 2], [2, 3], [2, 3], [2, 3]][D - 1];         // how far up the next island sits (3 is a full jump)
+    // Hops follow two fixed recipes the auto-player replays exactly: a full jump from the slab edge at run speed, or the
+    // same with a sideways dash five frames in. REACH lists, per rise, the gaps each recipe was measured to land
+    // (tests/reach.js against the real physics), so every hop the builder places is one the recipe clears.
+    var REACH = { jump: { 0: { 4: 24, 5: 14, 6: 4 }, 1: { 3: 29, 4: 19, 5: 9 }, 2: { 2: 33, 3: 23, 4: 13, 5: 3 }, 3: { 1: 8, 2: 8, 3: 14, 4: 4 } },
+                  dash: { 0: { 4: 42, 5: 32, 6: 22, 7: 12, 8: 2 }, 1: { 3: 39, 4: 29, 5: 19, 6: 9 } } };   // rise: { gap: where the feet land, px past the slab's near edge }
+    var HOPS = [];                                                       // the pool this difficulty draws from: [rise, gap, recipe, narrowest slab that catches the landing]
+    var rises = [[1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [2, 3]][D - 1], minGap = [3, 3, 4, 4, 5][D - 1];
+    function pool(recipe, rr0, gmin) { var gl = REACH[recipe][rr0]; if (!gl) return; for (var gs in gl) { var gp = +gs, o = gl[gs]; if (gp >= gmin && o >= 2) HOPS.push([rr0, gp, recipe, Math.max(3, Math.ceil((o + 10) / 10))]); } }
+    for (var hi = 0; hi < rises.length; hi++) pool('jump', rises[hi], minGap);
+    if (D >= 3) { pool('dash', 1, 6); if (D >= 4) pool('dash', 0, 6); }
     var plan = [], islands = [];
-    // the start island: a short slab at the bottom
-    // the floor is the first island (full width), so a fall always lands somewhere the route can restart from
+    // need marks the cells the route must keep clear: standing room over every slab, the arc of every hop, the
+    // face of every pillar, the column of every track. A new piece may only go where nothing is needed, and its
+    // own needs must be empty, so no slab ever sits in the way of a jump. If nothing fits, the route ends early.
+    var need = []; for (r = 0; r < ROWS; r++) { need.push([]); for (c = 0; c < COLS; c++) need[r].push(false); }
+    var ignore = null;                                                   // a box whose needs a candidate may build over (the slab it leaves from)
+    function freeCell(cx, cy, soft) { return cx >= 1 && cx <= 25 && cy >= 1 && cy <= ROWS - 3 && g[cy][cx] === '.' && (soft || !need[cy][cx] || (ignore && cx >= ignore[0] && cx <= ignore[1] && cy >= ignore[2] && cy <= ignore[3])); }
+    function boxFree(x0, x1, y0, y1) { for (var yy = y0; yy <= y1; yy++) for (var xx = x0; xx <= x1; xx++) if (xx < 1 || xx > 25 || yy < 1 || yy > ROWS - 3 || '.Gok'.indexOf(g[yy][xx]) < 0) return false; return true; }   // needs may overlap other needs and pickups, never a solid
+    function fits(cand) {
+      var j; for (j = 0; j < cand.tiles.length; j++) { var t = cand.tiles[j]; if (!freeCell(t[0], t[1], t[3])) return false; }
+      for (j = 0; j < cand.needs.length; j++) { var n = cand.needs[j]; if (n[2] < 1 || !boxFree(n[0], n[1], n[2], n[3])) return false; }
+      return true;
+    }
+    function commit(cand) {
+      var j; for (j = 0; j < cand.tiles.length; j++) set(cand.tiles[j][0], cand.tiles[j][1], cand.tiles[j][2]);
+      var yy, xx; if (cand.release) { var rl = cand.release; for (yy = rl[2]; yy <= rl[3]; yy++) for (xx = rl[0]; xx <= rl[1]; xx++) need[yy][xx] = false; }
+      for (j = 0; j < cand.needs.length; j++) { var n = cand.needs[j]; for (yy = n[2]; yy <= n[3]; yy++) for (xx = n[0]; xx <= n[1]; xx++) need[yy][xx] = true; }
+    }
+    function slab(cand, sx0, sw, sy) { for (var xx = sx0; xx < sx0 + sw; xx++) cand.tiles.push([xx, sy, '#']); cand.needs.push([sx0, sx0 + sw - 1, sy - 4, sy - 1]); }   // a slab and the room to stand and jump on it
+    function column(cand, cx, y0, y1) { for (var yy = y0; yy <= y1; yy++) cand.tiles.push([cx, yy, '#']); }
+    // the floor is the first island (full width), so a fall always lands somewhere the route can restart from;
+    // a two tile strip over it stays open so you can walk back under the slabs
     var dir = rnd() < 0.5 ? 1 : -1, x = 1, w = 25, y = ROWS - 2;
     g[y - 1][dir > 0 ? 3 : 23] = 'S';
     islands.push({ x: x, w: w, y: y, move: 'start', dir: dir }); stats.islands++;
+    for (c = 1; c <= 25; c++) { need[ROWS - 3][c] = true; need[ROWS - 4][c] = true; }
     x = dir > 0 ? 1 : 16; w = 10;                        // the first hop leaves from the start side of the floor
-    var usedKey = false, usedGem = false, k = 0;
-    while (y > 9) {
-      var move = pick({ hop: 6, climb: y > 14 ? 3 : 0, chimney: y > 16 && D >= 2 ? 2 : 0, spring: EL.springs !== false && y > 14 ? 1.5 : 0, zip: (EL.zips || EL.movers) && y > 12 ? 1.5 : 0 });
-      var nw = ri(3, 6), nx, ny, gap, rise, isl = { move: move };
+    var k = 0, hopGaps = [];
+    // each move is planned as a candidate (tiles, needs, island record), then placed only if it fits
+    function planMove(move, d, hp) {
+      var cand = { tiles: [], needs: [], isl: { move: move, dir: d } }, isl = cand.isl, nw, nx, ny;
       if (move === 'hop') {
-        gap = ri(HOP[0], HOP[1]); rise = k === 0 ? 3 : ri(RISE[0], RISE[1]);
-        // what a plain jump reaches: rise 3 over a 2 gap, rise 2 over 4, rise 1 over 5; anything wider needs a dash (difficulty 3 up)
-        var reach = [6, 5, 4, 2][rise];
-        if (gap > reach) { if (D >= 3 && gap <= reach + 3) isl.dash = true; else gap = reach; }
-        if (k === 0) { gap = Math.max(gap, 4); rise = 2; isl.dash = false; }   // the first island: clear of the floor, a plain jump away
-        nx = dir > 0 ? x + w + gap : x - gap - nw; ny = y - rise;
-        if (nx < 1 || nx + nw > 25) { dir = -dir; nx = dir > 0 ? x + w + gap : x - gap - nw; if (nx < 1 || nx + nw > 25) { nx = Math.max(1, Math.min(25 - nw + 1, nx)); } }
-        // the next island never hangs over this one (you would hit its underside), and never rises more than a jump
-        if (dir > 0 && nx < x + w + 1) nx = x + w + 1; if (dir < 0 && nx + nw > x) nx = x - nw;
-        if (nx < 1 || nx + nw > 25) { dir = -dir; nx = dir > 0 ? x + w + gap : x - gap - nw; nx = Math.max(1, Math.min(25 - nw + 1, nx)); if (dir > 0 && nx < x + w + 1) nx = x + w + 1; if (dir < 0 && nx + nw > x) nx = x - nw; }
-        if (nx < 1 || nx + nw > 25) { nw = 3; nx = dir > 0 ? Math.min(25 - 2, x + w + 1) : Math.max(1, x - 3); }
-        fill(nx, nx + nw - 1, ny, ny, '#');
-        // a spike patch on the far side of the landing, never where you land
-        if (HZ > 0 && nw >= 5 && rnd() < [0.2, 0.35, 0.5, 0.6, 0.7][D - 1]) { var sw = Math.min(nw - 3, ri(1, 2)), sx = dir > 0 ? nx + nw - sw : nx; fill(sx, sx + sw - 1, ny - 1, ny - 1, EL.firepits ? 'F' : '^'); isl.spikes = [sx, sw]; stats[EL.firepits ? 'fire' : 'spikes'] += sw; }
-      } else if (move === 'climb') {                       // a pillar beside this island; climb its face, the next island is on top or past it
-        var ph = ri(5, 8); gap = 1; nw = ri(3, 5);
-        var px = dir > 0 ? x + w : x - 1;                  // pillar is one tile wide, ph tall, flush with the island edge so you grab it from the island
-        if (dir > 0 ? px + 1 + nw > 25 : px - nw < 1) { dir = -dir; px = dir > 0 ? x + w + gap : x - gap - 1; }
-        px = Math.max(2, Math.min(24, px));
-        fill(px, px, y - ph, y - 1, '#');
-        nx = dir > 0 ? px + 1 : px - nw; ny = y - ph;      // the landing joins the pillar top on its far side
-        nx = Math.max(1, Math.min(25 - nw + 1, nx));
-        fill(nx, nx + nw - 1, ny, ny, '#');
-        isl.pillar = px; isl.ph = ph; isl.side = dir;
-      } else if (move === 'chimney') {                     // two facing walls hang above the end of this island; jump up into the gap and bounce between them
-        var ch = ri(6, 9), cw = 4, cx = dir > 0 ? x + w - cw - 2 : x;          // the chimney straddles the last cw+2 tiles of the island
-        if (w < cw + 2) { var ext = cw + 2 - w; if (dir > 0) { fill(x + w, x + w + ext - 1, y, y, '#'); w += ext; cx = x + w - cw - 2; } else { fill(x - ext, x - 1, y, y, '#'); x -= ext; w += ext; cx = x; } }
-        var wallBot = y - 4, wallTop = wallBot - ch;                            // the walls start 3 tiles above the island so you can walk under and jump up
-        fill(cx, cx, wallTop, wallBot, '#'); fill(cx + cw + 1, cx + cw + 1, wallTop, wallBot, '#');
-        nx = cx; nw = cw + 2; ny = wallTop;
-        fill(nx, nx + nw - 1, ny, ny, '#'); set(nx + 1 + ri(0, cw - 1), ny, '.');     // a hole in the lid to come up through
-        isl.hole = -1; for (i = nx; i < nx + nw; i++) if (at(i, ny) === '.') isl.hole = i;
-        isl.cx = cx; isl.cw = cw; isl.ch = ch; isl.wallBot = wallBot;
-        nx = cx; ny = wallTop;
-      } else if (move === 'spring') {                      // a spring on this island fires you up to a high slab
-        var sxp = dir > 0 ? x + w - 1 : x; set(sxp, y - 1, 'u'); stats.springs++;
-        nw = ri(3, 5); nx = Math.max(1, Math.min(25 - nw + 1, sxp - Math.floor(nw / 2))); ny = y - ri(9, 11);
-        fill(nx, nx + nw - 1, ny, ny, '#'); isl.spring = sxp;
-      } else {                                             // a platform (or zip) on a vertical track up to the next slab
-        var tx = dir > 0 ? x + w + 1 : x - 2, rise2 = ri(6, 9);
-        if (tx < 2 || tx > 24) { dir = -dir; tx = dir > 0 ? x + w + 1 : x - 2; }
-        tx = Math.max(2, Math.min(24, tx));
+        if (k === 0) hp = [3, 3, 'jump', 3];                                 // the first island: a plain jump up from the floor
+        var rise = hp[0], gap = hp[1]; nw = ri(hp[3], 6);
+        isl.recipe = hp[2]; isl.gap = gap; isl.rise = rise; isl.land = hp[3];   // land: how many tiles from the near edge the landing can use
+        nx = d > 0 ? x + w + gap : x - gap - nw; ny = y - rise;
+        if (nx < 1 || nx + nw - 1 > 25) { nw = hp[3]; nx = d > 0 ? x + w + gap : x - gap - nw; }
+        if (nx < 1 || nx + nw - 1 > 25) return null;
+        slab(cand, nx, nw, ny);
+        var a0 = d > 0 ? x + w - 1 : nx + nw, a1 = d > 0 ? nx - 1 : x;   // the arc: from the take-off column across the gap
+        if (k === 0) { a0 = d > 0 ? nx - gap - 1 : nx + nw; a1 = d > 0 ? nx - 1 : nx + nw + gap; }
+        cand.needs.push([Math.max(1, a0), Math.min(25, a1), y - 5, y - 1]);   // the jump peaks three and a half rows over the take-off
+        isl.gapCols = [Math.max(1, a0), Math.min(25, a1)];
+      } else if (move === 'climb') {                       // a pillar flush with this island's edge: climb its face, the landing joins its top on the far side
+        var ph = ri(5, 8); nw = ri(3, 5);
+        var px = d > 0 ? x + w : x - 1;
+        nx = d > 0 ? px + 1 : px - nw; ny = y - ph;
+        if (px < 2 || px > 24 || nx < 1 || nx + nw - 1 > 25) return null;
+        column(cand, px, y - ph, y - 1); slab(cand, nx, nw, ny);
+        cand.needs.push([px - d, px - d, y - ph - 4, y - 1]); cand.needs.push([px, px, y - ph - 4, y - ph - 1]);
+        isl.pillar = px; isl.ph = ph; isl.side = d;
+        nx = Math.min(nx, px); nw++;                       // the pillar top is part of the landing
+      } else if (move === 'chimney') {                     // a stepped pillar: climb the first step, rest on it, climb the second, higher still
+        var ph1 = ri(4, 6), ph2 = ri(4, 6); nw = ri(3, 5);
+        var p1 = d > 0 ? x + w : x - 1, p2 = p1 + d, top2 = y - ph1 - ph2;
+        nx = d > 0 ? p2 + 1 : p2 - nw; ny = top2;
+        if (p1 < 2 || p1 > 24 || p2 < 2 || p2 > 24 || nx < 1 || nx + nw - 1 > 25) return null;
+        column(cand, p1, y - ph1, y - 1); column(cand, p2, top2, y - 1); slab(cand, nx, nw, ny);
+        cand.needs.push([p1 - d, p1 - d, y - ph1 - 4, y - 1]); cand.needs.push([p1, p1, top2 - 4, y - ph1 - 1]); cand.needs.push([p2, p2, top2 - 4, top2 - 1]);
+        isl.p1 = p1; isl.ph1 = ph1; isl.p2 = p2; isl.ph2 = ph2; isl.side = d; isl.mid = y - ph1;
+        nx = Math.min(nx, p2); nw++;
+      } else if (move === 'spring') {                      // a spring at this island's far end throws you six rows up; hold the direction and you drift onto the slab
+        if (w <= islands[k].land || d !== (islands[k].from || islands[k].dir)) return null;   // the spring sits at the far end, past where you land
+        var sxp = d > 0 ? x + w - 1 : x; nw = ri(4, 5);
+        nx = d > 0 ? sxp + 4 : sxp - 3 - nw; ny = y - 6;
+        if (nx < 1 || nx + nw - 1 > 25) return null;
+        cand.tiles.push([sxp, y - 1, 'u', true]); slab(cand, nx, nw, ny);
+        cand.needs.push([Math.min(sxp, nx), Math.max(sxp, nx + nw - 1), y - 9, y - 2]);
+        isl.spring = sxp;
+      } else if (move === 'zip') {                         // a platform (or zip) at the island's end rides a track up; it stops a row above a slab one tile over, so you step off and drop onto it
+        var tx = d > 0 ? x + w : x - 1, rise2 = ri(6, 9); nw = ri(3, 5);
+        nx = d > 0 ? tx + 2 : tx - 1 - nw; ny = y - rise2;
+        if (tx < 2 || tx > 24 || nx < 1 || nx + nw - 1 > 25) return null;
         var zip = EL.zips && (!EL.movers || rnd() < 0.5);
-        fill(tx, tx, y - rise2, y - 2, '|'); set(tx, y - 1, zip ? 'z' : '='); if (zip) stats.zips++; else stats.platforms++;
-        nw = ri(3, 5); nx = dir > 0 ? tx + 1 : tx - nw; ny = y - rise2 - 1;
-        if (nx < 1) nx = 1; if (nx + nw > 25) nx = 25 - nw + 1;
-        fill(nx, nx + nw - 1, ny, ny, '#'); isl.track = tx; isl.zip = zip;
+        for (var yy = y - rise2 - 1; yy <= y - 1; yy++) cand.tiles.push([tx, yy, '|']);
+        cand.tiles.push([tx, y, zip ? 'z' : '=']); slab(cand, nx, nw, ny);
+        cand.needs.push([tx, tx, y - rise2 - 5, y - rise2 - 2]); cand.needs.push([tx + d, tx + d, y - rise2 - 5, y - rise2 - 1]); cand.needs.push([tx - d, tx - d, y - rise2 - 2, y - 1]);
+        isl.track = tx; isl.zip = zip;
+      } else if (move === 'shelf') {                       // the turn: a shelf over this slab's far part; stand at the near end, jump straight up, drift onto it, go back the other way
+        var ad = islands[k].from || islands[k].dir, ld = islands[k].land || 3, stand = ad > 0 ? x + ld - 1 : x + w - ld, off = rnd() < 0.7 ? 1 : 2, rise3 = off === 1 ? 3 : 2;   // one tile off goes three rows up (the way back needs the height), two tiles off only two   // stand past the landing zone, so the shelf never sits in the arc that arrives here
+        nw = ri(3, 5); if (ad > 0) nw = Math.min(nw, 25 - stand - off + 1); else nw = Math.min(nw, stand - off);   // as wide as the wall allows
+        nx = ad > 0 ? stand + off : stand - off - nw + 1; ny = y - rise3;
+        if (nw < 3 || nx < 1 || nx + nw - 1 > 25) return null;
+        ignore = [x, x + w - 1, y - 4, y - 1];
+        slab(cand, nx, nw, ny);
+        cand.needs.push([stand, stand, y - 5, y - 1]); cand.needs.push([Math.min(stand, nx), Math.max(stand, nx + nw - 1), ny - 4, y - 1]);   // the stand column and the drift across
+        isl.stand = stand; isl.dir = -ad; isl.from = ad;
+        cand.release = ad > 0 ? [stand + 1, x + w - 1, y - 4, y - 1] : [x, stand - 1, y - 4, y - 1];   // the slab's far part is never stood on again: its room is free for the way back
+      } else return null;
+      if (move !== 'shelf' && (d > 0 ? nx > 20 : nx + nw - 1 < 6)) return null;   // leave room past the landing for a shelf and the way back
+      isl.x = nx; isl.w = nw; isl.y = ny; if (!isl.land) isl.land = 3;
+      return cand;
+    }
+    var usedKey = false, usedGem = false;
+    while (y > 9) {
+      var cand = null, tries;
+      for (tries = 0; tries < 40 && !cand; tries++) {
+        var move = k === 0 ? 'hop' : pick({ hop: 6, climb: 3, chimney: D >= 2 ? 2 : 0, spring: EL.springs !== false && islands[k].move !== 'shelf' ? 1.5 : 0, zip: EL.zips || EL.movers ? 1.5 : 0, shelf: islands[k].move === 'shelf' || islands[k].move === 'spring' ? 0 : (tries < 20 ? 1.5 : 4) });
+        var d = tries < 20 ? dir : -dir;                  // after a few misses, try the other way
+        ignore = null;
+        if (move === 'hop') {                              // a hop tries every recipe in the pool, in a random order
+          var pool = HOPS.slice(), hi2 = pool.length;
+          while (hi2 > 0 && !cand) { var pi = ri(0, hi2 - 1), hp = pool[pi]; pool[pi] = pool[--hi2]; cand = planMove(move, d, hp); if (cand && !fits(cand)) cand = null; }
+        } else { cand = planMove(move, d); if (cand && !fits(cand)) cand = null; }
       }
-      isl.x = nx; isl.w = nw; isl.y = ny; isl.dir = dir;
-      if (EL.keys && !usedKey && k >= 2 && rnd() < 0.5) { set(nx + Math.floor(nw / 2), ny - 1, 'k'); usedKey = true; stats.keys++; }
-      if (EL.gems !== false && !usedGem && k >= 1 && isl.spikes) { set(isl.spikes[0], ny - 4, 'G'); usedGem = true; stats.gems++; }
+      if (!cand) break;
+      var isl = cand.isl; commit(cand);
+      if (isl.move === 'zip') { if (isl.zip) stats.zips++; else stats.platforms++; }
+      if (isl.move === 'spring') stats.springs++;
+      if (isl.move === 'hop' && k > 0) hopGaps.push(isl);
+      if (EL.keys && !usedKey && k >= 2 && rnd() < 0.5) { set(isl.x + Math.floor(isl.w / 2), isl.y - 1, 'k'); isl.key = true; usedKey = true; stats.keys++; }
+      if (EL.gems !== false && !usedGem && isl.move === 'hop' && k >= 2 && rnd() < 0.4) { set(isl.gapCols[d > 0 ? 1 : 0], Math.min(y, isl.y) - 4, 'G'); usedGem = true; stats.gems++; }
+      else if (EL.refills && isl.move === 'hop' && k >= 2 && rnd() < 0.3) set(isl.gapCols[d > 0 ? 1 : 0], Math.min(y, isl.y) - 4, 'o');
       islands.push(isl); stats.islands++;
-      x = nx; w = nw; y = ny; k++;
+      x = isl.x; w = isl.w; y = isl.y; dir = isl.dir; k++;
       if (rnd() < 0.3) dir = -dir;                         // zigzag now and then
     }
-    // the exit: on the last island, or a slab beside it
-    var ex = x + (dir > 0 ? w - 2 : 0); fill(ex, ex + 1, y - 2, y - 1, 'E');
-    if (stats.keys) { var dx0 = dir > 0 ? ex - 1 : ex + 2; set(dx0, y - 1, 'D'); set(dx0, y - 2, 'D'); }
+    // the exit on the last island; a locked door in front of it when a key is out (only if the slab has room)
+    var last = islands[islands.length - 1], prev = islands[islands.length - 2];
+    if (last.key) {                                      // the key never sits on the exit slab: move it one slab back, or drop it
+      set(last.x + Math.floor(last.w / 2), last.y - 1, '.'); last.key = false;
+      if (islands.length > 3 && at(prev.x + Math.floor(prev.w / 2), prev.y - 1) === '.') { set(prev.x + Math.floor(prev.w / 2), prev.y - 1, 'k'); prev.key = true; } else stats.keys = 0;
+    }
+    var ex = x + (dir > 0 ? w - 2 : 0); fill(ex, ex + 1, y - 2, y - 1, 'E'); last.exitDir = dir;
+    if (stats.keys) {
+      if (w >= 5) { var dx0 = dir > 0 ? ex - 1 : ex + 2; set(dx0, y - 1, 'D'); set(dx0, y - 2, 'D'); }
+      else { for (i = 0; i < islands.length; i++) if (islands[i].key) { set(islands[i].x + Math.floor(islands[i].w / 2), islands[i].y - 1, '.'); islands[i].key = false; } stats.keys = 0; }
+    }
+    // hazards live on the floor under the gaps: a miss costs a life instead of a walk back. The run-up strip to the
+    // first hop stays clear. Lots means the whole floor beyond it.
+    if (HZ > 0 && islands.length > 1) {
+      var hz = EL.firepits ? 'F' : '^', f1 = islands[1], safe0 = f1.dir > 0 ? 1 : f1.x + f1.w + f1.gap - 1, safe1 = f1.dir > 0 ? f1.x - f1.gap : 25;
+      var frow = ROWS - 3;
+      if (HZ >= 2 && D >= 2) { for (c = 1; c <= 25; c++) if ((c < safe0 || c > safe1) && g[frow][c] === '.') { g[frow][c] = hz; stats[EL.firepits ? 'fire' : 'spikes']++; } }
+      else if (D >= 2) for (i = 0; i < hopGaps.length; i++) { var hg = hopGaps[i]; if (rnd() < [0, 0.4, 0.6, 0.8, 1][D - 1]) for (c = hg.gapCols[0]; c <= hg.gapCols[1]; c++) if ((c < safe0 || c > safe1) && g[frow][c] === '.') { g[frow][c] = hz; stats[EL.firepits ? 'fire' : 'spikes']++; } }
+    }
     if (EL.lava && ROWS >= 96) { for (var lc = 1; lc < COLS - 1; lc++) g[ROWS - 1][lc] = '~'; stats.lava = 1; }
-    // shaping: the side walls bulge in where no island needs the space, and a dim backdrop behind the route
+    // shaping: the side walls bulge in where the route needs nothing, and a dim backdrop behind the slabs
     if (SHAPE) {
-      for (r = 2; r < ROWS - 3; r++) {
-        var lw = 0, rw = 0;
-        for (i = 0; i < islands.length; i++) { var q = islands[i]; if (r >= q.y - 8 && r <= q.y + 1) { lw = Math.max(lw, 0); } }
-        var free = true; for (i = 0; i < islands.length && free; i++) { q = islands[i]; if (r >= q.y - 8 && r <= q.y + 1 && q.x <= 5) free = false; }
-        var free2 = true; for (i = 0; i < islands.length && free2; i++) { q = islands[i]; if (r >= q.y - 8 && r <= q.y + 1 && q.x + q.w - 1 >= 21) free2 = false; }
-        if (r >= ROWS - 9) continue;                        // the floor strip stays open so you can walk back to the start after a fall
-        if (free && (r % 7 < 4)) fill(1, 1 + ri(1, 3), r, r, '#');
-        if (free2 && ((r + 3) % 7 < 4)) fill(25 - ri(1, 3), 25, r, r, '#');
+      for (r = 2; r < ROWS - 5; r++) {
+        if (r % 7 < 4) { var lw = ri(1, 3); for (c = 1; c <= lw; c++) if (freeCell(c, r) && !need[r][c + 1]) set(c, r, '#'); else break; }
+        if ((r + 3) % 7 < 4) { var rw = ri(1, 3); for (c = 25; c > 25 - rw; c--) if (freeCell(c, r) && !need[r][c - 1]) set(c, r, '#'); else break; }
       }
-      for (i = 0; i < islands.length; i++) { q = islands[i]; var bh = ri(2, 5), bx = q.x + ri(0, Math.max(0, q.w - 3)), bw = ri(2, 3); for (r = q.y + 1; r <= q.y + bh; r++) for (c = bx; c < bx + bw; c++) if (at(c, r) === '.') set(c, r, 'b'); }
+      for (i = 1; i < islands.length; i++) { var q = islands[i]; var bh = ri(2, 5), bx = q.x + ri(0, Math.max(0, q.w - 3)), bw = ri(2, 3); for (r = q.y + 1; r <= q.y + bh; r++) for (c = bx; c < bx + bw; c++) if (at(c, r) === '.') set(c, r, 'b'); }
     }
     for (i = 0; i < islands.length; i++) plan.push(islands[i]);
     return {
-      plan: { kind: 'islands', islands: islands }, stats: stats,
+      plan: { kind: 'islands', islands: islands }, stats: stats, top: y,
       room: { format: 1, id: 'auto-' + seed, name: 'Auto ' + seed, difficulty: D, world: WORLD || 1, grid: { cols: COLS, rows: ROWS, tile: 10 },
               tiles: g.map(function (row) { return row.join(''); }), entities: [] }
     };

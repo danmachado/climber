@@ -170,75 +170,77 @@ const fs = require('fs');
         const feetOn = (q) => s.ground && s.y + 10 === q.y * 10 && s.x + 8 > q.x * 10 && s.x < (q.x + q.w) * 10;
         const goTo = (px, tol, max) => { let lastX = -1, same = 0; until(() => { const dx = s.x + 4 < px - tol ? 1 : (s.x + 4 > px + tol ? -1 : 0); if (s.x === lastX) same++; else same = 0; lastX = s.x; return { x: dx, jump: same > 6 && s.ground }; }, () => Math.abs(s.x + 4 - px) <= tol && s.ground, max || 300); };   // hop over anything low in the way
         const standing = () => { for (let j = isl.length - 1; j >= 0; j--) if (feetOn(isl[j])) return j; return -1; };
-        let retries = 0;
+        const miss = (q) => { if (s.ground && !feetOn(q)) throw new Error('missed at ' + where + ' at ' + s.x + ',' + s.y + ' want y ' + (q.y * 10 - 10) + ' x ' + q.x * 10 + '-' + (q.x + q.w) * 10); };
+        let retries = 0, deaths = 0;
         for (let k = 1; k < isl.length; k++) {
           const q = isl[k], p = isl[k - 1], d = q.x + q.w / 2 > p.x + p.w / 2 ? 1 : -1;
           where = 'island ' + k + ' ' + q.move;
-          if (!feetOn(p)) {                                  // fell somewhere: settle, find the island we are on, and redo from there
-            until(() => ({}), () => s.ground, 300);
-            const j = standing(); if (j < 0 || ++retries > 6) throw new Error('lost at ' + where);
-            if (j < k - 1) { k = j; continue; }
-          }
-          const gapT = d > 0 ? q.x - (k === 1 ? 0 : p.x + p.w) : (k === 1 ? 26 : p.x) - (q.x + q.w);
-          const edgeX = k === 1 ? (d > 0 ? q.x * 10 - 40 : (q.x + q.w) * 10 + 40) : (d > 0 ? (p.x + p.w) * 10 - 6 : p.x * 10 + 6);   // the take-off edge: from the floor, four tiles short of the island
-          const landX = q.spikes ? (d > 0 ? (q.x + 1) * 10 + 5 : (q.x + q.w - 1) * 10 - 5) : (q.x + q.w / 2) * 10;   // the safe part of the next island
-          if (q.move === 'hop') {
-            if (window.__tr) window.__tr.push('edge' + edgeX + ' land' + landX);
-            // back up a few tiles, then run at the edge and jump as it goes by, so the jump carries full run speed
-            goTo(edgeX - d * 30, 4);
-            until(() => ({ x: d }), () => (d > 0 ? s.x + 4 >= edgeX - 2 : s.x + 4 <= edgeX + 2), 120);
-            const gapPx = Math.abs(landX - edgeX), rise = (p.y - q.y);
-            let k2 = 0, dashed = false;
-            step({ x: d, jump: true });
-            while (true) {
-              // a wide gap: dash sideways a few frames into the jump; a tall rise: dash up-and-over near the apex
-              const wantDash = !dashed && !s.ground && q.dash && k2 >= 3 && s.vy > -80;      // a wide gap: a sideways dash near the apex
-              if (wantDash) dashed = true;
-              const over = d > 0 ? s.x + 4 >= landX - 6 : s.x + 4 <= landX + 6, past = d > 0 ? s.x + 4 > landX + 4 : s.x + 4 < landX - 4;
-              step({ x: past ? -d : (over ? 0 : d), jump: s.vy < 0 && k2 < 14, dash: wantDash });
-              if (feetOn(q)) break;
-              if (++k2 > 240) throw new Error('stuck at ' + where);
+          try {
+            if (!feetOn(p)) {                                // fell somewhere: settle, find the island we are on, and redo from there
+              until(() => ({}), () => s.ground, 300);
+              const j = standing(); if (j < 0 || ++retries > 6) throw new Error('lost at ' + where);
+              if (j < k - 1) { k = j; continue; }
             }
-            goTo(landX, 6, 200);
-          } else if (q.move === 'climb') {
-            // walk to the pillar, grab it, climb to the top, step onto the landing on the far side
-            const sd = q.side, faceX = sd > 0 ? q.pillar * 10 : (q.pillar + 1) * 10;
-            goTo(sd > 0 ? faceX - 5 : faceX + 5, 2);
-            until((k2) => ({ x: sd, y: -1, grab: true, jump: k2 === 0 }), () => s.y + 10 <= q.y * 10, 500);     // climb until the feet are above the pillar top
-            until((k2) => ({ x: sd, jump: k2 < 2 || (s.vy < 0 && k2 < 10) }), () => feetOn(q), 200);          // a little hop over the lip onto the landing
-            goTo(landX, 6, 200);
-          } else if (q.move === 'chimney') {
-            // walk under the hole, then wall jump up between the walls until standing on the lid
-            // stand under the hole in the lid, jump up into the chimney, then wall jump from side to side until out the hole
-            const holeX = q.hole * 10 + 5, leftW = (q.cx + 1) * 10, rightW = (q.cx + 1 + q.cw) * 10;
-            goTo(holeX, 2);
-            let k2 = 0, side = holeX - leftW < rightW - holeX ? 1 : -1, grabbing = false;
-            while (!(s.ground && s.y + 10 <= q.y * 10)) {
-              const px = s.x, pr = s.x + 8;
-              const onL = px <= leftW + 1, onR = pr >= rightW - 1;
-              if (s.ground) step({ jump: true });
-              else if (s.y + 10 <= q.y * 10 + 10) step({ x: Math.abs(s.x + 4 - holeX) > 2 ? (s.x + 4 < holeX ? 1 : -1) : 0, jump: s.vy < 0 });   // near the lid: aim for the hole
-              else if (onL && s.vy > -20) { step({ x: 1, jump: true }); side = 1; }
-              else if (onR && s.vy > -20) { step({ x: -1, jump: true }); side = -1; }
-              else step({ x: side, jump: s.vy < 0 });
-              if (++k2 > 600) throw new Error('stuck at ' + where);
+            const landX = (q.x + q.w / 2) * 10;
+            if (q.move === 'hop') {
+              // the recipe the generator measured: run at the slab edge, jump as the leading edge reaches it, hold 12 frames,
+              // dash sideways at frame 5 if the recipe says so. The take-off edge is the previous island's far edge, or for
+              // the floor, the point gap tiles short of the landing.
+              const edgePx = k === 1 ? (d > 0 ? q.x * 10 - q.gap * 10 : (q.x + q.w) * 10 + q.gap * 10) : (d > 0 ? (p.x + p.w) * 10 : p.x * 10);
+              const backPx = k === 1 ? 60 : Math.min(40, p.w * 10 - 12);           // run-up stays on the slab we stand on
+              goTo(edgePx - d * backPx, 3);
+              until(() => ({ x: d }), () => (d > 0 ? s.x + 8 >= edgePx - 1 : s.x <= edgePx + 1), 120);
+              s = step({ x: d, jump: true });
+              let k2 = 0;
+              while (!feetOn(q)) { step({ x: d, jump: k2 < 12, dash: q.recipe === 'dash' && k2 === 5 }); if (k2 > 12) miss(q); if (++k2 > 90) throw new Error('stuck at ' + where); }
+              goTo(landX, 6, 200);
+            } else if (q.move === 'climb') {
+              // stand against the pillar, hold grab and up: the climb pops you onto the top, then walk onto the landing
+              const sd = q.side, faceX = sd > 0 ? q.pillar * 10 : (q.pillar + 1) * 10;
+              goTo(sd > 0 ? faceX - 5 : faceX + 5, 2);
+              until(() => ({ x: sd, y: -1, grab: true }), () => s.ground && s.y + 10 <= q.y * 10, 500);
+              goTo(landX, 6, 300);
+            } else if (q.move === 'chimney') {
+              // a stepped pillar: climb the first step and pop onto it, stand on it, climb the second, walk onto the landing
+              const sd = q.side, f1 = sd > 0 ? q.p1 * 10 : (q.p1 + 1) * 10;
+              goTo(sd > 0 ? f1 - 5 : f1 + 5, 2);
+              until(() => ({ x: sd, y: -1, grab: true }), () => s.ground && s.y + 10 <= q.mid * 10, 500);   // the hop off the first step often grabs the second and keeps going
+              if (!feetOn(q)) { goTo(q.p1 * 10 + 5, 2, 60); until(() => ({ x: sd, y: -1, grab: true }), () => s.ground && s.y + 10 <= q.y * 10, 500); }
+              goTo(landX, 6, 300);
+            } else if (q.move === 'spring') {
+              // walk onto the spring, hold jump and the direction through the rise, steer onto the slab on the way down
+              const sx = q.spring * 10 + 5;
+              until(() => ({ x: s.x + 4 < sx ? 1 : -1 }), () => s.vy < -150, 300);
+              until(() => ({ x: d, jump: true }), () => s.vy >= 0, 80);
+              until(() => ({ x: s.x + 4 < landX - 4 ? 1 : (s.x + 4 > landX + 4 ? -1 : 0) }), () => { miss(q); return feetOn(q); }, 200);
+            } else if (q.move === 'zip') {
+              // the mover sits level with the slab at its end: wait for it to be down, walk on, ride up, step off and drop onto the slab
+              const tx = q.track * 10 + 5, m0 = () => s.movers.filter(m => m.x === q.track * 10 && m.y >= (q.y - 1) * 10 && m.y <= p.y * 10)[0];   // the mover on this track (another zip may share the column higher up)
+              goTo(tx - d * 12, 3);
+              until(() => ({}), () => { const m = m0(); return m && m.y >= p.y * 10 - 1 && (m.z === 'idle' || m.wait > 0.15 || (m.axis === 'y' && m.dir < 0 && m.y >= p.y * 10 - 1)); }, 1200);
+              until(() => ({ x: s.x + 4 < tx - 2 ? 1 : (s.x + 4 > tx + 2 ? -1 : 0) }), () => Math.abs(s.x + 4 - tx) <= 2, 120);
+              until(() => ({}), () => s.ground && s.y + 10 <= (q.y - 1) * 10 + 1, 900);
+              until(() => ({ x: d }), () => feetOn(q), 80);
+              goTo(landX, 6, 200);
+            } else if (q.move === 'shelf') {
+              // the turn: stand at the slab's near end, jump straight up, drift onto the shelf once the jump peaks
+              const off = Math.abs((q.from > 0 ? q.x : q.x + q.w - 1) - q.stand);   // one tile off: jump from the tile centre; two: lean toward the shelf
+              const standX = q.stand * 10 + 5 + (off > 1 ? q.from * 3 : -q.from * 2);   // one tile off: lean away so the head clears the shelf's corner
+              goTo(standX, 6); until(() => ({}), () => s.vx === 0 && s.ground, 30);
+              for (let n = 0; n < 40 && Math.abs(s.x + 4 - standX) > 1; n++) { step({ x: s.x + 4 < standX ? 1 : -1 }); step({}); step({}); }   // creep the last few pixels so no momentum carries into the jump
+              until(() => ({}), () => s.vx === 0 && s.ground, 30);
+              s = step({ jump: true });
+              let k3 = 0;
+              while (!feetOn(q)) { step({ x: s.vy >= -40 ? q.from : 0, jump: k3 < 12 }); if (k3 > 12) miss(q); if (++k3 > 90) throw new Error('stuck at ' + where); }
+              goTo(landX, 6, 200);
             }
-            goTo(landX, 6, 200);
-          } else if (q.move === 'spring') {
-            goTo(q.spring * 10 + 5, 2);
-            until(() => ({ jump: true }), () => s.y + 10 <= q.y * 10 + 2, 150);
-            until((k2) => ({ x: s.x + 4 < landX - 4 ? 1 : (s.x + 4 > landX + 4 ? -1 : 0), jump: s.vy < 0 }), () => feetOn(q), 300);
-          } else if (q.move === 'zip') {
-            const tx = q.track * 10 + 5;
-            goTo(d > 0 ? tx - 12 : tx + 12, 3);
-            until(() => ({}), () => { const m = s.movers.filter(m => m.x === q.track * 10)[0]; return m && (m.z === 'idle' || m.wait > 0.2) && m.y >= (p.y - 2) * 10; }, 1200);
-            until((k2) => ({ x: Math.abs(s.x + 4 - tx) > 2 ? (s.x + 4 < tx ? 1 : -1) : 0, jump: k2 < 2 || s.vy < 0 }), () => s.ground && s.y + 10 <= (p.y - 1) * 10 && Math.abs(s.x + 4 - tx) <= 5, 300);
-            until(() => ({}), () => s.y + 10 <= (q.y + 1) * 10, 900);
-            until((k2) => ({ x: d, jump: k2 < 2 || s.vy < 0 }), () => feetOn(q), 300);
-            goTo(landX, 6, 200);
+          } catch (e) {
+            if (!e.message || e.message.indexOf('died') !== 0 || ++deaths > 6) throw e;
+            for (let f = 0; f < 200 && (s.dead || !s.ground); f++) { s = G.step(I({}), 1); frames++; }      // respawn and start over from the floor
+            k = 0;
           }
         }
-        where = 'exit'; until(() => ({ x: isl[isl.length - 1].dir || 1 }), () => false, 400);
+        where = 'exit'; until(() => ({ x: isl[isl.length - 1].exitDir || 1 }), () => false, 400);
         return { ok: false, why: 'ran out of islands' };
       }
     }
@@ -263,6 +265,6 @@ const fs = require('fs');
   const kinds = {};
   out.fail.forEach(f => { const k = f[1].replace(/floor \d+ /, '').replace(/ t\d+/, ''); kinds[k] = (kinds[k] || 0) + 1; });
   console.log('rooms', out.total, 'failed', out.fail.length, JSON.stringify(kinds, null, 0).slice(0, 1500));
-  console.log(out.fail.slice(0, ONE ? 1 : 4).map(f => ONE ? f.join(' => ') : f.join(' => ')).join('\n'), 'errors', JSON.stringify(errs).slice(0, 300));
+  console.log(out.fail.slice(0, ONE ? 1 : +(process.env.PRINT || 4)).map(f => ONE ? f.join(' => ') : f.join(' => ')).join('\n'), 'errors', JSON.stringify(errs).slice(0, 300));
   await b.close();
 })();

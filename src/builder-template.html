@@ -120,6 +120,8 @@
           <select id="g-diff"><option value="1">1 Gentle</option><option value="2" selected>2 Easy</option><option value="3">3 Medium</option><option value="4">4 Hard</option><option value="5">5 Brutal</option></select></label>
         <label>How many obstacles
           <select id="g-obs"><option value="0">Few</option><option value="1" selected>Some</option><option value="2">Lots</option></select></label>
+        <label>Layout
+          <select id="g-layout"><option value="floors" selected>Floors (corridors with obstacles)</option><option value="islands">Islands (floating slabs, pillars, climbing)</option><option value="mixed">Either (by seed)</option></select></label>
         <div>
           <span class="lab">Challenges (pick any)</span>
           <div class="chips" id="g-styles">
@@ -597,13 +599,13 @@
     lastSeed = seed;
     var styles = picked('g-styles'), els = {};
     Array.prototype.forEach.call($('g-els').children, function (b) { els[b.dataset.v] = !b.hidden && b.getAttribute('aria-pressed') === 'true'; });
-    var out = generateRoom({ difficulty: +$('g-diff').value, obstacles: +$('g-obs').value, styles: styles, spikes: +$('g-spikes').value, elements: els, world: room.world || 1, rows: ROWS }, seed);
+    var out = generateRoom({ difficulty: +$('g-diff').value, obstacles: +$('g-obs').value, styles: styles, spikes: +$('g-spikes').value, elements: els, world: room.world || 1, rows: ROWS, layout: $('g-layout').value }, seed);
     pushUndo(); setDb(null);
     tiles = out.room.tiles.map(function (r) { return r.split(''); });
     room = { id: out.room.id, name: out.room.name, difficulty: out.room.difficulty, entities: [], world: room.world || 1, level: room.level || 0, par: 0 };
     syncMeta();
     $('name').value = room.name; $('diff').value = String(room.difficulty);
-    var st = out.stats, bits = [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
+    var st = out.stats, bits = st.islands ? [st.islands + ' islands', st.spikes + ' spike tiles'] : [st.floors + ' floors', st.obstacles + ' obstacles', st.spikes + ' spike tiles'];
     if (st.springs) bits.push(st.springs + (st.springs === 1 ? ' spring' : ' springs')); if (st.gems) bits.push('a gem');
     if (st.fire) bits.push(st.fire + ' fire'); if (st.fireballs) bits.push(st.fireballs + (st.fireballs === 1 ? ' fireball' : ' fireballs'));
     if (st.ice) bits.push(st.ice + ' ice'); if (st.crumble) bits.push(st.crumble + ' crumble'); if (st.platforms) bits.push(st.platforms + (st.platforms === 1 ? ' platform' : ' platforms')); if (st.zips) bits.push(st.zips + (st.zips === 1 ? ' zip mover' : ' zip movers')); if (st.keys) bits.push('a key and a door'); if (st.jets) bits.push(st.jets + (st.jets === 1 ? ' fire jet' : ' fire jets')); if (st.lava) bits.push('rising lava'); if (st.lasers) bits.push(st.lasers + (st.lasers === 1 ? ' laser' : ' lasers')); if (st.drones) bits.push(st.drones + (st.drones === 1 ? ' drone' : ' drones'));
