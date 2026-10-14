@@ -1762,7 +1762,8 @@
   var CITY_KEY = 'climber.city.v1', cityOn = true, city = null;
   try { cityOn = localStorage.getItem(CITY_KEY) !== '0'; } catch (e) {}
   function setCity(on) { cityOn = on; allDirty = true; try { localStorage.setItem(CITY_KEY, on ? '1' : '0'); } catch (e) {} }
-  var CITY_ORDER = ['sky', '@far', 'far', 'farWin', '@mid', 'near', 'nearWin', 'cables', 'front'];
+  var CITY_ORDER = ['sky', '@far', 'far', 'farWin', '@mid', 'near', 'nearWin', '@near', 'cables', 'front'];
+  var DEPTH_LVL = { '@far': 1, '@mid': 2, '@near': 3 };                  // what hides each depth in the occlusion map
   function newCity(CL, D) {
     var c = { L: CL, D: D, movers: [], lanes: [], nextWin: tick + 90, nextShip: tick + 600 + Math.floor(Math.random() * 900), last: 0, sway: [], stats: { win: 0, sway: 0 } };
     // What is hidden where: the terrain hides everything, the near row hides the cars between the rows, and the far
@@ -1771,17 +1772,31 @@
     c.occ = new Uint8Array(LW * RH);
     for (i = 0; i < LW * RH; i++) c.occ[i] = fa[i * 4 + 3] === 255 ? 3 : (na[i * 4 + 3] === 255 ? 2 : (ra[i * 4 + 3] >= 200 ? 1 : 0));   // 3 terrain, 2 near row, 1 far rows, 0 sky
     function open(yy, hh, lvl) { var n = 0; for (x = 0; x < LW; x++) { var ok = true; for (var k = 0; k < hh && ok; k++) if (c.occ[(yy + k) * LW + x] >= lvl) ok = false; if (ok) n++; } return n; }
-    function lanes(depth, lvl, hh, count, y0, y1, speed) {               // the rows with the most open sky, spread apart, each kept inside one chunk row
-      var cand = [];
-      for (y = Math.max(2, y0); y < y1; y += 3) { var lr = ((y - 2) % CH + CH) % CH; if (lr > CH - hh - 4) continue; var n = open(y, hh, lvl); if (n >= 50) cand.push([n, y]); }
-      cand.sort(function (a, b) { return b[0] - a[0]; });
-      var got = [];
-      for (var j = 0; j < cand.length && got.length < count; j++) { var ok = true; for (var q = 0; q < got.length; q++) if (Math.abs(got[q] - cand[j][1]) < 14) ok = false; if (ok) got.push(cand[j][1]); }
-      for (j = 0; j < got.length; j++) c.lanes.push({ depth: depth, y: got[j], dir: (got[j] >> 2) % 2 ? -1 : 1, speed: speed[0] + Math.random() * speed[1] });
+    function lanes(depth, lvl, hh, count, y0, y1, speed) {
+      // Lanes at every height: the city's height is cut into bands and each band gets the row with the most open sky
+      // in it, so traffic passes high and low, slipping behind buildings and out through the gaps. A lane needs only
+      // a little open sky; a car is simply hidden (and costs nothing) while it is behind something.
+      for (var bnd = 0; bnd < count; bnd++) {
+        var a = Math.round(y0 + (y1 - y0) * bnd / count), z = Math.round(y0 + (y1 - y0) * (bnd + 1) / count), best = 0, by = -1;
+        for (y = Math.max(2, a); y < z; y += 2) { var lr = ((y - 2) % CH + CH) % CH; if (lr > CH - hh - 4) continue; var n = open(y, hh, lvl); if (n > best) { best = n; by = y; } }
+        if (best >= 20 && !c.lanes.some(function (l) { return l.depth === depth && Math.abs(l.y - by) < 14; })) c.lanes.push({ depth: depth, y: by, dir: bnd % 2 ? -1 : 1, speed: speed[0] + Math.random() * speed[1] });
+      }
     }
     var top = Math.max(D.h - D.h0 * 1.05, D.cityTop - 20, 14), bottom = D.h - 26;   // down among the buildings
-    lanes('@mid', 2, 3, 3, top, bottom, [13, 6]);
-    lanes('@far', 1, 1, 2, top, bottom, [6, 4]);
+    lanes('@mid', 2, 6, 4, top, bottom, [13, 6]);
+    lanes('@far', 1, 1, 3, top, bottom, [6, 4]);
+    // steam: off a few rooftops (middle and near rows) and up out of the street between the near buildings
+    var vents = [], sp;
+    function vent(x, yy, depth) { if (yy > 16 && x > 3 && x < LW - 4 && cityVisible([x - 2, yy - 13, 5, 11], DEPTH_LVL[depth], c)) vents.push({ x: x, y: yy, depth: depth }); }
+    for (i = 0; i < D.mid.length; i++) vent(D.mid[i][0] + Math.floor(D.mid[i][1] * (0.25 + Math.random() * 0.5)), D.h - D.mid[i][2], '@mid');
+    for (i = 0; i < D.near.length; i++) { vent(D.near[i][0] + Math.floor(D.near[i][1] * (0.25 + Math.random() * 0.5)), D.h - D.near[i][2], '@near'); if (i + 1 < D.near.length) vent(Math.round((D.near[i][0] + D.near[i][1] + D.near[i + 1][0]) / 2), D.h - 1, '@mid'); }
+    for (i = vents.length - 1; i > 0; i--) { var jj = Math.floor(Math.random() * (i + 1)), tv = vents[i]; vents[i] = vents[jj]; vents[jj] = tv; }
+    c.steam = 0;
+    for (i = 0; i < vents.length && c.steam < 2; i++) {
+      sp = vents[i]; var near = false; for (var q2 = 0; q2 < c.movers.length; q2++) if (Math.abs(c.movers[q2].x + 3 - sp.x) < 30 && Math.abs(c.movers[q2].y + 13 - sp.y) < 40) near = true;
+      if (near) continue;
+      c.movers.push({ kind: 'steam', depth: sp.depth, x: sp.x - 3, y: sp.y - 13, w: 7, h: 14, vx: 0, dir: 1, ph: Math.floor(Math.random() * 600), drift: Math.random() < 0.5 ? -1 : 1, shown: null }); c.steam++;
+    }
     c.shipY = -1; var best = 0;
     for (y = Math.max(14, D.h - D.h0); y < D.h - 60; y += 4) { var lr2 = ((y - 2) % CH + CH) % CH; if (lr2 > CH - 14) continue; var n2 = open(y, 9, 2); if (n2 > best + 10) { best = n2; c.shipY = y; } }
     if (best < 70) c.shipY = -1;                                          // nowhere open enough for the airship in this room
@@ -1802,9 +1817,9 @@
     }
     ctx.restore();
   }
-  function cityVisible(r, lvl) {                                            // can anything at this depth be seen in r?
-    var x0 = Math.max(0, r[0]), y0 = Math.max(0, r[1]), x1 = Math.min(LW, r[0] + r[2]), y1 = Math.min(RH, r[1] + r[3]);
-    for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) if (city.occ[y * LW + x] < lvl) return true;
+  function cityVisible(r, lvl, cc) {                                        // can anything at this depth be seen in r?
+    var occ = (cc || city).occ, x0 = Math.max(0, r[0]), y0 = Math.max(0, r[1]), x1 = Math.min(LW, r[0] + r[2]), y1 = Math.min(RH, r[1] + r[3]);
+    for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) if (occ[y * LW + x] < lvl) return true;
     return false;
   }
   function moverRect(m) { return [Math.round(m.x) - 2, m.y - 2, m.w + 4, m.h + 4]; }
@@ -1812,6 +1827,24 @@
     var x = Math.round(m.x), y = m.y, d = m.dir, i;
     function px(dx, dy, w, col) { b.fillStyle = col; b.fillRect(d > 0 ? x + dx : x + m.w - dx - w, y + dy, w, 1); }   // drawn facing right, mirrored for left
     if (m.kind === 'far') { px(0, 0, 1, '#ff4a6a'); px(1, 0, 1, '#1d1436'); px(2, 0, 1, '#fff1c0'); return; }
+    if (m.kind === 'steam') {                                                          // four puffs rising, spreading and thinning out
+      var qq = Math.floor((tick + m.ph) / 20), bx = x + 3, by = y + 13;
+      b.fillStyle = '#d8d0f0';
+      for (i = 0; i < 4; i++) {
+        var age = ((qq + i * 4) % 16) / 16, sz = age < 0.35 ? 1 : 2;
+        b.globalAlpha = 0.06 + 0.3 * (1 - age);
+        b.fillRect(Math.round(bx + Math.sin(age * 4 + m.ph) * 1.2 + age * m.drift * 2.5) - (sz > 1 ? 1 : 0), Math.round(by - age * 12), sz, sz);
+      }
+      b.globalAlpha = 1; return;
+    }
+    if (m.kind === 'heli') {                                                           // a small helicopter: rotor, cabin, tail boom, skids
+      y += Math.floor((tick + m.ph) / 45) % 2;                                       // it bobs a pixel as it flies
+      if (Math.floor((tick + m.ph) / 24) % 2) px(0, 0, 9, '#4a4070'); else px(2, 0, 5, '#4a4070');
+      px(5, 1, 1, '#2c2450'); px(0, 1, 1, '#151026');
+      px(0, 2, 8, '#151026'); px(7, 2, 1, '#38f0ff'); px(3, 3, 5, '#151026'); px(4, 4, 4, '#2c2450');
+      if (Math.floor((tick + m.ph) / 60) % 2) px(0, 2, 1, '#ff3a5a');
+      return;
+    }
     if (m.kind === 'car') {
       px(2, 0, 3, '#2c2450'); px(5, 0, 1, '#38f0ff');                                   // roof and windscreen
       px(0, 1, 7, '#151026'); px(0, 1, 1, '#ff3a5a'); px(6, 1, 1, '#ffe9a8');           // body, tail light, headlight
@@ -1879,14 +1912,15 @@
       city.stats.sway++;
     }
     // traffic: each lane sends a car across now and then; the airship comes by every minute or so
-    for (i = 0; i < city.lanes.length && !skip.cars; i++) {
-      var ln = city.lanes[i];
-      if (city.next[ln.depth] < 0 || tick < city.next[ln.depth] || Math.random() < 0.5) continue;   // that depth has a car out, or not yet
-      city.next[ln.depth] = -1;
-      m = ln.depth === '@far' ? { kind: 'far', w: 3, h: 1 } : { kind: 'car', w: 7, h: 3 };
-      m.depth = ln.depth; m.dir = ln.dir; m.y = ln.y; m.vx = ln.dir * ln.speed; m.lane = ln; m.x = ln.dir > 0 ? -m.w - 2 : LW + 2; m.shown = null;
-      city.movers.push(m);
-    }
+    ['@mid', '@far'].forEach(function (dep) {                                        // one flyer at a time per depth, on a lane picked at random
+      if (skip.cars || city.next[dep] < 0 || tick < city.next[dep]) return;
+      var ls = city.lanes.filter(function (l) { return l.depth === dep; }); if (!ls.length) return;
+      var ln = ls[Math.floor(Math.random() * ls.length)], heli = dep === '@mid' && Math.random() < 0.35;
+      city.next[dep] = -1;
+      var mm = dep === '@far' ? { kind: 'far', w: 3, h: 1 } : heli ? { kind: 'heli', w: 9, h: 6, ph: Math.floor(Math.random() * 600) } : { kind: 'car', w: 7, h: 3 };
+      mm.depth = dep; mm.dir = Math.random() < 0.5 ? 1 : -1; mm.y = ln.y; mm.vx = mm.dir * (heli ? 7 + Math.random() * 3 : ln.speed); mm.lane = ln; mm.x = mm.dir > 0 ? -mm.w - 2 : LW + 2; mm.shown = null;
+      city.movers.push(mm);
+    });
     if (tick >= city.nextShip && !city.ship && city.shipY >= 0) {
       var dirS = Math.random() < 0.5 ? 1 : -1, sy = city.shipY;
       city.ship = { kind: 'ship', depth: '@mid', w: 24, h: 9, dir: dirS, y: sy, vx: dirS * 4, x: dirS > 0 ? -28 : LW + 4, ph: Math.floor(Math.random() * 600), shown: null, glyphs: [Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), Math.floor(Math.random() * 16)] };
@@ -1894,16 +1928,16 @@
     }
     for (i = city.movers.length - 1; i >= 0; i--) {
       m = city.movers[i]; m.x += m.vx * dt;
-      if (m.x < -40 || m.x > LW + 40) {
+      if (m.kind !== 'steam' && (m.x < -40 || m.x > LW + 40)) {
         if (m.lane) city.next[m.depth] = tick + 180 + Math.floor(Math.random() * 420);   // the next one in 3 to 10 s
         if (m === city.ship) { city.ship = null; city.nextShip = tick + 2400 + Math.floor(Math.random() * 2400); }
         city.movers.splice(i, 1); continue;
       }
-      var mr = moverRect(m), key = Math.round(m.x) + (m.kind === 'ship' ? '/' + Math.floor((tick + m.ph) / 60) % 2 + '/' + Math.floor((tick + m.ph) / 75) : '');
+      var mr = moverRect(m), key = Math.round(m.x) + (m.kind === 'ship' ? '/' + Math.floor((tick + m.ph) / 60) % 2 + '/' + Math.floor((tick + m.ph) / 75) : m.kind === 'heli' ? '/' + Math.floor((tick + m.ph) / 24) + '/' + Math.floor((tick + m.ph) / 45) : m.kind === 'steam' ? '/' + Math.floor((tick + m.ph) / 20) : '');
       if (key !== m.shown) {
         m.shown = key;
         var ur = m.was ? [Math.min(mr[0], m.was[0]), mr[1], Math.max(mr[0] + mr[2], m.was[0] + m.was[2]) - Math.min(mr[0], m.was[0]), mr[3]] : mr;   // where it is and where it was
-        if (ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, m.depth === '@far' ? 1 : 2)) mark(ur[0], ur[1], ur[2], ur[3]);
+        if (ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, DEPTH_LVL[m.depth])) mark(ur[0], ur[1], ur[2], ur[3]);
         m.was = mr;
       }
     }
@@ -2794,7 +2828,7 @@
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     weather: function (on) { setWeather(on); return weather.on; },
-    city: function (on) { if (on === 'ship') { if (city) city.nextShip = tick; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, chunks: chunkCopies, tick: tick }; },
+    city: function (on) { if (on === 'ship') { if (city) city.nextShip = tick; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick }; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
     startLevel: startLevel,
     demoAll: function () { // plays every recorded demo to the end, to prove the recordings still reach the exit
