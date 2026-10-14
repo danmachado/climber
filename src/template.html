@@ -1084,6 +1084,16 @@
   document.addEventListener('fullscreenchange', layout);
   document.addEventListener('webkitfullscreenchange', layout);
 
+  // Neon signs: baked into the static layer in their lit state; the few animated ones are repainted here only when
+  // their frame changes (a sign is a rectangle of 10 to 30 px, so a change costs one chunk copy, like the hero moving).
+  var signs = [];
+  function stepSigns() {
+    for (var i = 0; i < signs.length; i++) {
+      var sg = signs[i], f = signFrame(sg, tick);
+      if (f !== sg.shown) { sg.shown = f; mark(sg.x - 1, sg.y - 1, sg.w + 2, sg.h + 2); }
+      if (f) { if (sg.kind === 'dot') drawDot(g, sg, f); else drawSign(g, sg, f); }
+    }
+  }
   function drawTileLayer() {
     tileLayer = document.createElement('canvas');
     tileLayer.width = LW; tileLayer.height = RH; allDirty = true;
@@ -1100,6 +1110,7 @@
     b.drawImage(wl, 0, 0);
     var seed = skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0));
     var lamps = drawDecals(b, cols, rows, function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols ? '#' : room.tiles[rr].charAt(cc); }, seed);
+    signs = []; if (lamps.signs) for (i = 0; i < lamps.signs.length; i++) if (lamps.signs[i].kind !== 'still') { lamps.signs[i].shown = 0; signs.push(lamps.signs[i]); }   // only the animated ones are kept
     for (i = 0; i < tracks.length; i++) drawTrack(b, tracks[i].x, tracks[i].y, tracks[i].v);
     for (i = 0; i < hazards.length; i++) if (hazards[i].dir < 4) drawSpike(b, hazards[i].tx, hazards[i].ty, hazards[i].dir);
     for (i = 0; i < jets.length; i++) if (jets[i].laser) drawEmitter(b, jets[i].x, jets[i].y); else drawVent(b, jets[i].x, jets[i].y);
@@ -1145,6 +1156,7 @@
       return;
     }
     g.drawImage(tileLayer, 0, 0);
+    if (signs.length) stepSigns();
     if (lava) {
       var ly = Math.floor(lava.y);
       drawLavaBody(g, ly, LW, RH, tick);

@@ -47,12 +47,24 @@ var SET4 = [
   ['Boss Rush',   { difficulty: 4, obstacles: 2, styles: [],        layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, crumble: true, zips: true, lasers: true, drones: true, gems: true, keys: true } }, 8417],
   ['Final Round', { difficulty: 5, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, lasers: true, drones: true, gems: true, keys: true } }, 8518]
 ];
+// World 5, Neon Row: the night city. Common pieces only for now, half of them island rooms.
+var SET5 = [
+  ['Night Shift', { difficulty: 1, obstacles: 0, styles: ['jump'],  spikes: 1, elements: { spikes: true, refills: true, springs: true } }, 9111],
+  ['Afterglow',   { difficulty: 1, obstacles: 1, styles: [],        layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, gems: true } }, 9112],
+  ['Static',      { difficulty: 2, obstacles: 1, styles: ['dash'],  spikes: 1, elements: { spikes: true, refills: true, zips: true, crumble: true, gems: true } }, 9213],
+  ['Downpour',    { difficulty: 2, obstacles: 1, styles: ['climb'], layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, springs: true, keys: true } }, 9214],
+  ['Signal',      { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, movers: true, zips: true, gems: true, keys: true } }, 9315],
+  ['Back Alley',  { difficulty: 3, obstacles: 2, styles: ['jump'],  layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, zips: true, crumble: true, keys: true, gems: true } }, 9316],
+  ['Overpass',    { difficulty: 4, obstacles: 2, styles: [],        spikes: 2, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, gems: true, keys: true } }, 9417],
+  ['Last Train',  { difficulty: 5, obstacles: 2, styles: [],        layout: 'islands', spikes: 2, elements: { spikes: true, refills: true, crumble: true, zips: true, springs: true, gems: true, keys: true } }, 9518]
+];
 // One tall (two-screen) level per world, so the scrolling camera has something to show.
 var TALL = [
   ['The Long Way', { difficulty: 2, obstacles: 1, styles: ['climb'], layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, crumble: true, movers: true, zips: true, springs: true, gems: true, keys: true }, world: 1, rows: 96 }, 7111],
   ['Cold Shaft',   { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, ice: true, springs: true, zips: true, gems: true, keys: true }, world: 2, rows: 96 }, 7212],
   ['The Chimney',  { difficulty: 3, obstacles: 1, styles: ['jump'],  layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, firepits: true, fireballs: true, jets: true, lava: true, springs: true, gems: true }, world: 3, rows: 96 }, 7313],
-  ['The Pyramid',  { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, zips: true, springs: true, lasers: true, drones: true, gems: true, keys: true }, world: 4, rows: 96 }, 7414]
+  ['The Pyramid',  { difficulty: 3, obstacles: 1, styles: [],        spikes: 1, elements: { spikes: true, refills: true, zips: true, springs: true, lasers: true, drones: true, gems: true, keys: true }, world: 4, rows: 96 }, 7414],
+  ['The Tower',    { difficulty: 3, obstacles: 1, styles: ['climb'], layout: 'islands', spikes: 1, elements: { spikes: true, refills: true, zips: true, springs: true, crumble: true, gems: true, keys: true }, world: 5, rows: 96 }, 7515]
 ];
 first.world = 1; first.level = 1;
 var starters = [first], plans = [null];
@@ -83,6 +95,12 @@ SET4.forEach(function (s, i) {
   s[1].world = 4;
   var out = generateRoom(s[1], s[2]);
   out.room.id = 'temple-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
+  starters.push(out.room); plans.push(out.plan);
+});
+SET5.forEach(function (s, i) {
+  s[1].world = 5;
+  var out = generateRoom(s[1], s[2]);
+  out.room.id = 'neon-0' + (i + 1); out.room.name = s[0]; out.room.level = i + 1;
   starters.push(out.room); plans.push(out.plan);
 });
 TALL.forEach(function (s, i) {
