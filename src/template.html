@@ -1112,12 +1112,14 @@
   var CITY_ORDER = ['sky', '@far', 'far', 'farWin', '@mid', 'near', 'nearWin', '@near', 'cables', 'front'];
   var DEPTH_LVL = { '@far': 1, '@mid': 2, '@near': 3 };                  // what hides each depth in the occlusion map
   function newCity(CL, D) {
-    var c = { L: CL, D: D, movers: [], lanes: [], nextWin: tick + 90, nextShip: tick + 600 + Math.floor(Math.random() * 900), last: 0, sway: [], stats: { win: 0, sway: 0 } };
+    var c = { L: CL, D: D, movers: [], lanes: [], nextWin: tick + 90, nextShip: tick + 600 + Math.floor(Math.random() * 900), last: 0, sway: [], stats: { win: 0, sway: 0, ev: 0 } };
     // What is hidden where: the terrain hides everything, the near row hides the cars between the rows, and the far
     // rows hide the far cars too. Nothing is redrawn or marked where it cannot be seen, and lanes go where it can.
     var fa = CL.front.getContext('2d').getImageData(0, 0, LW, RH).data, na = CL.near.getContext('2d').getImageData(0, 0, LW, RH).data, ra = CL.far.getContext('2d').getImageData(0, 0, LW, RH).data, i, y, x;
     c.occ = new Uint8Array(LW * RH);
-    for (i = 0; i < LW * RH; i++) c.occ[i] = fa[i * 4 + 3] === 255 ? 3 : (na[i * 4 + 3] === 255 ? 2 : (ra[i * 4 + 3] >= 200 ? 1 : 0));   // 3 terrain, 2 near row, 1 far rows, 0 sky
+    var hid = 0;
+    for (i = 0; i < LW * RH; i++) { c.occ[i] = fa[i * 4 + 3] === 255 ? 3 : (na[i * 4 + 3] === 255 ? 2 : (ra[i * 4 + 3] >= 200 ? 1 : 0)); if (c.occ[i] === 3) hid++; }   // 3 terrain, 2 near row, 1 far rows, 0 sky
+    if (hid > LW * RH * 0.97) c.occ.fill(0);                              // a browser that reads canvases back as solid (some privacy modes do) would hide everything: treat it all as open
     function open(yy, hh, lvl) { var n = 0; for (x = 0; x < LW; x++) { var ok = true; for (var k = 0; k < hh && ok; k++) if (c.occ[(yy + k) * LW + x] >= lvl) ok = false; if (ok) n++; } return n; }
     function lanes(depth, lvl, hh, count, y0, y1, speed) {
       // Lanes at every height: the city's height is cut into bands and each band gets the row with the most open sky
@@ -1176,10 +1178,10 @@
     if (m.kind === 'far') { px(0, 0, 1, '#ff4a6a'); px(1, 0, 1, '#1d1436'); px(2, 0, 1, '#fff1c0'); return; }
     if (m.kind === 'steam') {                                                          // four puffs rising, spreading and thinning out
       var qq = Math.floor((tick + m.ph) / 20), bx = x + 3, by = y + 13;
-      b.fillStyle = '#d8d0f0';
+      b.fillStyle = '#f4f0ff';
       for (i = 0; i < 4; i++) {
         var age = ((qq + i * 4) % 16) / 16, sz = age < 0.35 ? 1 : 2;
-        b.globalAlpha = 0.06 + 0.3 * (1 - age);
+        b.globalAlpha = 0.1 + 0.45 * (1 - age);
         b.fillRect(Math.round(bx + Math.sin(age * 4 + m.ph) * 1.2 + age * m.drift * 2.5) - (sz > 1 ? 1 : 0), Math.round(by - age * 12), sz, sz);
       }
       b.globalAlpha = 1; return;
@@ -1232,7 +1234,7 @@
           x0 = Math.min(x0, sl.x); x1 = Math.max(x1, sl.x + sl.s);
         }
         var wr = [x0, fl[st].y, x1 - x0, fl[st].s];
-        if (cityVisible(wr, 3)) { cityRecompose(wr); city.stats.win++; } else cityCompose(tileLayer.getContext('2d'), wr[0], wr[1], wr[2], wr[3], false);
+        if (cityVisible(wr, 3)) { cityRecompose(wr); city.stats.win++; city.stats.ev++; } else cityCompose(tileLayer.getContext('2d'), wr[0], wr[1], wr[2], wr[3], false);
       }
     }
     // cables bob
@@ -1254,7 +1256,7 @@
         cc.save(); cc.beginPath(); cc.rect(r[0], r[1], r[2], r[3]); cc.clip();
         for (var k = 0; k < D.cables.length; k++) drawCable(cc, D.cables[k], city.sway[k], LW, r[0], r[0] + r[2]);
         cc.restore();
-        if (q.yb + 3 >= v0 && q.ya <= v1 && cityVisible(r, 3)) cityRecompose(r); else cityCompose(tileLayer.getContext('2d'), r[0], r[1], r[2], r[3], false);
+        if (q.yb + 3 >= v0 && q.ya <= v1 && cityVisible(r, 3)) { cityRecompose(r); city.stats.ev++; } else cityCompose(tileLayer.getContext('2d'), r[0], r[1], r[2], r[3], false);
       }
       city.stats.sway++;
     }
@@ -1284,7 +1286,7 @@
       if (key !== m.shown) {
         m.shown = key;
         var ur = m.was ? [Math.min(mr[0], m.was[0]), mr[1], Math.max(mr[0] + mr[2], m.was[0] + m.was[2]) - Math.min(mr[0], m.was[0]), mr[3]] : mr;   // where it is and where it was
-        if (ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, DEPTH_LVL[m.depth])) mark(ur[0], ur[1], ur[2], ur[3]);
+        if (ur[1] + ur[3] > v0 && ur[1] < v1 && cityVisible(ur, DEPTH_LVL[m.depth])) { mark(ur[0], ur[1], ur[2], ur[3]); city.stats.ev++; }
         m.was = mr;
       }
     }
@@ -1463,7 +1465,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
+    var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     drawWeather();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
@@ -1739,7 +1741,7 @@
       h.fillStyle = sg < segs ? (canDash ? C.flame : C.hurt) : '#232c55';
       h.fillRect(Math.round((106 + sg * 6 + (shaky() && sg % 2 === Math.floor(tick / 6) % 2 ? 1 : 0)) * u), Math.round(3 * u), Math.round(5 * u), Math.round(6 * u));
     }
-    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS', 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
+    if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS' + (city ? (cityOn ? '  CITY ' + Math.max(0, fps.city) : '  CITY OFF') : ''), 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
     if (wiz.on) drawWiz(u);
     if (run.won && run.result) {
@@ -2121,6 +2123,7 @@
         fps.now = Math.round(fps.frames / fps.acc); fps.secs++; fps.ms = Math.round(fps.work / fps.frames * 10) / 10; fps.work = 0;
         if (fps.secs === 2 || (fps.secs > 2 && fps.now < fps.low)) fps.low = fps.now;
         fps.frames = 0; fps.acc = 0;
+        fps.city = city && cityOn ? city.stats.ev - (fps.cityLast || 0) : -1; fps.cityLast = city ? city.stats.ev : 0;   // city life changes shown in the last second (-1: none here or off)
       }
       var inp = readInput();
       if (wiz.on) { wizTick(); acc = 0; render(); window.requestAnimationFrame(frame); return; }
