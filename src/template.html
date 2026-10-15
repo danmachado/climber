@@ -58,7 +58,11 @@
 
 /*SHARED_WORLDS*/
 
-  // ---- theme: ORIGINAL or GAME BOY (Settings, THEME; climber.theme.v1, read once at start, a change reloads) ----
+  // ---- theme: ORIGINAL, GAME BOY or BLACK AND WHITE (Settings, THEME; climber.theme.v1, read once, a change reloads) ----
+  // BLACK AND WHITE is the GAME BOY theme flipped for night play: the same four shades and bands, drawn in two colours,
+  // a near-black and a pale white. The lightest shade becomes black and the darkest white, so the backgrounds go dark and
+  // the walls, hazards, hero and menu ink go light; the two middle shades are dithers (a dot every other pixel on every
+  // other row, and a checker), fixed to the canvas grid so they never crawl. GB.on is true for both; GB.kind says which.
   // GAME BOY draws everything in four greens (2-bit, lightest to darkest). Nothing extra runs per frame: the static
   // layer and the hero sheets are snapped to the four shades once when they are built (gbSnap), and every colour the
   // game sets while playing goes through gbColor, cached per colour string, via the 2D context's own setters.
@@ -68,9 +72,25 @@
   // solid, and the painted glows are left out. Pins give gameplay signals a fixed shade (dash ready is the darkest, spent
   // is light) so they read without colour.
   var THEME_KEY = 'climber.theme.v1', GB = { on: false, live: true, cache: {}, pins: { obj: {}, ui: {} } };
-  try { GB.on = localStorage.getItem(THEME_KEY) === 'gb'; } catch (e) {}
-  var GB_PAL = [[140, 173, 40], [108, 148, 33], [48, 98, 48], [24, 52, 30]];   // lightest, light, dark, darkest
-  var GB_HEX = GB_PAL.map(function (c) { return '#' + c.map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join(''); });
+  try { GB.kind = localStorage.getItem(THEME_KEY); } catch (e) {}
+  if (GB.kind === 'gb' || GB.kind === 'bw') GB.on = true; else GB.kind = '';
+  var GB_PALS = { gb: [[140, 173, 40], [108, 148, 33], [48, 98, 48], [24, 52, 30]],   // lightest, light, dark, darkest
+                  bw: [[24, 24, 24], [24, 24, 24], [233, 234, 254], [233, 234, 254]] };   // black, dots on black, checker, white
+  var GB_PAL = GB_PALS[GB.kind === 'bw' ? 'bw' : 'gb'];
+  function gbHex(c) { return '#' + c.map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+  var GB_HEX = GB_PAL.map(gbHex), BW_INK = [[24, 24, 24], [233, 234, 254]];
+  // BLACK AND WHITE: whether shade s is white at pixel (x, y). 1 = a dot every other pixel on every other row, 2 = a checker.
+  function bwOn(s, x, y) { return s === 3 || (s === 2 && ((x + y) & 1) === 0) || (s === 1 && !(x & 1) && !(y & 1)); }
+  function gbFill(s) {                               // what a fill of shade s is: a colour, or (BLACK AND WHITE middles) a dither pattern
+    if (GB.kind !== 'bw' || s === 0 || s === 3) return GB_HEX[s];
+    var P0 = GB.pats || (GB.pats = {});
+    if (!P0[s]) {
+      var c = document.createElement('canvas'); c.width = c.height = 2; var x = c.getContext('2d'), i;
+      for (i = 0; i < 4; i++) { GB.set.call(x, gbHex(BW_INK[bwOn(s, i & 1, i >> 1) ? 1 : 0])); x.fillRect(i & 1, i >> 1, 1, 1); }
+      P0[s] = (GB.parse || (GB.parse = document.createElement('canvas').getContext('2d'))).createPattern(c, 'repeat');
+    }
+    return P0[s];
+  }
   function gbLum(r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
   // the live mapping for things drawn while playing ('obj'), and the inverted one for menus and the HUD ('ui')
   function gbObj(L) { return L > 0.86 ? 0 : L > 0.66 ? 1 : L > 0.34 ? 2 : 3; }
@@ -89,7 +109,8 @@
     if (c[3] < 0.5) out = 'rgba(0,0,0,0)';
     else {
       s = pin != null ? pin : band === 'ui' ? gbUi(gbLum(c[0], c[1], c[2])) : gbObj(gbLum(c[0], c[1], c[2]));   // pins hold on every band
-      out = GB_HEX[s];
+      if (GB.kind === 'bw' && band !== 'ui') s = pin === 1 || pin === 2 ? pin : 3;   // BLACK AND WHITE: things in play are solid white on the black (spent and tired keep their dithers)
+      out = gbFill(s);
     }
     GB.cache[key] = out;
     return out;
@@ -123,6 +144,7 @@
   // dark shades so a hazard is a dark shape on any background; 'obj' (the hero) uses the fixed live mapping. Several canvases can share one set of cut points (the city layers).
   // Alpha is cut at one half. The canvas is read through a throwaway so it stays on the GPU.
   var GB_BANDS = { back: [[0.3, 1], [1, 0]], wall: [[0.55, 3], [1, 2]], ice: [[0.35, 2], [1, 1]], deco: [[0.5, 2], [1, 1]] };
+  if (GB.kind === 'bw') GB_BANDS.wall = [[0.55, 2], [1, 3]];   // BLACK AND WHITE: wall bodies are the checker and their lit edges white, so big walls do not glare at night
   function gbSnap(list, band) {
     if (!GB.on) return;
     var reads = list.map(function (cv) {
@@ -145,9 +167,11 @@
         var pin = GB.pins.obj[p[i] + ',' + p[i + 1] + ',' + p[i + 2]], L = Math.round(gbLum(p[i], p[i + 1], p[i + 2]) * 255), s;
         if (pin != null) s = pin;
         else if (cuts) { for (n = 0; n < cuts.length - 1 && L > cuts[n][0]; n++); s = cuts[n][1]; }
-        else if (band === 'ink') s = L > 178 ? 2 : 3;   // hazards are solid dark shapes, pale parts a step lighter
+        else if (band === 'ink') s = GB.kind === 'bw' ? 3 : L > 178 ? 2 : 3;   // hazards are solid dark shapes, pale parts a step lighter (BLACK AND WHITE: solid white)
         else s = gbObj(L / 255);
-        var c = GB_PAL[s]; p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255;
+        if (GB.kind === 'bw' && band === 'obj') s = (pin != null ? pin === 3 : L < 26) ? 0 : 3;   // BLACK AND WHITE hero: a white figure with its outline (and a ready bandana) black, so it stands out on black and on any dither
+        var c = GB.kind === 'bw' ? BW_INK[bwOn(s, (i >> 2) % R.cv.width, ((i >> 2) / R.cv.width) | 0) ? 1 : 0] : GB_PAL[s];
+        p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255;
       }
       R.tg.putImageData(R.d, 0, 0);
       var cg = R.cv.getContext('2d'); cg.clearRect(0, 0, R.cv.width, R.cv.height); cg.drawImage(R.t, 0, 0);
@@ -1077,7 +1101,7 @@
   var hud = makeCanvas(LW, LH), h = hud.getContext('2d');
   if (GB.on) {                                          // GAME BOY: menus and the HUD are dark ink on the lightest green; the page around matches
     h.gbBand = 'ui';
-    document.body.style.background = GB_HEX[3]; stage.style.background = GB_HEX[0];
+    document.body.style.background = GB.kind === 'bw' ? GB_HEX[0] : GB_HEX[3]; stage.style.background = GB_HEX[0];   // BLACK AND WHITE: black all round
   }
   var CW = 45, CH = 48, chunks = [], dirtyNow = [], dirtyPrev = [], allDirty = true, chunkCopies = 0;   // chunkCopies: a running count, for measuring what an effect costs
   // The chunks live in a "world" layer as tall as the room. A tall room scrolls by sliding that layer with a
@@ -2217,8 +2241,8 @@
   // and the speed readout). Back from a page returns to the list, back from the list returns to the menu.
   var set = { page: 'top', row: 0, topRow: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
   var SET_PAGES = {
-    top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['theme', 'THEME', 'ORIGINAL COLOURS OR GAME BOY GREENS'], ['back', 'BACK', 'BACK TO THE MENU']] },
-    theme: { title: 'THEME', rows: [['t-original', 'ORIGINAL', 'THE GAME IN FULL COLOUR'], ['t-gb', 'GAME BOY', 'FOUR GREENS. THE FAST MODE FOR THE FRAME'], ['back', 'BACK', 'BACK TO SETTINGS']] },
+    top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['theme', 'THEME', 'ORIGINAL, GAME BOY OR BLACK AND WHITE'], ['back', 'BACK', 'BACK TO THE MENU']] },
+    theme: { title: 'THEME', rows: [['t-original', 'ORIGINAL', 'THE GAME IN FULL COLOUR'], ['t-gb', 'GAME BOY', 'FOUR GREENS. THE FAST MODE FOR THE FRAME'], ['t-bw', 'BLACK AND WHITE', 'GAME BOY FLIPPED FOR NIGHT. ALSO FAST'], ['back', 'BACK', 'BACK TO SETTINGS']] },
     controls: { title: 'CONTROLS', rows: ACTIONS.map(function (a) { return [a[0], a[1], 'act']; }).concat([['redo', 'REDO SETUP', 'LEARN WHICH BUTTON IS WHICH AGAIN'], ['reset', 'RESET BUTTONS', 'BACK TO THE STARTING JOBS'], ['back', 'BACK', 'BACK TO SETTINGS']]) },
     graphics: { title: 'GRAPHICS', rows: [['fx', 'PARTICLES', 'WEATHER DRAWN OVER THE ROOM'], ['shake', 'SHAKE', 'A SMALL KICK ON HARD LANDINGS AND HITS'], ['city', 'CITY LIFE', 'WINDOWS TRAFFIC AND STEAM IN NEON ROW'],
                                  ['speed', 'SPEED READOUT', 'FPS IN THE TOP BAR WHILE PLAYING'], ['back', 'BACK', 'BACK TO SETTINGS']] }
@@ -2236,7 +2260,8 @@
     if (id === 'city') return cityOn ? 'ON' : 'OFF';
     if (id === 'speed') return check === 1 ? 'ON' : 'OFF';
     if (id === 't-original') return GB.on ? '' : 'ON';
-    if (id === 't-gb') return GB.on ? 'ON' : '';
+    if (id === 't-gb') return GB.kind === 'gb' ? 'ON' : '';
+    if (id === 't-bw') return GB.kind === 'bw' ? 'ON' : '';
     return '';
   }
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
@@ -2248,14 +2273,14 @@
     set.row = k; set.note = ''; lastSig = '';
     if (id === 'back') { setBack(); return; }
     if (set.page === 'top') { set.topRow = k; set.page = id; set.row = 0; return; }
-    if (GB.on && (id === 'shake' || id === 'city' || id === 'fx')) { set.note = 'OFF IN THE GAME BOY THEME, FOR SPEED'; return; }
+    if (GB.on && (id === 'shake' || id === 'city' || id === 'fx')) { set.note = 'OFF IN THIS THEME, FOR SPEED'; return; }
     if (id === 'shake') { setShake(!shakeOn); set.note = shakeOn ? 'SCREEN SHAKE ON' : 'SCREEN SHAKE OFF. CHECK THE SPEED READOUT.'; return; }
     if (id === 'city') { setCity(!cityOn); set.note = cityOn ? 'CITY LIFE ON. CHECK THE SPEED READOUT.' : 'CITY LIFE OFF. THE CITY STANDS STILL.'; return; }
     if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
     if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON' : 'SPEED READOUT OFF'; return; }
-    if (id === 't-original' || id === 't-gb') {    // a theme is set up as the page loads, so a change saves it and reloads onto this page
-      var want = id === 't-gb' ? 'gb' : 'original';
-      if ((want === 'gb') === GB.on) { set.note = 'ALREADY IN USE'; return; }
+    if (id === 't-original' || id === 't-gb' || id === 't-bw') {    // a theme is set up as the page loads, so a change saves it and reloads onto this page
+      var want = id.substring(2);
+      if (want === (GB.kind || 'original')) { set.note = 'ALREADY IN USE'; return; }
       try { localStorage.setItem(THEME_KEY, want); sessionStorage.setItem(THEME_KEY + '.back', '1'); } catch (e) {}
       set.note = 'SWITCHING THEME'; setTimeout(function () { window.location.reload(); }, 150);
       return;
@@ -2364,14 +2389,21 @@
     } else if (set.page === 'theme') {
       for (i = 0; i < rows.length; i++) {
         y = 110 + i * 32 + (rows[i][0] === 'back' ? 16 : 0);
-        row(i, 25, y, 220, 24, rows[i][1], setValue(rows[i][0]));
+        row(i, 13, y, 244, 24, rows[i][1], setValue(rows[i][0]));
       }
-      pxText(rows[set.row][2], 135, 230, 1, C.text, 'center');
-      // the four greens, drawn as they are (outside the GAME BOY colour mapping)
-      GB.live = false;
-      for (i = 0; i < 4; i++) { box(63 + i * 38, 252, 30, 30, GB.on ? GB_HEX[3] : '#05070f'); box(65 + i * 38, 254, 26, 26, GB_HEX[i]); }
-      GB.live = true;
-      pxText('THE GAME RELOADS TO SWITCH', 135, 300, 1, C.dim, 'center');
+      pxText(rows[set.row][2], 135, 262, 1, C.text, 'center');
+      // the chosen row's four shades, drawn as they are (outside the colour mapping); BLACK AND WHITE shows its dithers
+      var pk = rows[set.row][0];
+      if (pk === 't-gb' || pk === 't-bw') {
+        GB.live = false;
+        for (i = 0; i < 4; i++) {
+          box(63 + i * 38, 280, 30, 30, GB.on ? GB_HEX[3] : '#5a6488'); var sx0 = 65 + i * 38;
+          if (pk === 't-gb') box(sx0, 282, 26, 26, gbHex(GB_PALS.gb[i]));
+          else { box(sx0, 282, 26, 26, gbHex(BW_INK[0])); for (var dy = 0; dy < 26; dy++) for (var dx = 0; dx < 26; dx++) if (bwOn(i, dx, dy)) box(sx0 + dx, 282 + dy, 1, 1, gbHex(BW_INK[1])); }
+        }
+        GB.live = true;
+      }
+      pxText('THE GAME RELOADS TO SWITCH', 135, 326, 1, C.dim, 'center');
     } else if (set.page === 'graphics') {
       for (i = 0; i < rows.length; i++) {
         y = 110 + i * 32 + (rows[i][0] === 'back' ? 16 : 0);
@@ -2655,7 +2687,7 @@
   try {                                              // just switched theme: come back to the THEME page
     if (!embedded && sessionStorage.getItem(THEME_KEY + '.back')) {
       sessionStorage.removeItem(THEME_KEY + '.back'); openSettings();
-      set.topRow = 2; set.page = 'theme'; set.row = GB.on ? 1 : 0; set.note = GB.on ? 'GAME BOY ON' : 'ORIGINAL ON';
+      set.topRow = 2; set.page = 'theme'; set.row = GB.kind === 'bw' ? 2 : GB.on ? 1 : 0; set.note = GB.kind === 'bw' ? 'BLACK AND WHITE ON' : GB.on ? 'GAME BOY ON' : 'ORIGINAL ON';
     }
   } catch (e) {}
 

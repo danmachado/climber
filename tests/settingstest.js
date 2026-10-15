@@ -1,5 +1,5 @@
 // Settings: a category list (CONTROLS, GRAPHICS, THEME, BACK), each opening its own page; back steps up one level at a time.
-// THEME switches between ORIGINAL and GAME BOY: it saves, reloads and comes back to the THEME page.
+// THEME switches between ORIGINAL, GAME BOY and BLACK AND WHITE: it saves, reloads and comes back to the THEME page.
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
@@ -50,10 +50,20 @@ const { chromium } = require('playwright');
   await p.evaluate(() => { const G = window.__climber; G.nav({ back: true }); });
   await p.reload(); await p.waitForTimeout(700);
   await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); v = await nav({ jump: true });
-  ok(v.set.page === 'graphics' && v.set.note === 'OFF IN THE GAME BOY THEME, FOR SPEED', 'GAME BOY: SHAKE stays off (' + v.set.note + ')');
+  ok(v.set.page === 'graphics' && v.set.note === 'OFF IN THIS THEME, FOR SPEED', 'GAME BOY: SHAKE stays off (' + v.set.note + ')');
   await shot('6-graphics-gb');
-  await nav({ back: true }); await nav({ y: 1 });
-  await nav({ jump: true });
+  // BLACK AND WHITE: the third row; black all round and only two colours on screen
+  await nav({ back: true }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ y: 1 });
+  await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
+  th = await p.evaluate(() => localStorage.getItem('climber.theme.v1')); v = await nav({});
+  ok(th === 'bw' && v.set.page === 'theme' && v.set.row === 2 && v.set.note === 'BLACK AND WHITE ON', 'BLACK AND WHITE saves, reloads and returns to THEME (' + th + ')');
+  await shot('7-theme-bw');
+  ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(24, 24, 24)', 'BLACK AND WHITE: black around the game');
+  await p.evaluate(() => window.__climber.startLevel(0, 0)); await p.waitForTimeout(600);
+  const pal2 = await p.evaluate(() => { const cs = document.querySelectorAll('#world canvas'), seen = {}; for (const c of cs) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) seen[d[i] + ',' + d[i + 1] + ',' + d[i + 2]] = 1; } return Object.keys(seen); });
+  ok(pal2.length <= 2, 'BLACK AND WHITE: a level on screen uses only black and white (' + pal2.join(' ') + ')');
+  await p.reload(); await p.waitForTimeout(700);
+  await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true });
   await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
   th = await p.evaluate(() => localStorage.getItem('climber.theme.v1')); v = await nav({});
   ok(th === 'original' && v.set.page === 'theme' && v.set.note === 'ORIGINAL ON', 'ORIGINAL switches back (' + th + ')');
