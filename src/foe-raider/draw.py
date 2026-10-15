@@ -66,6 +66,40 @@ def strip(frames, pal=None):
                 if fr[y][x] != '.': im.putpixel((i * 16 + x, y), hexrgb(pal[fr[y][x]]))
     return im
 
+# Body parts for deaths: the standing frame cut into pieces by what each pixel is (mask = head, carbine = gun, pants
+# and boots = legs, split left and right, the rest = torso; the heavy's front arm comes off on its own). Outline pixels
+# go with the part most of their neighbours belong to. The game throws these with physics and the head rolls.
+def cut(fr, groups, w, h, extra=None):
+    own = [[None] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            ch = fr[y][x]
+            if ch in '.o': continue
+            g = extra(x, y, ch) if extra else None
+            if not g:
+                for name, chars in groups:
+                    if ch in chars: g = name; break
+            own[y][x] = g or '?'
+    for _ in range(2):                                                   # ambiguous colours and outlines take their neighbours' part
+        for y in range(h):
+            for x in range(w):
+                if fr[y][x] == '.' or (own[y][x] and own[y][x] != '?'): continue
+                votes = {}
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        if 0 <= x + dx < w and 0 <= y + dy < h and own[y + dy][x + dx] not in (None, '?'): votes[own[y + dy][x + dx]] = votes.get(own[y + dy][x + dx], 0) + 1
+                if votes: own[y][x] = max(votes, key=votes.get)
+    legs = [x for y in range(h) for x in range(w) if own[y][x] == 'legs']
+    mid = (min(legs) + max(legs)) / 2 if legs else 0
+    for y in range(h):
+        for x in range(w):
+            if own[y][x] == 'legs': own[y][x] = 'leg1' if x <= mid else 'leg2'
+    out = []
+    for name in ['head', 'torso', 'arm', 'leg1', 'leg2', 'gun']:
+        pts = [(x, y) for y in range(h) for x in range(w) if own[y][x] == name]
+        if pts: out.append((name, pts, min(x for x, y in pts), min(y for x, y in pts), max(x for x, y in pts) + 1, max(y for x, y in pts) + 1))
+    return out
+
 if __name__ == '__main__':
     os.chdir(HERE)
     atlas = Image.new('RGBA', (16 * max(len(a[3]) for a in ANIMS), 16 * len(ANIMS)), (0, 0, 0, 0)); meta = {}
@@ -86,10 +120,22 @@ if __name__ == '__main__':
                     if fr[y][x] != '.': hatlas.putpixel((k * HV.W + x, i * HV.H + y), hexrgb(HV.PAL[fr[y][x]]))
         hmeta[name] = {'row': i, 'n': len(frames), 'fps': fps, 'loop': loop, 'muzzles': muz}
     hatlas.save('heavy-sheet.png'); hbuf = io.BytesIO(); hatlas.save(hbuf, 'PNG', optimize=True)
+    rcut = cut(ANIMS[0][3][0], [('head', 'mMlL'), ('gun', 'gGa'), ('legs', 'QPpcC'), ('torso', 'sSTHhvy')], 16, 16)
+    hcut = cut(HV.ANIMS[0][3][0], [('head', 'mMnlL'), ('gun', 'gGhrR'), ('legs', 'pPqcC'), ('torso', 'kKjvVwz')], HV.W, HV.H,
+               lambda x, y, ch: 'arm' if ch in 'kKj' and x >= HV.CX + 4 and y >= 7 + HV.OY else None)
+    pw = sum(c[4] - c[2] + 1 for c in rcut + hcut); ph = max(HV.H, 16)
+    patlas = Image.new('RGBA', (pw, ph), (0, 0, 0, 0)); pmeta = {'raider': [], 'heavy': []}; px_ = 0
+    for kind, cuts, fr, pal in (('raider', rcut, ANIMS[0][3][0], C), ('heavy', hcut, HV.ANIMS[0][3][0], HV.PAL)):
+        for name, pts, x0, y0, x1, y1 in cuts:
+            for x, y in pts: patlas.putpixel((px_ + x - x0, y - y0), hexrgb(pal[fr[y][x]]))
+            pmeta[kind].append({'n': name, 'sx': px_, 'w': x1 - x0, 'h': y1 - y0, 'ox': x0, 'oy': y0})
+            px_ += x1 - x0 + 1
+    patlas.save('parts.png'); pbuf = io.BytesIO(); patlas.save(pbuf, 'PNG', optimize=True)
     cfg = {'frame': 16, 'anims': meta, 'gibs': [C['m'], C['M'], C['H'], C['h'], C['Q'], C['p'], C['g'], C['l']],
            'heavyGibs': HV.GIBS,
            'src': 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode(),
-           'heavy': {'w': HV.W, 'h': HV.H, 'cx': HV.CX, 'anims': hmeta, 'src': 'data:image/png;base64,' + base64.b64encode(hbuf.getvalue()).decode()}}
+           'heavy': {'w': HV.W, 'h': HV.H, 'cx': HV.CX, 'anims': hmeta, 'src': 'data:image/png;base64,' + base64.b64encode(hbuf.getvalue()).decode()},
+           'parts': {'list': pmeta, 'src': 'data:image/png;base64,' + base64.b64encode(pbuf.getvalue()).decode()}}
     open(os.path.join(HERE, '..', 'shared-foes.js'), 'w').write(
         '  // ---- bad guys: the raider sheet, 16 x 16 frames facing right (drawn by src/foe-raider/draw.py, original art) ----\n'
         '  var FOES = ' + json.dumps(cfg) + ';\n')
@@ -98,4 +144,4 @@ if __name__ == '__main__':
         name, fps, loop, frames = a[:4]
         y0 = 6 + r * (16 * Z + 12); d.text((4, y0), name, fill=(255, 220, 120))
         big = strip(frames, a[4] if len(a) > 4 else C).resize((16 * Z * len(frames), 16 * Z), Image.NEAREST); sheet.paste(big, (76, y0), big)
-    sheet.save('sheet.png'); print('raider written:', ', '.join(a[0] for a in ANIMS), '| heavy:', ', '.join(hmeta))
+    sheet.save('sheet.png'); print('raider written:', ', '.join(a[0] for a in ANIMS), '| heavy:', ', '.join(hmeta), '| parts:', {k: [p['n'] for p in v] for k, v in pmeta.items()})

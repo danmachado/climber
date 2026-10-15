@@ -64,6 +64,8 @@ const { chromium } = require('playwright');
   ok(m.heavyDown === 'dead' && m.heavySafe, 'a heavy cannot be shot down from above his line of fire');
   ok(m.heavyKills, 'a heavy does not kill the hero on his level');
   ok(m.climbing === 'climb' && m.wallShot === 'dead' && m.stillOnWall === 'climb', 'shooting from a wall does not fire away from it');
+  const packed = await p.evaluate(() => ['"wall_aim"', '"idle_aim"', '"run_aim"'].filter(k => !document.documentElement.innerHTML.includes(k)));
+  ok(!packed.length, 'hero sheet is missing ' + packed.join(' ') + ' (run make-hero.py after hero-wolf/draw.py)');
   if (process.env.SHOTS) {
     await p.reload(); await p.waitForTimeout(400);
     await p.evaluate(() => { window.__climber.manual(true); window.__climber.demoStart(); });

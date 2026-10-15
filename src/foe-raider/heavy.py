@@ -1,10 +1,11 @@
-# The heavy (original art): a muscle-bound brute about three times the raider's height, drawn at full size (not the
-# raider scaled up). Huge bare shoulders and arms, a khaki vest over a barrel chest, short thick legs, a small masked
+# The heavy (original art): a muscle-bound brute about twice the raider's height (Dan, Oct 2026: three times was too
+# big), drawn at full size (never the raider scaled up). Huge bare shoulders and arms, a khaki vest over a barrel chest, short thick legs, a small masked
 # head sunk between the traps with the raiders' goggle band in red, and a drum-fed cannon carried low in both hands so
-# its shots fly at the hero's chest height. Frames face right, 44 x 44, feet on the bottom row, body centred on
+# its shots fly at the hero's chest height. Frames face right, 32 x 31, feet on the bottom row, body centred on
 # column CX. Shapes are filled first, then a shading pass lights the top edge of every colour region and darkens its
 # bottom edge, then one outline pass closes the silhouette.
-W, H, CX = 44, 44, 16
+W, H, CX = 32, 31, 11
+OY = 1                                                                 # everything drawn a row down, so the head's outline fits
 PAL = {
     'o': '#0D0F18',
     'm': '#2A2530', 'M': '#4A4252', 'n': '#1A161E',                    # balaclava
@@ -23,6 +24,7 @@ SHADE = {'k': 'j', 'v': 'w', 'p': 'q', 'm': 'n', 'g': 'h'}
 
 def blank(): return [['.'] * W for _ in range(H)]
 def px(f, x, y, ch):
+    y += OY
     if 0 <= x < W and 0 <= y < H: f[y][x] = ch
 def rect(f, x0, y0, x1, y1, ch):
     for y in range(y0, y1 + 1):
@@ -68,39 +70,39 @@ def frame(breath=0, step=None, kick=0, spin=0):
     f = blank()
     bob = 0 if step is None else (1 if step in (1, 3) else 0)
     b = -breath + bob
-    # legs: thick, set wide, knees a touch bent; the walk swings them
-    lf, ln = (0, 0) if step is None else [(-3, 2), (-1, 1), (2, -3), (1, -1)][step]
-    for lx in (CX - 5 + lf, CX + 5 + ln):
-        part(f, [('l', [(lx, 27 + b), (lx + 1, 34), (lx, 39)], 3)], 'p')
-        part(f, [('e', lx + 1, 41.5, 4, 1.6)], 'c')                    # boot, toe forward
-    # far arm, behind the body: only its shoulder and the outside of the bicep show
-    part(f, [('e', CX - 10, 12 + b, 5, 4.5), ('e', CX - 12, 18 + b, 4, 4.5), ('l', [(CX - 11, 22 + b), (CX - 8, 29 + b), (CX - 5, 32)], 2.5)], 'k')
+    # legs: thick, set wide; the walk swings them
+    lf, ln = (0, 0) if step is None else [(-2, 2), (-1, 1), (2, -2), (1, -1)][step]
+    for lx in (CX - 3 + lf, CX + 3 + ln):
+        part(f, [('l', [(lx, 19 + b), (lx, 26)], 2)], 'p')
+        part(f, [('e', lx + 1, 28, 2.6, 1.1)], 'c')                    # boot, toe forward
+    # far arm, behind the body
+    part(f, [('e', CX - 7, 8 + b, 3.5, 3), ('e', CX - 8, 12 + b, 2.8, 3), ('l', [(CX - 8, 15 + b), (CX - 6, 19 + b), (CX - 3, 22)], 1.8)], 'k')
     # torso: a sleeveless vest over a barrel chest, widest across the top, narrowing to the belt; bare traps
-    part(f, [('e', CX - 6, 10 + b, 6, 3.5), ('e', CX + 6, 10 + b, 6, 3.5)], 'k')
+    part(f, [('e', CX - 4, 7 + b, 4, 2.5), ('e', CX + 4, 7 + b, 4, 2.5)], 'k')
     rows = []
-    for y in range(9 + b, 27 + b):
-        t = (y - 9 - b) / 17.0
-        half = int(round(9.5 - 2.5 * t * t - 1.5 * t)); rows.append((y, half))
+    for y in range(6 + b, 19 + b):
+        t = (y - 6 - b) / 12.0
+        half = int(round(6.5 - 1.5 * t * t - 1.0 * t)); rows.append((y, half))
     for y, half in rows: rect(f, CX - half - 1, y, CX + half, y, 'o')
     for y, half in rows[1:]: rect(f, CX - half, y, CX + half - 1, y, 'v')
-    for y in range(13 + b, 25 + b, 3): rect(f, CX - 6, y, CX + 5, y, 'z')   # quilted ribs
-    rect(f, CX, 11 + b, CX, 26 + b, 'z')                                  # zip
-    rect(f, CX - 7, 26 + b, CX + 6, 27 + b, 'o'); rect(f, CX - 7, 27 + b, CX + 6, 27 + b, 'z'); px(f, CX, 27 + b, 'y')   # belt, buckle
+    for y in range(9 + b, 18 + b, 3): rect(f, CX - 4, y, CX + 3, y, 'z')    # quilted ribs
+    rect(f, CX, 8 + b, CX, 18 + b, 'z')                                   # zip
+    rect(f, CX - 5, 18 + b, CX + 4, 19 + b, 'o'); rect(f, CX - 5, 19 + b, CX + 4, 19 + b, 'z'); px(f, CX, 19 + b, 'y')   # belt, buckle
     # head: small for the body, masked, sunk between the traps, the red goggle band facing forward
-    part(f, [('e', CX + 1, 5 + b, 4, 4.5)], 'm')
-    rect(f, CX - 1, 4 + b, CX + 6, 5 + b, 'L'); rect(f, CX + 1, 4 + b, CX + 6, 4 + b, 'l')
-    # the cannon: carried low in both hands, barrels out front, a red ring at the muzzle, a drum on top at the back
-    cy = 35; kx = -kick
-    part(f, [('l', [(CX - 6 + kx, cy), (CX + 13 + kx, cy)], 2.5)], 'g')
-    part(f, [('e', CX - 1 + kx, cy - 4, 3, 2)], 'r'); rect(f, CX - 3 + kx, cy - 4, CX + 1 + kx, cy - 4, 'y')
-    for i, by in enumerate((cy - 2, cy, cy + 2)):                         # three barrels
-        rect(f, CX + 15 + kx, by - 1, CX + 25 + kx, by + (1 if i == 2 else 0), 'o')
-    for i, by in enumerate((cy - 2, cy, cy + 2)):
-        rect(f, CX + 15 + kx, by, CX + 25 + kx, by, 'G' if (i + spin) % 3 == 0 else 'g')
-    rect(f, CX + 18 + kx, cy - 3, CX + 18 + kx, cy + 3, 'h'); rect(f, CX + 23 + kx, cy - 3, CX + 23 + kx, cy + 3, 'h')   # clamps
-    rect(f, CX + 26 + kx, cy - 3, CX + 27 + kx, cy + 3, 'R'); px(f, CX + 27 + kx, cy, 'r')                              # muzzle ring
-    # near arm, in front: a huge shoulder, a bicep that bulges out, a thick forearm down to a fist on the front grip
-    sh = [('e', CX + 10, 12 + b, 5.5, 4.5), ('e', CX + 12, 18 + b, 4.5, 4.5), ('l', [(CX + 12, 22 + b), (CX + 12, 27 + b), (CX + 11 - kick, 32)], 2.5), ('e', CX + 11 - kick, 34, 3, 2.5)]
+    part(f, [('e', CX + 1, 3.5 + b, 2.8, 3.2)], 'm')
+    rect(f, CX, 3 + b, CX + 4, 3 + b, 'l'); px(f, CX - 1, 3 + b, 'L')
+    # the cannon: carried low in both hands, two barrels out front, a red ring at the muzzle, a drum on top
+    cy = 22; kx = -kick
+    part(f, [('l', [(CX - 4 + kx, cy), (CX + 8 + kx, cy)], 1.8)], 'g')
+    part(f, [('e', CX + kx, cy - 3, 2, 1.2)], 'r'); px(f, CX - 1 + kx, cy - 3, 'y'); px(f, CX + kx, cy - 3, 'y')
+    rect(f, CX + 10 + kx, cy - 2, CX + 17 + kx, cy + 2, 'o')
+    for i, by in enumerate((cy - 1, cy + 1)):                             # two barrels
+        rect(f, CX + 10 + kx, by, CX + 17 + kx, by, 'G' if (i + spin) % 2 == 0 else 'g')
+    rect(f, CX + 10 + kx, cy, CX + 17 + kx, cy, 'h')
+    rect(f, CX + 13 + kx, cy - 2, CX + 13 + kx, cy + 2, 'h')                                                              # clamp
+    rect(f, CX + 18 + kx, cy - 2, CX + 18 + kx, cy + 2, 'R'); px(f, CX + 18 + kx, cy, 'r')                              # muzzle ring
+    # near arm, in front: a big shoulder, a bicep that bulges out, a forearm down to a fist on the front grip
+    sh = [('e', CX + 6, 8 + b, 3.8, 3.2), ('e', CX + 8, 12 + b, 3, 3), ('l', [(CX + 8, 15 + b), (CX + 8, 19 + b), (CX + 7 - kick, 21)], 1.8), ('e', CX + 7 - kick, 22, 2, 1.6)]
     part(f, sh, 'k')
     f = shade(f)
     g = [row[:] for row in f]                                             # skin volume: lit along the front edge, shaded along the back
@@ -109,18 +111,13 @@ def frame(breath=0, step=None, kick=0, spin=0):
             if f[y][x] in 'k' and f[y][x + 1] == 'o': g[y][x] = 'K'
             elif f[y][x] in 'kK' and f[y][x - 1] == 'o': g[y][x] = 'j'
     f = g
-    for dx, dy in ((1, -1), (2, -1), (2, 0), (1, 0)): px(f, CX + 13 + dx, 17 + b + dy, 'K')   # the bicep's peak catches the light
-    for dx, dy in ((0, -2), (1, -2), (2, -1)): px(f, CX + 10 + dx, 11 + b + dy, 'K')         # and the shoulder's
-    for x in range(CX + 7, CX + 15):                                      # creases: under the shoulder, at the elbow
-        if f[16 + b][x] in 'kK': f[16 + b][x] = 'j'
-    for x in range(CX + 9, CX + 15):
-        if f[23 + b][x] in 'kK': f[23 + b][x] = 'j'
-    for x in range(CX + 8, CX + 14):
-        if f[33][x - kick] in 'kKj' and f[34][x - kick] in 'kKj': f[33][x - kick] = 'j'   # knuckles
+    for dx, dy in ((0, -1), (1, -1), (1, 0)): px(f, CX + 9 + dx, 11 + b + dy, 'K')   # the bicep's peak catches the light
+    for x in range(CX + 5, CX + 11):                                      # crease under the shoulder
+        if f[11 + b + OY][x] in 'kK' and x < CX + 7: f[11 + b + OY][x] = 'j'
     return outline(f)
 
 # muzzle: where shots leave, per frame (the ring's front column, the middle barrel's row)
-def muzzle(kick): return [CX + 28 - kick, 35]
+def muzzle(kick): return [CX + 19 - kick, 22 + OY]
 ANIMS = [
     ('idle', 3, True, [frame(0), frame(0), frame(1), frame(1)], [muzzle(0)] * 4),
     ('walk', 6, True, [frame(0, s) for s in range(4)], [muzzle(0)] * 4),
