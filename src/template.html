@@ -1990,6 +1990,44 @@
               ['RELOAD', 'Fetch the newest version of the game', reloadGame],
               ['EXIT', 'Close the game', exitGame]];
   var menuNote = '';
+  var MENU_BIG = 2;                                  // MENU's first two are the big buttons; the rest are icons in a row at the bottom
+  var MENU_ICONS = {                                 // 13 x 13 pixel icons for the small buttons: a gear, a circular arrow, a power symbol
+    SETTINGS: ['.....###.....', '.##.#####.##.', '.###########.', '..####.####..', '.###.....###.', '####.....####', '####.....####', '####.....####', '.###.....###.', '..####.####..', '.###########.', '.##.#####.##.', '.....###.....'],
+    RELOAD:   ['.............', '....#####.#..', '...##...####.', '..##.....###.', '.##.....####.', '.##..........', '.##..........', '.##.......##.', '.##.......##.', '..##.....##..', '...##...##...', '....#####....', '.............'],
+    EXIT:     ['.............', '......#......', '......#......', '...#..#..#...', '..##..#..##..', '.##...#...##.', '.#....#....#.', '.#.........#.', '.#.........#.', '.##.......##.', '..##.....##..', '...#######...', '.............']
+  };
+  function wrapText(str, max) {                      // split into lines of at most max characters, at spaces
+    var words = str.split(' '), lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) { if (cur && (cur + ' ' + words[i]).length > max) { lines.push(cur); cur = words[i]; } else cur = cur ? cur + ' ' + words[i] : words[i]; }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  // The main menu: the hero, the title, MAP and ENDLESS as two big buttons, and settings, reload and exit as a row of
+  // small icon buttons. Under them, what the chosen one does. A still picture, drawn only when something changes.
+  function drawMenu(u, box) {
+    var INK = '#101426', i, k;
+    pxText('CLIMBER', 135, 150, 5, C.flame, 'center');
+    for (i = 0; i < MENU_BIG; i++) {
+      var on = i === sel.menu, y = 206 + i * 52;
+      if (on) { box(35, y + 4, 200, 42, '#05070e'); box(35, y, 200, 42, C.flame); }
+      else { box(35, y, 200, 42, '#232c55'); box(36, y + 1, 198, 40, '#131a33'); }
+      pxText(MENU[i][0], 135, y + 11, 3, on ? INK : C.dim, 'center');
+      hits.push({ x: 35, y: y, w: 200, h: 42, fn: (function (kk) { return function () { sel.menu = kk; MENU[kk][2](); }; })(i) });
+    }
+    var n = MENU.length - MENU_BIG;
+    for (i = 0; i < n; i++) {
+      var mi = MENU_BIG + i, on2 = mi === sel.menu, cx = 135 + (i - (n - 1) / 2) * 50, x0 = cx - 20, y0 = 324, ic = MENU_ICONS[MENU[mi][0]];
+      if (on2) { box(x0, y0 + 3, 40, 40, '#05070e'); box(x0, y0, 40, 40, C.flame); }
+      else { box(x0, y0, 40, 40, '#232c55'); box(x0 + 1, y0 + 1, 38, 38, '#131a33'); }
+      if (ic) for (var r = 0; r < 13; r++) for (k = 0; k < 13; k++) if (ic[r].charAt(k) === '#') box(cx - 13 + k * 2, y0 + 7 + r * 2, 2, 2, on2 ? INK : C.dim);
+      hits.push({ x: x0, y: y0, w: 40, h: 40, fn: (function (kk) { return function () { sel.menu = kk; MENU[kk][2](); }; })(mi) });
+    }
+    // what the chosen button does; a note from reload or exit takes its place
+    var lines = wrapText(hudClean(menuNote || MENU[sel.menu][1]), 40), ly = 384;
+    if (!menuNote && sel.menu >= MENU_BIG) { pxText(MENU[sel.menu][0], 135, ly, 1, C.flame, 'center'); ly += 12; }
+    for (i = 0; i < lines.length; i++) pxText(lines[i], 135, ly + i * 11, 1, menuNote ? C.flame : C.text, 'center');
+    pxText(usedPad ? 'ARROWS CHOOSE - JUMP STARTS' : 'ARROWS CHOOSE - C STARTS - OR CLICK', 135, 462, 1, '#5a6590', 'center');
+  }
   // Reload asks the server for a fresh copy first, so a new build shows up without clearing anything by hand.
   function reloadGame() {
     menuNote = 'Reloading'; lastSig = '';
@@ -2236,7 +2274,11 @@
       return;
     }
     if (scene === 'menu') {
-      if (dy) { sel.menu = (sel.menu + dy + MENU.length) % MENU.length; menuNote = ''; }
+      var m = sel.menu;                            // two big buttons, then a row of three small ones: up and down between the rows, left and right along the small ones
+      if (dy > 0) m = m < MENU_BIG ? m + 1 : m;
+      if (dy < 0) m = m >= MENU_BIG ? MENU_BIG - 1 : Math.max(0, m - 1);
+      if (dx && m >= MENU_BIG) m = Math.max(MENU_BIG, Math.min(MENU.length - 1, m + dx));
+      if (m !== sel.menu) { sel.menu = m; menuNote = ''; }
       if (go) MENU[sel.menu][2]();
       return;
     }
@@ -2269,21 +2311,13 @@
     else if (scene === 'menu') {
       box(0, 0, LW, LH, THEMES.brick.bg);
       for (i = 0; i < 6; i++) box(0, 446 - i * 6, LW, 1, i % 2 ? '#10152e' : '#141a38');
-      // the lantern, big
-      if (hero.ready) { h.imageSmoothingEnabled = false; h.drawImage(hero.sheets[0], 0, 0, 16, 16, Math.round(103 * u), Math.round(76 * u), Math.round(64 * u), Math.round(64 * u)); }
+      // the hero, big
+      if (hero.ready) { h.imageSmoothingEnabled = false; h.drawImage(hero.sheets[0], 0, 0, 16, 16, Math.round(103 * u), Math.round(66 * u), Math.round(64 * u), Math.round(64 * u)); }
       else if (!HERO.enabled) {
         box(119, 96, 32, 40, C.body); box(135, 108, 4, 8, C.eye); box(143, 108, 4, 8, C.eye);
         box(127, 88, 16, 8, C.flame); box(131, 80, 8, 8, C.flame);
       }
-      t('CLIMBER', 135, 186, 30, C.flame, 'center');
-      for (i = 0; i < MENU.length; i++) {
-        var on = i === sel.menu, y = 226 + i * 32;
-        box(55, y - 17, 160, 28, on ? C.flame : '#131a33');
-        t(MENU[i][0], 135, y + 2, 13, on ? '#1a1205' : C.dim, 'center');
-        hits.push({ x: 55, y: y - 17, w: 160, h: 28, fn: (function (k) { return function () { sel.menu = k; MENU[k][2](); }; })(i) });
-      }
-      t(menuNote || MENU[sel.menu][1], 135, 392, 7, menuNote ? C.flame : C.text, 'center');
-      t(usedPad ? 'Up and down to choose   Jump to start' : 'Arrows choose   C or Space starts   or click', 135, 468, 6.5, C.dim, 'center');
+      drawMenu(u, box);
     } else {
       drawMap(u, box);
     }
