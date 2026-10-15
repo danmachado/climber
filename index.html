@@ -1082,9 +1082,26 @@
   // scene: 'menu', 'map' or 'play'. mode: how rooms follow each other while playing, 'map' (one chosen level) or 'endless'.
   var scene = 'play', mode = 'endless', sel = { menu: 0, w: 0, i: 0 }, lvl = { w: 0, i: 0 };
   function staged() { return mode === 'map' && !testMode && !demo.on; }
+  // Pause: Start (or Esc) in a level stops the game and shows a menu. Nothing steps while it is up, so the clock,
+  // movers and hazards hold still; the picture is drawn once into the full-screen HUD layer, like the level clear panel.
+  var pause = { on: false, pick: 0 };
+  function pauseButtons() {
+    return [['RESUME', resumePlay], ['RESTART', function () { pause.on = false; if (mode === 'map') startLevel(lvl.w, lvl.i); else startEndless(); }],
+            ['MAP', function () { pause.on = false; if (mode === 'map') { sel.w = lvl.w; sel.i = lvl.i; } toMap(); }],
+            ['MAIN MENU', function () { pause.on = false; toMenu(); }]];
+  }
+  function openPause() { pause.on = true; pause.pick = 0; }
+  function resumePlay() { pause.on = false; pl.prevJump = pl.prevDash = true; }      // the press that chose RESUME is not a jump
+  function pauseInput(inp, p) {
+    var dy = inp.y && !p.y ? inp.y : 0, n = pauseButtons().length;
+    if (dy) pause.pick = (pause.pick + dy + n) % n;
+    if (inp.back && !p.back || inp.dash && !p.dash) { resumePlay(); return; }      // Start, Esc or dash again: straight back in
+    if (inp.jump && !p.jump) pauseButtons()[pause.pick][1]();
+  }
   function startSpawn() { cam.snap = true; if (run && staged()) run.time = 0; resetPlayer(); resetDynamics(); fx = { mode: 'spawn', t: 0, x: pl.x, y: pl.y, facing: 1 }; }
   // A fresh run. In a builder test it replays the room being edited; in the demo it plays the first built-in room.
   function resetRun() {
+    pause.on = false;
     run = { deaths: 0, time: 0, won: false, count: 1, result: null };
     if (!testMode) {
       if (demo.on) buildRoom(demo.room || starters[0]);
@@ -1106,9 +1123,9 @@
   function gotGem() { for (var i = 0; i < gems.length; i++) if (gems[i].state !== 'idle') return true; return false; }
   function hasGem(r) { for (var i = 0; i < r.tiles.length; i++) if (r.tiles[i].indexOf('G') >= 0) return true; return false;
   }
-  function toMenu() { scene = 'menu'; demo.idle = 0; lastSig = ''; }
+  function toMenu() { pause.on = false; scene = 'menu'; demo.idle = 0; lastSig = ''; }
   function toMap() {
-    scene = 'map'; mode = 'map'; demo.idle = 0; lastSig = '';
+    pause.on = false; scene = 'map'; mode = 'map'; demo.idle = 0; lastSig = '';
     if (sel.w >= levels.length) sel.w = 0;
     sel.i = Math.max(0, Math.min(sel.i, levels[sel.w].length - 1));
   }
@@ -1714,7 +1731,7 @@
     dirtyPrev = dirtyNow; dirtyNow = []; allDirty = false;
   }
   function blitHud() {
-    var th = hudTop.height, bh = hudBot.height, overlay = scene !== 'play' || run.won || wiz.on || check >= 2;
+    var th = hudTop.height, bh = hudBot.height, overlay = scene !== 'play' || run.won || pause.on || wiz.on || check >= 2;
     hudMid.style.display = overlay ? 'block' : 'none';
     hudTop.style.display = hudBot.style.display = overlay ? 'none' : 'block';
     if (overlay) { mctx.clearRect(0, 0, hudMid.width, hudMid.height); mctx.drawImage(hud, 0, 0); return; }
@@ -1773,7 +1790,7 @@
       for (var k = 0; k < hits.length; k++) { var hb = hits[k]; if (mx >= hb.x && mx < hb.x + hb.w && my >= hb.y && my < hb.y + hb.h) { hb.fn(); return; } }
       return;
     }
-    if (run.won && run.result && staged()) {       // the level clear buttons work with the mouse too
+    if ((run.won && run.result && staged()) || pause.on) {       // the level clear and pause buttons work with the mouse too
       var cb = stage.getBoundingClientRect(), cx = (e.clientX - cb.left) / cb.width * LW, cy = (e.clientY - cb.top) / cb.height * LH;
       for (var q = 0; q < hits.length; q++) { var hq = hits[q]; if (cx >= hq.x && cx < hq.x + hq.w && cy >= hq.y && cy < hq.y + hq.h) { hq.fn(); return; } }
       return;
@@ -2180,7 +2197,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
+    var sig = [pause.on, pause.pick, mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     drawWeather();
     if (sig !== lastSig) { lastSig = sig; drawHud(); blitHud(); }
@@ -2440,7 +2457,7 @@
       h.textAlign = align || 'left'; h.fillStyle = color; h.fillText(str, x * u, y * u);
     }
     var topH = Math.round(TOP_H * u), botH = Math.round(BOT_H * u);
-    if (run.won || wiz.on || check >= 2) h.clearRect(0, 0, hud.width, hud.height);   // an overlay uses the whole canvas
+    if (run.won || pause.on || wiz.on || check >= 2) h.clearRect(0, 0, hud.width, hud.height);   // an overlay uses the whole canvas
     else { h.clearRect(0, 0, hud.width, topH); h.clearRect(0, hud.height - botH, hud.width, botH); }   // in play only the two strips are shown, so only they are cleared
     h.fillStyle = 'rgba(10,13,28,0.84)';
     h.fillRect(0, 0, hud.width, topH); h.fillRect(0, hud.height - botH, hud.width, botH);
@@ -2449,7 +2466,7 @@
     t(testMode || demo.on ? title : (mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : run.count) + '  ' + title, 4, 7.5, 7, C.text);
     t('FALLS ' + run.deaths + '   ' + clock(run.time), 266, 7.5, 7, C.text, 'right');
     t(testMode ? 'TEST   Esc returns to the builder' : demo.on ? 'DEMO   Any button to play   Click to fill the screen'
-      : (usedPad ? 'Start goes back   Click three times to set up buttons' : 'Arrows move   C jump   X dash   hold Z to climb   Esc back'),
+      : (usedPad ? 'Start pauses   Click three times to set up buttons' : 'Arrows move   C jump   X dash   hold Z to climb   Esc pause'),
       135, 473, 6.5, C.dim, 'center');
     if (gems.length) { var gg = gotGem(); h.fillStyle = gg ? C.teal : '#232c55'; h.beginPath(); h.moveTo(176 * u, 2 * u); h.lineTo(181 * u, 6 * u); h.lineTo(176 * u, 10 * u); h.lineTo(171 * u, 6 * u); h.closePath(); h.fill(); }
     // stamina meter: ten blocks. Amber while there is enough left for a dash, red when there is not.
@@ -2461,7 +2478,8 @@
     if (check === 1) t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS' + (city ? (cityOn ? '  CITY ' + Math.max(0, fps.city) : '  CITY OFF') : ''), 135, 7.5, 7, C.flame, 'center');   // the speed readout takes the meter's place
     if (check >= 2) drawCheck(u, t);
     if (wiz.on) drawWiz(u);
-    if (run.won && run.result) {
+    if (pause.on && !wiz.on) drawPause(u);
+    else if (run.won && run.result) {
       drawClear(u);
     } else if (run.won) {
       h.fillStyle = 'rgba(11,16,32,0.86)'; h.fillRect(30 * u, 190 * u, 210 * u, 90 * u);
@@ -2526,6 +2544,31 @@
       var ax = Math.round((x + c * sc) * u), ay = Math.round((y + r * sc) * u);
       h.fillRect(ax, ay, Math.round((x + (c + 1) * sc) * u) - ax, Math.round((y + (r + 1) * sc) * u) - ay);
     }
+  }
+  // The pause panel: the clear panel's look (accent card, hard shadow, dark buttons) over the frozen room.
+  function drawPause(u) {
+    var th = themeOf(room), INK = '#101426', btns = pauseButtons(), top = 108, hh = 112 + btns.length * 32, i;
+    function box(x, y, w, hgt, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round((x + w) * u) - Math.round(x * u), Math.round((y + hgt) * u) - Math.round(y * u)); }
+    function dots(y) { for (var x = 51; x < 220; x += 6) box(x, y, 3, 2, INK); }
+    hits = [];
+    box(0, 0, LW, LH, 'rgba(7,9,20,0.72)');
+    box(35, top + 5, 200, hh, INK);
+    box(35, top, 200, hh, th.accent);
+    var where = mode === 'map' ? 'LEVEL ' + (lvl.w + 1) + '-' + (lvl.i + 1) : 'ENDLESS  ROOM ' + run.count;
+    pxText(where, 135, top + 14, 1, INK, 'center');
+    pxText((room.name || '').toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 30), 135, top + 26, 1, INK, 'center');
+    pxText('PAUSED', 135, top + 42, 4, INK, 'center');
+    dots(top + 78);
+    pxText('TIME ' + run.time.toFixed(1) + '   FALLS ' + run.deaths, 135, top + 88, 1, INK, 'center');
+    for (i = 0; i < btns.length; i++) {
+      var by = top + 104 + i * 32, on = i === pause.pick;
+      box(55, by, 160, 26, INK);
+      if (!on) { box(57, by + 2, 156, 20, th.accent); box(57, by + 22, 156, 2, th.accentLo); }
+      pxText(btns[i][0], 135, by + 6, 2, on ? th.accent : INK, 'center');
+      if (on) { box(63, by + 10, 6, 6, th.accent); box(201, by + 10, 6, 6, th.accent); }
+      hits.push({ x: 55, y: by, w: 160, h: 26, fn: btns[i][1] });
+    }
+    pxText(usedPad ? 'START OR DASH RESUMES' : 'ESC OR X RESUMES', 135, top + hh + 14, 1, C.text, 'center');
   }
   function drawClear(u) {
     var rs = run.result, th = themeOf(room), INK = '#101426', btns = rs.demo ? [] : clearButtons(), top = rs.demo ? 130 : 92, hh = rs.demo ? 214 : 194 + btns.length * 32, i;
@@ -2931,9 +2974,10 @@
         acc = 0;
       } else if (demo.on && any) { demo.on = false; toMenu(); navPrev = inp; acc = 0; }
       else {
-        if (inp.back && !navPrev.back && !testMode && !demo.on && !embedded) { leavePlay(); acc = 0; }
+        if (pause.on) { pauseInput(inp, navPrev); acc = 0; }
+        else if (inp.back && !navPrev.back && !testMode && !demo.on && !embedded) { if (run.won && run.result && staged()) leavePlay(); else openPause(); acc = 0; }
         navPrev = inp;
-        while (scene === 'play' && acc >= STEP) { step(demo.on ? demoInput() : inp); acc -= STEP; }
+        while (scene === 'play' && !pause.on && acc >= STEP) { step(demo.on ? demoInput() : inp); acc -= STEP; }
       }
     }
     render();
@@ -2972,7 +3016,7 @@
                drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }) };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
-    view: function () { return { scene: scene, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
+    view: function () { return { scene: scene, pause: { on: pause.on, pick: pause.pick }, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     weather: function (on) { setWeather(on); return weather.on; },
     city: function (on) { if (on === 'ship') { if (city) city.nextShip = ct; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick, ms: fps.ms, fps: fps.now }; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },

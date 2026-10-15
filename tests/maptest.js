@@ -24,7 +24,9 @@ const { chromium } = require('playwright');
   v = await V(); console.log('MAP button -> map', v.scene, 'sel', v.sel.i);
   await shot('map-4-progress');
   await p.keyboard.press('KeyC', { delay: 80 }); await p.waitForTimeout(300); v = await V(); console.log('start 1-2', v.scene, v.room, JSON.stringify(v.lvl));
-  await p.keyboard.press('Escape', { delay: 80 }); await p.waitForTimeout(200); v = await V(); console.log('esc -> ', v.scene);
+  await p.keyboard.press('Escape', { delay: 80 }); await p.waitForTimeout(200); v = await V(); console.log('esc pauses:', v.pause.on);
+  for (const k of ['ArrowDown', 'ArrowDown', 'KeyC']) { await p.keyboard.press(k, { delay: 80 }); await p.waitForTimeout(150); }
+  v = await V(); console.log('pause, MAP -> ', v.scene);
   await p.reload(); await p.waitForTimeout(300); v = await V(); console.log('after reload saved', Object.keys(v.prog));
   // mouse: click MAP, then click level 1-2 twice
   const st = await p.locator('#stage').boundingBox(), at = (x, y) => p.mouse.click(st.x + x / 270 * st.width, st.y + y / 480 * st.height);
