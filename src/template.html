@@ -2032,12 +2032,15 @@
       mark(s.x - 5, s.y - 1, 14, 4);
     }
   }
-  function drawShots() {                                              // the hero's shots: a pale tracer with a hot head
+  // The hero's shots: round energy pellets (Contra and Broforce style, not fire), a 4 x 4 ball with an amber rim, a
+  // pale core and one white glint up front, centred on the shot's hit box. No tail.
+  function drawShots() {
     for (var i = 0; i < shots.length; i++) {
-      var s = shots[i], d = s.vx > 0 ? 1 : -1, hx = d > 0 ? s.x + 3 : s.x;
-      g.fillStyle = '#FFB74A'; g.fillRect(d > 0 ? hx - 6 : hx + 1, s.y + 1, 6, 1);
-      g.fillStyle = '#FFF3C4'; g.fillRect(d > 0 ? hx - 1 : hx, s.y, 2, 2);
-      mark(Math.min(hx - 8, hx - 2), s.y - 1, 12, 4);
+      var s = shots[i], d = s.vx > 0 ? 1 : -1, x = s.x, y = s.y - 1;
+      g.fillStyle = '#E8862A'; g.fillRect(x + 1, y, 2, 4); g.fillRect(x, y + 1, 4, 2);
+      g.fillStyle = '#FFE08A'; g.fillRect(x + 1, y + 1, 2, 2);
+      g.fillStyle = '#FFFFFF'; g.fillRect(d > 0 ? x + 2 : x + 1, y + 1, 1, 1);
+      mark(x - 2, y - 2, 8, 8);
     }
   }
   // Dust: a few pale pixels kicked up on a hard landing, a run start, a skid and a wall slide. Render only.
