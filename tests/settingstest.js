@@ -52,7 +52,7 @@ const { chromium } = require('playwright');
   await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); v = await nav({ jump: true });
   ok(v.set.page === 'graphics' && v.set.note === 'OFF IN THIS THEME, FOR SPEED', 'GAME BOY: SHAKE stays off (' + v.set.note + ')');
   await shot('6-graphics-gb');
-  // BLACK AND WHITE: the third row; black all round and only two colours on screen
+  // BLACK AND WHITE: the third row; black all round and only its four shades on screen
   await nav({ back: true }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ y: 1 });
   await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
   th = await p.evaluate(() => localStorage.getItem('climber.theme.v1')); v = await nav({});
@@ -61,7 +61,7 @@ const { chromium } = require('playwright');
   ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(24, 24, 24)', 'BLACK AND WHITE: black around the game');
   await p.evaluate(() => window.__climber.startLevel(0, 0)); await p.waitForTimeout(600);
   const pal2 = await p.evaluate(() => { const cs = document.querySelectorAll('#world canvas'), seen = {}; for (const c of cs) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) seen[d[i] + ',' + d[i + 1] + ',' + d[i + 2]] = 1; } return Object.keys(seen); });
-  ok(pal2.length <= 2, 'BLACK AND WHITE: a level on screen uses only black and white (' + pal2.join(' ') + ')');
+  ok(pal2.length <= 4 && pal2.every(c => '24,24,24|46,46,50|92,92,100|233,234,254'.indexOf(c) >= 0), 'BLACK AND WHITE: a level on screen uses only black, two greys and white (' + pal2.join(' ') + ')');
   await p.reload(); await p.waitForTimeout(700);
   await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true });
   await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
