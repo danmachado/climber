@@ -1991,11 +1991,19 @@
               ['EXIT', 'Close the game', exitGame]];
   var menuNote = '';
   var MENU_BIG = 2;                                  // MENU's first two are the big buttons; the rest are icons in a row at the bottom
-  var MENU_ICONS = {                                 // 13 x 13 pixel icons for the small buttons: a gear, a circular arrow, a power symbol
-    SETTINGS: ['.....###.....', '.##.#####.##.', '.###########.', '..####.####..', '.###.....###.', '####.....####', '####.....####', '####.....####', '.###.....###.', '..####.####..', '.###########.', '.##.#####.##.', '.....###.....'],
-    RELOAD:   ['.............', '....#####.#..', '...##...####.', '..##.....###.', '.##.....####.', '.##..........', '.##..........', '.##.......##.', '.##.......##.', '..##.....##..', '...##...##...', '....#####....', '.............'],
-    EXIT:     ['.............', '......#......', '......#......', '...#..#..#...', '..##..#..##..', '.##...#...##.', '.#....#....#.', '.#.........#.', '.#.........#.', '.##.......##.', '..##.....##..', '...#######...', '.............']
+  var MENU_ICONS = {                                 // pixel icons for the small buttons (any size, drawn 2 game px a dot): a gear, a refresh arrow, a power symbol
+    SETTINGS: ['.....##.....', '.##..##..##.', '.##########.', '..########..', '.##########.', '#####..#####', '#####..#####', '.##########.', '..########..', '.##########.', '.##..##..##.', '.....##.....'],
+    RELOAD:   ['...######...', '..########.#', '.###....####', '###......###', '##......####', '##..........', '##........##', '##........##', '###......###', '.###....###.', '..########..', '...######...'],
+    EXIT:     ['......#......', '......#......', '...#..#..#...', '..##..#..##..', '.##...#...##.', '.#....#....#.', '.#.........#.', '.#.........#.', '.##.......##.', '..##.....##..', '...#######...']
   };
+  // A menu button drawn as a key: a dark outline with rounded corners, a lit top band and a shaded bottom band.
+  function keyButton(box, x, y, w, hh, on) {
+    var O = '#05070e', F = on ? C.flame : '#1a2140', HI = on ? '#ffd88a' : '#26315f', LO = on ? '#c47f24' : '#10152e';
+    box(x + 2, y, w - 4, hh, O); box(x, y + 2, w, hh - 4, O); box(x + 1, y + 1, w - 2, hh - 2, O);
+    box(x + 3, y + 2, w - 6, hh - 4, F); box(x + 2, y + 3, w - 4, hh - 6, F);
+    box(x + 3, y + 2, w - 6, 2, HI); box(x + 2, y + 4, 1, 2, HI);
+    box(x + 3, y + hh - 5, w - 6, 3, LO);
+  }
   function wrapText(str, max) {                      // split into lines of at most max characters, at spaces
     var words = str.split(' '), lines = [], cur = '';
     for (var i = 0; i < words.length; i++) { if (cur && (cur + ' ' + words[i]).length > max) { lines.push(cur); cur = words[i]; } else cur = cur ? cur + ' ' + words[i] : words[i]; }
@@ -2009,17 +2017,16 @@
     pxText('CLIMBER', 135, 150, 5, C.flame, 'center');
     for (i = 0; i < MENU_BIG; i++) {
       var on = i === sel.menu, y = 206 + i * 52;
-      if (on) { box(35, y + 4, 200, 42, '#05070e'); box(35, y, 200, 42, C.flame); }
-      else { box(35, y, 200, 42, '#232c55'); box(36, y + 1, 198, 40, '#131a33'); }
-      pxText(MENU[i][0], 135, y + 11, 3, on ? INK : C.dim, 'center');
+      keyButton(box, 35, y, 200, 42, on);
+      pxText(MENU[i][0], 135, y + 10, 3, on ? INK : C.dim, 'center');
       hits.push({ x: 35, y: y, w: 200, h: 42, fn: (function (kk) { return function () { sel.menu = kk; MENU[kk][2](); }; })(i) });
     }
     var n = MENU.length - MENU_BIG;
     for (i = 0; i < n; i++) {
       var mi = MENU_BIG + i, on2 = mi === sel.menu, cx = 135 + (i - (n - 1) / 2) * 50, x0 = cx - 20, y0 = 324, ic = MENU_ICONS[MENU[mi][0]];
-      if (on2) { box(x0, y0 + 3, 40, 40, '#05070e'); box(x0, y0, 40, 40, C.flame); }
-      else { box(x0, y0, 40, 40, '#232c55'); box(x0 + 1, y0 + 1, 38, 38, '#131a33'); }
-      if (ic) for (var r = 0; r < 13; r++) for (k = 0; k < 13; k++) if (ic[r].charAt(k) === '#') box(cx - 13 + k * 2, y0 + 7 + r * 2, 2, 2, on2 ? INK : C.dim);
+      keyButton(box, x0, y0, 40, 40, on2);
+      if (ic) { var iw = ic[0].length, ih = ic.length, ix = cx - iw, iy = y0 + 19 - ih;   // centred, nudged up a pixel for the shaded bottom band
+        for (var r = 0; r < ih; r++) for (k = 0; k < iw; k++) if (ic[r].charAt(k) === '#') box(ix + k * 2, iy + r * 2, 2, 2, on2 ? INK : C.dim); }
       hits.push({ x: x0, y: y0, w: 40, h: 40, fn: (function (kk) { return function () { sel.menu = kk; MENU[kk][2](); }; })(mi) });
     }
     // what the chosen button does; a note from reload or exit takes its place
