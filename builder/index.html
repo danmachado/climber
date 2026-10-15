@@ -449,6 +449,23 @@
       if (!sameAt(c + 1, r)) b.fillRect(x + 9, y, 1, 10);
       return;
     }
+    if (TILE_THEME.backKind === 'stone') {                 // Temple: a dark pier of big ashlar in front of the ruined wall, moss on top, vines under
+      var B2 = TILE_THEME.back, a2 = c % 2 ? 3 : 8, a3 = c % 2 ? 8 : 3;
+      b.fillStyle = B2[1]; b.fillRect(x, y + 4, 10, 1); b.fillRect(x, y + 9, 10, 1); b.fillRect(x + a2, y, 1, 4); b.fillRect(x + a3, y + 5, 1, 4);
+      if (v < 0.18) { b.fillStyle = B2[1]; b.fillRect(x + (a2 < 5 ? 5 : 1), y + 1, 2, 2); }   // a worn chip
+      if (!sameAt(c - 1, r)) { b.fillStyle = B2[3]; b.fillRect(x, y, 1, 10); }
+      if (!sameAt(c + 1, r)) { b.fillStyle = B2[1]; b.fillRect(x + 9, y, 1, 10); }
+      if (!sameAt(c, r + 1)) {
+        b.fillStyle = B2[1]; b.fillRect(x, y + 9, 10, 1);
+        if (v > 0.55) { var hx = x + 1 + Math.floor(v * 7), hl = 3 + Math.floor(tileHash(c, r + 9) * 8); b.fillStyle = '#145a32'; b.fillRect(hx, y + 10, 1, hl); b.fillStyle = '#23803f'; b.fillRect(hx + 1, y + 12, 1, 1); b.fillRect(hx - 1, y + 10 + hl - 1, 2, 1); }
+      }
+      if (!sameAt(c, r - 1)) {
+        b.fillStyle = B2[2]; b.fillRect(x, y, 10, 1);
+        b.fillStyle = '#23803f'; for (var mx2 = 0; mx2 < 10; mx2++) if (tileHash(c * 10 + mx2, r + 3) < 0.4) b.fillRect(x + mx2, y, 1, 1);
+        b.fillStyle = '#3fa152'; for (mx2 = 0; mx2 < 10; mx2++) if (tileHash(c * 10 + mx2, r + 8) < 0.15) b.fillRect(x + mx2, y - 1, 1, 1);
+      }
+      return;
+    }
     b.fillStyle = TILE_THEME.back[1];
     var j1 = v < 0.34 ? 7 : (v < 0.67 ? 3 : 5), j2 = v < 0.34 ? 2 : (v < 0.67 ? 8 : 6);
     b.fillRect(x, y + 4, 10, 1); b.fillRect(x, y + 9, 10, 1);
@@ -482,8 +499,8 @@
     var s = (Math.abs(seed) % 2147483646) + 1;             // keep the generator in range, or widths could go negative
     function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
     function between(a, c) { return a + Math.floor(rnd() * (c - a + 1)); }
-    b.fillStyle = th.dot;                                   // stars (embers in the Furnace), only in the open sky
-    for (i = 0; i < 70 * (h / 480); i++) { var sx = Math.floor(rnd() * w), sy = Math.floor(rnd() * (h - h0 * 0.45)); b.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1); }
+    b.fillStyle = th.dot;                                   // stars (embers in the Furnace), only in the open sky; the Temple is daylight
+    for (i = 0; i < (th.ruins ? 0 : 70) * (h / 480); i++) { var sx = Math.floor(rnd() * w), sy = Math.floor(rnd() * (h - h0 * 0.45)); b.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1); }
     if (!far) return;
     var kind = th.skyline || 'town';
     SKY_SIGNS = [];
@@ -609,8 +626,10 @@
       var tallest = 0; for (i = 0; i < mid.length; i++) tallest = Math.max(tallest, mid[i][2]);
       CITY = { floors: winFloors, nMid: nMid, cables: cables, w: w, h: h, h0: h0, cityTop: h - tallest, near: near, mid: mid };
     } else {
+      if (th.ruins) ruinsBack(b, w, h, h0, rnd, between, th.ruins);
       band(far[0], Math.round(h0 * 0.34), far[2]);
       band(far[1], Math.round(h0 * 0.2), kind === 'cave' ? far[2] : null);
+      if (th.ruins) ruinsFront(b, w, h, h0, rnd, between, th.ruins);
     }
     if (kind === 'towers') {                                 // baked rain: thin diagonal streaks at two densities, still, like a held frame
       var Lr = L ? L.rain : b;
@@ -639,6 +658,197 @@
       b.fillStyle = '#07060f'; b.fillRect(x, y, 1, 1);
       b.fillStyle = ((x - 3) / 7) % 2 ? '#ff7ad0' : '#ffd27a'; b.fillRect(x, y + 1, 1, 1);
     }
+  }
+  // ---- Temple ruins: the room is inside a temple whose back wall has fallen in. Depths, back to front: daylight sky
+  // and clouds, a hazy jungle canopy, the far pyramid and palms (band), a second ruined wall further back (pale, big
+  // holes), then the room's own back wall: big masonry, pilasters and a carved frieze, with large chunks knocked out.
+  // Broken tops catch the light, the sky under a broken lintel takes a cast shadow, and vines, ivy, ferns and moss
+  // grow over all of it. Value by depth: each nearer layer is darker, and the yellow terrain stays the brightest thing.
+  // All of it is painted once per room into the static layer (the game and the builder both call drawSky).
+  function ruinsRgb(c) { var n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  function ruinsOval(b, cx, cy, rx, ry) {                   // a crisp pixel ellipse, row by row
+    for (var y = -ry; y <= ry; y++) { var hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry)))); if (hw > 0) b.fillRect(cx - hw, cy + y, hw * 2, 1); }
+  }
+  function ruinsBack(b, w, h, h0, rnd, between, R) {
+    var i, x;
+    b.fillStyle = R.cloud;                                  // soft cloud banks, a few per screen, brighter on top
+    for (i = 0; i < Math.round(4 * h / 480); i++) {
+      var cy = between(8, Math.max(9, h - Math.round(h0 * 0.45))), cx = between(-20, w), cw = between(18, 40);
+      for (var k = 0; k < 4; k++) ruinsOval(b, cx + k * Math.round(cw * 0.55) - cw, cy - (k % 2) * 4, Math.round(cw * (0.5 + rnd() * 0.4)), between(4, 8));
+    }
+    for (var row = 0; row < 2; row++) {                     // two rows of round treetops, the far one paler and higher
+      var base = Math.round(h0 * (row ? 0.3 : 0.44)), hm = [];
+      for (x = 0; x < w; x++) hm[x] = base;
+      for (x = -10; x < w + 10; x += between(5, 11)) {
+        var r = between(5, row ? 10 : 13), top = base + between(-4, 8);
+        for (var dx = -r; dx <= r; dx++) if (x + dx >= 0 && x + dx < w) hm[x + dx] = Math.max(hm[x + dx], top + Math.round(Math.sqrt(r * r - dx * dx)));
+      }
+      b.fillStyle = R.canopy[row];
+      for (x = 0; x < w; x++) b.fillRect(x, h - hm[x], 1, hm[x]);
+      b.fillStyle = R.canopy[2 + row];                      // a lit rim on each crown
+      for (x = 0; x < w; x++) if (hm[x] >= hm[x - 1 < 0 ? 0 : x - 1]) b.fillRect(x, h - hm[x], 1, 1);
+    }
+  }
+  function ruinsFront(b, w, h, h0, rnd, between, R) {
+    var scr = h / 480;
+    function holes(n, rmin, rmax) {                         // lumpy blobs spread down the room, one band each
+      var out = [];
+      for (var i = 0; i < n; i++) {
+        var p1 = rnd() * 6.28, p2 = rnd() * 6.28, lump = new Float32Array(64);   // the outline's wobble, by direction (64 steps of a diamond angle)
+        for (var k = 0; k < 64; k++) { var a = k * Math.PI / 32; lump[k] = 1 + 0.22 * Math.sin(a * 3 + p1) + 0.1 * Math.sin(a * 7 + p2); }
+        out.push([between(-10, w + 10), Math.round((i + rnd()) * h / n), between(rmin, rmax), between(Math.round(rmin * 0.7), Math.round(rmax * 0.8)), lump]);
+      }
+      return out;
+    }
+    // f(x, y) > 0 inside a hole. Sampled once on a 2 px grid so the per-pixel passes only look it up.
+    function field(B) {
+      var gw = (w >> 1) + 1, gh = (h >> 1) + 1, g = new Float32Array(gw * gh), gx, gy, i;
+      for (gy = 0; gy < gh; gy++) for (gx = 0; gx < gw; gx++) {
+        var x = gx * 2, y = gy * 2, best = -9;
+        for (i = 0; i < B.length; i++) {
+          var o = B[i], dx = (x - o[0]) / o[2], dy = (y - o[1]) / o[3], d2 = dx * dx + dy * dy;
+          if (d2 > 4) continue;
+          var ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy, da = ax + ay ? (dy >= 0 ? (dx >= 0 ? dy / (ax + ay) : 2 - dy / (ax + ay)) : (dx < 0 ? 2 - dy / (ax + ay) : 4 + dy / (ax + ay))) : 0;
+          var d = Math.sqrt(d2) * o[4][(da * 16) & 63];
+          if (1 - d > best) best = 1 - d;
+        }
+        g[gy * gw + gx] = best;
+      }
+      return function (x, y) { x = x < 0 ? 0 : (x >= w ? w - 1 : x); y = y < 0 ? 0 : (y >= h ? h - 1 : y); return g[(y >> 1) * gw + (x >> 1)]; };
+    }
+    // One wall. P: colours, BH: course height, bw: [min, max] block width, pil: pilaster spacing (0 for none),
+    // fr: frieze spacing (0 for none). Whole blocks fall out inside a hole, blocks on its rim break raggedly,
+    // pilasters and the frieze are sturdier, so columns and lintels often stand across a gap.
+    function wall(B, P, BH, bw, pil, fr, edges) {
+      var F = field(B), m = new Uint8Array(w * h), out = new Uint8ClampedArray(w * h * 4), x, y, i, r;
+      var nr = Math.ceil(h / BH) + 1, rowMap = [], rowB = [];
+      for (r = 0; r < nr; r++) {
+        var mp = new Int16Array(w), bl = [], x0 = -between(0, bw[1]);
+        while (x0 < w) { var ww = between(bw[0], bw[1]); bl.push([x0, ww, Math.floor(rnd() * P.body.length), rnd() < 0.05]); for (x = Math.max(0, x0); x < Math.min(w, x0 + ww); x++) mp[x] = bl.length - 1; x0 += ww; }
+        rowMap.push(mp); rowB.push(bl);
+      }
+      var pilAt = new Int8Array(w).fill(-1), PW = 12, pcx = [];
+      if (pil) for (x = between(10, pil); x < w - 4; x += between(pil, pil + 40)) { for (i = 0; i < PW && x + i < w; i++) pilAt[x + i] = i; pcx[x + 6] = 1; }
+      var frAt = new Int8Array(h).fill(-1), FH = 10;
+      if (fr) for (y = between(30, fr); y < h - FH; y += between(fr, fr + 60)) for (i = 0; i < FH; i++) frAt[y + i] = i;
+      var pal = [], pix = {};                               // colours as palette indices, so the pixel passes stay cheap
+      function idx(c) { if (pix[c] === undefined) { pix[c] = pal.length; pal.push(ruinsRgb(c)); } return pix[c]; }
+      var Q = { body: P.body.map(idx), mortar: idx(P.mortar), fr: P.fr.map(idx), pil: P.pil.map(idx), carve: idx(P.carve) };
+      var CI = new Uint8Array(w * h);
+      for (y = 0; y < h; y++) {
+        r = (y / BH) | 0; var yy = y - r * BH, mp2 = rowMap[r], bl2 = rowB[r];
+        for (x = 0; x < w; x++) {
+          var ux, uy, bonus = 0, c, pi = pilAt[x], fi = frAt[y];
+          if (fi >= 0) {                                    // the frieze: a lit ledge, a course of carved blocks, a shadow under it
+            var fx = Math.floor(x / 12) * 12; ux = fx + 6; uy = y - fi + 5; bonus = -0.18;
+            c = fi === 0 ? Q.fr[1] : (fi === FH - 1 ? Q.fr[2] : (x === fx ? Q.mortar : Q.fr[0]));
+            if (fi >= 3 && fi <= 7 && x - fx >= 3 && x - fx <= 9) {     // a carved fret, one of three, cut darker
+              var gx = x - fx - 3, gy = fi - 3, kind = Math.floor(tileHash(fx, y - fi) * 3);
+              var on = kind === 0 ? (gy === 0 || gy === 4 || gx === 0 || gx === 6 || (gy === 2 && gx >= 2 && gx <= 4))
+                     : kind === 1 ? ((gy === 0 && gx <= 4) || (gx === 4 && gy <= 2) || (gy === 2 && gx >= 2) || (gx === 2 && gy >= 2) || (gy === 4 && gx <= 2))
+                     : ((gx + gy) % 3 === 0 && gy > 0 && gy < 4);
+              if (on) c = Q.carve;
+            }
+          } else if (pi >= 0) {                             // a pilaster: lit on the left, fluted, in tall drums
+            ux = x - pi + 6; uy = Math.floor(y / 16) * 16 + 8; bonus = -0.38;
+            c = pi === 0 ? Q.pil[1] : (pi >= PW - 2 ? Q.pil[2] : (pi % 4 === 2 ? Q.pil[2] : Q.pil[0]));
+            if (y % 16 === 15) c = Q.mortar;
+          } else {
+            var blk = bl2[mp2[x]]; ux = blk[0] + (blk[1] >> 1); uy = r * BH + (BH >> 1);
+            c = (yy === BH - 1 || x === blk[0]) ? Q.mortar : Q.body[blk[2]];
+            if (blk[3] && yy >= 1 && yy <= BH - 3 && x - blk[0] >= 2 && x - blk[0] <= blk[1] - 3 && ((x - blk[0]) % 2 === 0 || yy === 1 || yy === BH - 3)) c = Q.carve;   // a glyph block
+          }
+          var fu = F(ux, uy) + bonus, gone = fu > 0.1 || (fu > -0.3 && F(x, y) + bonus + (tileHash(x >> 1, (y >> 1) + 977) - 0.5) * 0.3 > 0.02);
+          if (!gone) { m[y * w + x] = 1; CI[y * w + x] = c; }
+        }
+      }
+      var iHi = idx(P.hi), iCut = idx(P.cut), iLo = idx(P.lo), iSide = idx(P.side), sv = ruinsRgb(P.shadow), SH = [0, 110, 70, 40, 18];
+      var out32 = new Uint32Array(out.buffer), pal32 = pal.map(function (v) { return ((255 << 24) | (v[2] << 16) | (v[1] << 8) | v[0]) >>> 0; });   // RGBA bytes, little-endian
+      for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+        i = y * w + x; var o = i * 4;
+        if (m[i]) {
+          var k = CI[i];
+          if (edges) {
+            if (y > 0 && !m[i - w]) k = iHi;                                    // a broken top, lit from the sky
+            else if ((y > 1 && !m[i - 2 * w]) || (y > 2 && !m[i - 3 * w])) k = iCut;   // the wall's thickness under it
+            else if (y < h - 1 && !m[i + w]) k = iLo;                           // the underside of a broken course
+            else if ((x > 0 && !m[i - 1]) || (x < w - 1 && !m[i + 1])) k = iSide;
+          } else if (y > 0 && !m[i - w]) k = iHi;
+          out32[i] = pal32[k];
+        } else if (edges) {                                 // a cast shadow on whatever shows through, under a broken lintel
+          for (var d = 1; d <= 4 && y - d >= 0; d++) if (m[i - d * w]) { out[o] = sv[0]; out[o + 1] = sv[1]; out[o + 2] = sv[2]; out[o + 3] = SH[d]; break; }
+        }
+      }
+      return { m: m, out: out };
+    }
+    function put(g) { var cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(new ImageData(g.out, w, h), 0, 0); b.drawImage(cv, 0, 0); }
+    function isWall(m, x, y) { return x >= 0 && x < w && y >= 0 && y < h && m[y * w + x] === 1; }
+    var RGB = {};
+    function px(g, c, x, y) { if (x < 0 || x >= w || y < 0 || y >= h) return; var v = RGB[c] || (RGB[c] = ruinsRgb(c)), o = (y * w + x) * 4; g.out[o] = v[0]; g.out[o + 1] = v[1]; g.out[o + 2] = v[2]; g.out[o + 3] = 255; }
+    function oval(g, c, cx, cy, rx, ry) { for (var y = -ry; y <= ry; y++) { var hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry)))); for (var x = -hw; x < hw; x++) px(g, c, cx + x, cy + y); } }
+    // A hanging vine: a stem that sways a pixel or so, a leaf every few pixels on alternate sides, a bud at the end.
+    function vine(g, L, x0, y0, len, leafy) {
+      var ph = rnd() * 6.28, amp = rnd() < 0.5 ? 1 : 1.6, side = rnd() < 0.5 ? -1 : 1, t;
+      for (t = 0; t < len; t++) {
+        var xx = x0 + Math.round(Math.sin(ph + t / 5) * amp), yy = y0 + t;
+        px(g, L[0], xx, yy);
+        if (leafy && t > 1 && t % 3 === 0) { side = -side; px(g, L[1], xx + side, yy); if (rnd() < 0.6) px(g, L[2], xx + side * 2, yy - 1); }
+      }
+      var ex = x0 + Math.round(Math.sin(ph + len / 5) * amp), ey = y0 + len;
+      px(g, L[1], ex, ey); px(g, L[1], ex - 1, ey - 1); px(g, L[2], ex + 1, ey - 1);
+    }
+    function ivy(g, L, m, cx, cy, rr) {                     // a patch of leaves clinging to the stone, thinning out at its edge
+      for (var y = cy - rr; y <= cy + rr; y += 2) for (var x = cx - rr; x <= cx + rr; x += 2) {
+        var jx = x + (tileHash(x, y + 51) < 0.5 ? 0 : 1), d = Math.sqrt((jx - cx) * (jx - cx) + (y - cy) * (y - cy)) / rr;
+        if (d > 1 || tileHash(jx, y) > (1 - d) * 0.95 || !isWall(m, jx, y) || !isWall(m, jx + 1, y + 1)) continue;
+        var t = tileHash(jx + 7, y + 3);
+        px(g, L[1], jx, y); px(g, L[0], jx + 1, y + 1); px(g, t < 0.35 ? L[2] : L[1], t < 0.5 ? jx + 1 : jx, y + (t < 0.5 ? 0 : 1));
+        if (t > 0.92 && L[3]) px(g, L[3], jx, y);
+      }
+    }
+    function near(m, x, y, k) { return !isWall(m, x - k, y) || !isWall(m, x + k, y) || !isWall(m, x, y - k) || !isWall(m, x, y + k); }
+
+    // the wall further back: pale, smaller courses, big holes, a few pale vines
+    var MID = wall(holes(Math.round(6 * scr), 42, 92), R.mid, 5, [7, 12], 70, 0, false), mg = MID, x, y, i, n;
+    for (y = 1; y < h; y++) for (x = 0; x < w; x++) if (isWall(MID.m, x, y - 1) && !isWall(MID.m, x, y) && tileHash(x + 300, y) < 0.035) vine(mg, R.leafFar, x, y, between(4, 30), false);
+    put(MID);
+
+    // the room's own wall
+    var NW = wall(holes(Math.round(7 * scr), 30, 70), R.near, 7, [9, 16], 90, 130, true), m = NW.m, g = NW, L = R.leaf;
+    for (n = 0; n < Math.round(14 * scr); n++) {             // ivy on the stone, mostly near a break
+      for (i = 0; i < 30; i++) { x = between(0, w - 1); y = between(0, h - 1); if (isWall(m, x, y) && near(m, x, y, 10)) break; }
+      if (i < 30) ivy(g, L, m, x, y, between(5, 13));
+    }
+    for (n = 0; n < Math.round(7 * scr); n++) {             // creepers wandering down the face
+      x = between(0, w - 1); y = between(0, h - 1); if (!isWall(m, x, y)) continue;
+      var len = between(25, 80), dx = 0;
+      for (i = 0; i < len; i++) { if (i % 4 === 0) dx = between(-1, 1); x += dx; y += 1; if (isWall(m, x, y)) { px(g, L[0], x, y); if (i % 3 === 0 && rnd() < 0.8) px(g, rnd() < 0.5 ? L[1] : L[2], x + (i % 2 ? 1 : -1), y); } }
+    }
+    for (y = 1; y < h; y++) for (x = 0; x < w; x++) {
+      if (!isWall(m, x, y)) continue;
+      if (!isWall(m, x, y - 1)) {                           // on a broken top: moss, grass and the odd fern or bush
+        var t = tileHash(x + 11, y + 29);
+        if (t < 0.45) px(g, t < 0.2 ? L[2] : L[1], x, y);
+        if (t < 0.22) { var bh = 1 + Math.floor(tileHash(x, y + 5) * 3); for (i = 1; i <= bh; i++) px(g, i === bh ? L[2] : L[1], x, y - i); }
+        if (t > 0.985) { var bw2 = between(4, 7), bh2 = between(3, 5); oval(g, L[1], x, y - bh2 + 1, bw2, bh2 - 1); oval(g, L[2], x - 1, y - bh2, bw2 - 2, Math.max(1, bh2 - 3)); px(g, L[3], x - 2, y - bh2 - 1); px(g, L[3], x + 2, y - bh2); }
+      }
+      if (!isWall(m, x, y + 1) && tileHash(x + 77, y + 13) < 0.06)   // vines hanging from every broken underside
+        vine(g, L, x, y + 1, rnd() < 0.15 ? between(40, 110) : between(6, 36), true);
+    }
+    for (n = 0; n < Math.round(4 * scr); n++) {             // a vine draped across a hole, sagging, with strands hanging off it
+      for (i = 0; i < 40; i++) { x = between(0, w - 1); y = between(0, h - 1); if (!isWall(m, x, y)) break; }
+      if (i >= 40) continue;
+      var xa = x, xb = x; while (xa > 0 && !isWall(m, xa, y)) xa--; while (xb < w - 1 && !isWall(m, xb, y)) xb++;
+      if (xb - xa < 16 || xb - xa > 140) continue;
+      var sag = between(4, 12), last = -1;
+      for (x = xa; x <= xb; x++) {
+        var tt = (x - xa) / (xb - xa), vy = y + Math.round(Math.sin(tt * Math.PI) * sag);
+        px(g, L[0], x, vy); px(g, L[0], x, vy + 1);
+        if ((x - xa) % 3 === 1) px(g, (x - xa) % 2 ? L[1] : L[2], x, vy - 1);
+        if (x - last > between(4, 9)) { last = x; vine(g, L, x, vy + 2, between(3, 16), true); }
+      }
+    }
+    put(NW);
   }
   // Painted light: a soft disc baked into the static layer under anything that glows. Nothing is computed per frame.
   function drawGlow(b, cx, cy, rad, rgb, alpha) {
@@ -918,8 +1128,15 @@
       sky: ['#0b0404', '#1e0a08', '#521c12'], far: ['#26110d', '#110504', '#7a2e1c'], skyline: 'cave' },
     frost: { tiles: 'frost', bg: '#07121d', dot: '#16324a', back: ['#12283c', '#0b1a29', '#1f4460'], accent: '#9fe3ff', accentLo: '#5aa3c4',
       sky: ['#040b14', '#0d2238', '#204d6c'], far: ['#143148', '#091826', '#5a93b6'], skyline: 'peaks' },
-    jungle: { tiles: 'jungle', bg: '#07141a', dot: '#1a3a3c', back: ['#123a2a', '#0a2419', '#1f5a3c'], accent: '#ff4fa3', accentLo: '#b8306f',
-      sky: ['#0a2a4a', '#0e5f78', '#3ec6b8'], far: ['#0d3a30', '#071e18', '#2b7a4a'], skyline: 'pyramid' },
+    jungle: { tiles: 'jungle', bg: '#07141a', dot: '#1a3a3c', back: ['#24403a', '#172b26', '#6f9a80', '#3a5c50'], backKind: 'stone', accent: '#ff4fa3', accentLo: '#b8306f',
+      sky: ['#1a6a8e', '#38acbc', '#a4ead6'], far: ['#4f9f8c', '#3f8a78', '#86c9b4'], skyline: 'pyramid',
+      // the ruined back wall (ruinsBack/ruinsFront in shared-tiles.js): each nearer layer a step darker
+      ruins: { cloud: 'rgba(255,255,255,0.22)', canopy: ['#7cc6b0', '#5fb39c', '#9ad6c2', '#7cc6b0'],
+        mid: { body: ['#62a594', '#5fa08f', '#66a998'], mortar: '#559484', carve: '#559484', hi: '#93cdb9', lo: '#518d7d', side: '#62a594', cut: '#62a594',
+               pil: ['#6aad9b', '#84c2ad', '#5a9787'], fr: ['#62a594', '#93cdb9', '#518d7d'], shadow: '#3f7a6a' },
+        near: { body: ['#35564a', '#325148', '#395b4d'], mortar: '#243c34', carve: '#22382f', hi: '#93c79a', cut: '#5e8670', side: '#466c5c', lo: '#1c2f29',
+                pil: ['#3f6658', '#5c8a72', '#2a463d'], fr: ['#3c6253', '#76a687', '#1f3530'], shadow: '#082019' },
+        leaf: ['#145a32', '#23803f', '#3fa152', '#86d070'], leafFar: ['#4f9f7c', '#5fab86', '#72b892'] } },
     neon: { tiles: 'neon', bg: '#0c0a1e', dot: '#c4b8f2', back: ['#13112b', '#0b0a1c', '#221e44'], backKind: 'windows', accent: '#ff3ab8', accentLo: '#b01f7c',
       sky: ['#24194e', '#4f3f94', '#a592dc'], far: ['#241446', '#140b2e', '#38f0ff'], skyline: 'towers' }   // a lavender night: the far city is light haze, the play layer stays darkest
   };
