@@ -1006,11 +1006,12 @@
   }
   // Snaps canvases to the shades of a band once (the static layer as it is built, the hero sheets). The cut points come
   // from the canvases' own brightness, so every world keeps its contrast: 'back' puts the darkest 30% of the sky and
-  // backdrop on the light shade and the rest on the lightest; 'wall' lights the brightest 18% of the walls, the next third
-  // is dark and the rest darkest; 'ice' is mostly the light shade with dark edges and a few pale glints; 'deco' splits decals between light and dark; 'ink' (spikes, tracks, vents) is the two
+  // backdrop on the light shade and the rest on the lightest; 'wall' is only the two dark shades (the brightest 45%, lit
+  // edges included, dark; the rest darkest), so a wall's top edge never matches the sky and nothing looks like it floats
+  // over a gap; 'ice' is the light shade with dark edges; 'deco' splits decals between light and dark; 'ink' (spikes, tracks, vents) is the two
   // dark shades so a hazard is a dark shape on any background; 'obj' (the hero) uses the fixed live mapping. Several canvases can share one set of cut points (the city layers).
   // Alpha is cut at one half. The canvas is read through a throwaway so it stays on the GPU.
-  var GB_BANDS = { back: [[0.3, 1], [1, 0]], wall: [[0.49, 3], [0.82, 2], [1, 1]], ice: [[0.3, 2], [0.9, 1], [1, 0]], deco: [[0.5, 2], [1, 1]] };
+  var GB_BANDS = { back: [[0.3, 1], [1, 0]], wall: [[0.55, 3], [1, 2]], ice: [[0.35, 2], [1, 1]], deco: [[0.5, 2], [1, 1]] };
   function gbSnap(list, band) {
     if (!GB.on) return;
     var reads = list.map(function (cv) {
@@ -1984,6 +1985,7 @@
   var FX_KEY = 'climber.fx.v1', weather = { on: false, list: [], kind: '' };
   var SHAKE_KEY = 'climber.shake.v1', shakeOn = true;      // screen shake moves the stage with a transform; off means the stage never moves
   try { weather.on = localStorage.getItem(FX_KEY) === '1'; shakeOn = localStorage.getItem(SHAKE_KEY) !== '0'; } catch (e) {}
+  if (GB.on) { weather.on = false; shakeOn = false; }       // GAME BOY is the fast mode for the frame: no particles, no shake (CLAUDE.md, Themes)
   function setShake(on) { shakeOn = on; try { localStorage.setItem(SHAKE_KEY, on ? '1' : '0'); } catch (e) {} }
   function setWeather(on) {
     weather.on = on; weather.list = [];
@@ -2154,6 +2156,7 @@
   var CITY_KEY = 'climber.city.v1', cityOn = true, city = null;
   var ct = 0, cityT = 0;   // the city's own clock, in 60ths of a second of real time: on a slow screen it still keeps its pace
   try { cityOn = localStorage.getItem(CITY_KEY) !== '0'; } catch (e) {}
+  if (GB.on) cityOn = false;
   function setCity(on) { cityOn = on; allDirty = true; try { localStorage.setItem(CITY_KEY, on ? '1' : '0'); } catch (e) {} if (city && tileLayer) drawTileLayer(); }   // rebuild: off leaves the plain still city, with nothing frozen mid-flight
   var CITY_ORDER = ['sky', '@far', 'far', 'farWin', '@mid', 'near', 'nearWin', '@near', 'cables', 'front'];
   var DEPTH_LVL = { '@far': 1, '@mid': 2, '@near': 3 };                  // what hides each depth in the occlusion map
@@ -2356,7 +2359,7 @@
     tileLayer.width = LW; tileLayer.height = RH; allDirty = true;
     var b = tileLayer.getContext('2d'), tb = b, r, c, i, CL = null;
     city = null; GB.live = false;                                         // GAME BOY: the static layer is drawn in full colour, then snapped (gbSnap)
-    if (themeOf(room).skyline === 'towers') {                             // Neon Row: the city is painted in depth layers so a few things can move in it
+    if (themeOf(room).skyline === 'towers' && !GB.on) {                   // Neon Row: the city is painted in depth layers so a few things can move in it
       CL = {}; ['sky', 'far', 'farWin', 'near', 'nearWin', 'cables', 'front'].forEach(function (k) { var cv = document.createElement('canvas'); cv.width = LW; cv.height = RH; CL[k] = cv; });
       b = CL.front.getContext('2d');
       drawSky(CL.sky.getContext('2d'), LW, RH, LH, skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0)),
@@ -2378,7 +2381,7 @@
     if (il !== wl) { gbSnap([il], 'ice'); b.drawImage(il, 0, 0); }
     var seed = skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0));
     var lamps = gbStage(b, 'deco', function (d) { return drawDecals(d, cols, rows, function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols ? '#' : room.tiles[rr].charAt(cc); }, seed); });
-    signs = []; if (lamps.signs) for (i = 0; i < lamps.signs.length; i++) if (lamps.signs[i].kind !== 'still') { lamps.signs[i].shown = 0; signs.push(lamps.signs[i]); }   // only the animated ones are kept
+    signs = []; if (lamps.signs && !GB.on) for (i = 0; i < lamps.signs.length; i++) if (lamps.signs[i].kind !== 'still') { lamps.signs[i].shown = 0; signs.push(lamps.signs[i]); }   // only the animated ones are kept
     gbStage(b, 'ink', function (d) {
       for (i = 0; i < tracks.length; i++) drawTrack(d, tracks[i].x, tracks[i].y, tracks[i].v);
       for (i = 0; i < hazards.length; i++) if (hazards[i].dir < 4) drawSpike(d, hazards[i].tx, hazards[i].ty, hazards[i].dir);
@@ -2432,14 +2435,18 @@
     if (signs.length) stepSigns();
     if (lava) {
       var ly = Math.floor(lava.y);
-      drawLavaBody(g, ly, LW, RH, tick);
+      drawLavaBody(g, ly, LW, RH, GB.on ? 0 : tick);
       if (ly !== lava.shown) { mark(0, Math.min(ly, lava.shown < 0 ? ly : lava.shown) - 4, LW, Math.abs((lava.shown < 0 ? ly : lava.shown) - ly) + 8); lava.shown = ly; }
-      else if (tick % 8 === 0) mark(0, ly - 3, LW, 6);                    // the surface shimmers slowly
+      else if (tick % 8 === 0 && !GB.on) mark(0, ly - 3, LW, 6);                    // the surface shimmers slowly
     }
     for (i = 0; i < jets.length; i++) {
       var jt = jets[i], jp = jetPhase(jt);
       if (jp.on !== jt.on || jp.warn !== jt.warn) { jt.on = jp.on; jt.warn = jp.warn; mark(jt.x, jt.y - 2 * T, T, 3 * T); }
-      if (jt.holo) {
+      if (GB.on) {                                  // GAME BOY: each state is one still picture, repainted only when the state changes
+        if (jt.holo) { if (jp.on) drawHolo(g, jt.x, jt.y, 0); else if (jp.warn) drawHoloWarn(g, jt.x, jt.y, 1); }
+        else if (jt.laser) { if (jp.on) drawLaser(g, jt.x, jt.y, 0); else if (jp.warn) drawLaserWarn(g, jt.x, jt.y, 1); }
+        else if (jp.on) drawJet(g, jt.x, jt.y, 0); else if (jp.warn) drawJetWarn(g, jt.x, jt.y, 1);
+      } else if (jt.holo) {
         if (jp.on) { drawHolo(g, jt.x, jt.y, Math.floor(tick / 5) % 4); if (tick % 5 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
         else if (jp.warn) { drawHoloWarn(g, jt.x, jt.y, Math.floor(tick / 4) % 2); if (tick % 4 === 0) mark(jt.x, jt.y - 2 * T, T, 3 * T); }
       } else if (jt.laser) {
@@ -2463,7 +2470,7 @@
     }
     for (i = 0; i < roomKeys.length; i++) {
       var ky = roomKeys[i];
-      if (ky.state === 'idle') { var kb = Math.round(Math.sin(tick / 20 + i) * 1.5); drawKey(g, ky.x, ky.y + kb); if (tick % 10 === 0) mark(ky.x - 1, ky.y - 3, T + 2, T + 6); }
+      if (ky.state === 'idle') { var kb = GB.on ? 0 : Math.round(Math.sin(tick / 20 + i) * 1.5); drawKey(g, ky.x, ky.y + kb); if (tick % (GB.on ? 30 : 10) === 0) mark(ky.x - 1, ky.y - 3, T + 2, T + 6); }   // GAME BOY: no bob
       else if (ky.state === 'follow') {
         var kx = pl.x + (pl.facing > 0 ? -9 : 9), kyy = pl.y - 11 + (gotGem() ? 8 : 0);   // sits behind the hero, under the gem if both are along
         mark(ky.fx - 2, ky.fy - 2, T + 4, T + 4);
@@ -2473,7 +2480,7 @@
     }
     var flick = Math.floor(tick / 14) % 2;
     // flames swap shape three times a second, each on its own beat, so the screen never repaints every flame at once
-    for (i = 0; i < flames.length; i++) { var fph = (tick + i * 7) % 20 < 10 ? 1 : 0; drawFlame(g, flames[i].x, flames[i].y, fph); if ((tick + i * 7) % 10 === 0) mark(flames[i].x, flames[i].y, T, T); }
+    for (i = 0; i < flames.length; i++) { var fph = GB.on ? 1 : (tick + i * 7) % 20 < 10 ? 1 : 0; drawFlame(g, flames[i].x, flames[i].y, fph); if ((tick + i * 7) % (GB.on ? 60 : 10) === 0) mark(flames[i].x, flames[i].y, T, T); }   // GAME BOY: flames hold still
     for (i = 0; i < drones.length; i++) {
       var dn = drones[i];
       drawDrone(g, dn.x, dn.y, dn.dir, flick);
@@ -2502,7 +2509,7 @@
     for (i = 0; i < springs.length; i++) { var sq = springs[i]; drawSpring(g, sq.x, sq.y, sq.t > 0); if (sq.t > 0) mark(sq.x, sq.y - 4, T, T + 4); }
     for (i = 0; i < gems.length; i++) {
       var gm = gems[i];
-      if (gm.state === 'idle') { var bob = Math.round(Math.sin(tick / 20) * 1.5); drawGem(g, gm.x, gm.y + bob, flick); if (tick % 10 === 0) mark(gm.x - 1, gm.y - 3, T + 2, T + 6); }
+      if (gm.state === 'idle') { var bob = GB.on ? 0 : Math.round(Math.sin(tick / 20) * 1.5); drawGem(g, gm.x, gm.y + bob, GB.on ? 0 : flick); if (tick % (GB.on ? 30 : 10) === 0) mark(gm.x - 1, gm.y - 3, T + 2, T + 6); }
       else if (gm.state === 'follow') {              // trails just behind and above the hero
         var tx = pl.x + (pl.facing > 0 ? -9 : 9), ty = pl.y - 11;
         mark(gm.fx - 2, gm.fy - 2, T + 4, T + 4);
@@ -2521,6 +2528,7 @@
       mark(tr.x - 5, tr.y - 7, 18, 18);
     }
     g.globalAlpha = 1;
+    var heroMarks = dirtyNow.length; hero.ph = 0;
     if (fx.mode === 'none') mark(pl.x - 10, pl.y - 16, 28, 28);
     else mark(fx.x - 22, fx.y - 30, 52, 60);
     if (fx.mode === 'exit') {
@@ -2530,7 +2538,13 @@
     }
     else if (fx.mode === 'die') drawDeath();
     else if (fx.mode === 'spawn') drawSpawn();
-    else if (hero.ready) drawHeroState();
+    else if (hero.ready) {
+      drawHeroState();
+      // GAME BOY: a hero that drew exactly the same pixels as last frame (standing still between breaths, the tails
+      // settled) needs no repaint, so its marks are dropped. ORIGINAL always repaints the hero.
+      if (GB.on && fx.mode === 'none' && !pl.trail.length && hero.ph === hero.lastPh && hero.lastPx === pl.x + ',' + pl.y) dirtyNow.length = heroMarks;
+      hero.lastPh = hero.ph; hero.lastPx = pl.x + ',' + pl.y;
+    }
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
     var sig = [pause.on, pause.pick, padVer, mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
@@ -2597,13 +2611,14 @@
     var F = HERO.frame, dx = x + pl.w / 2 - F / 2, dy = y + pl.h - F, sheet = hero.sheets[variant || 0];
     var sx = hero.sx, sy = hero.sy;
     if (facing < 0) sx = -sx;
+    hero.ph = (hero.ph * 31 + ((f * 64 + a.row) * 4 + (variant | 0)) * 7919 + Math.round(dx) * 613 + Math.round(dy) * 3 + Math.round(sx * 100) * 17 + Math.round(sy * 100)) | 0;
     if (sx === 1 && sy === 1) g.drawImage(sheet, f * F, a.row * F, F, F, dx, dy, F, F);
     else { g.save(); g.translate(dx + F / 2, dy + F); g.scale(sx, sy); g.drawImage(sheet, f * F, a.row * F, F, F, -F / 2, -F, F, F); g.restore(); }   // squash and stretch about the feet
     return true;
   }
   // Dust: a few pale pixels kicked up on a hard landing, a run start, a skid and a wall slide. Render only.
   var dust = [];
-  function puff(x, y, n, vx, vy) { for (var i = 0; i < n; i++) dust.push({ x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 2, vx: vx + (Math.random() - 0.5) * 30, vy: vy - Math.random() * 20, life: 0.25 + Math.random() * 0.15, t: 0 }); }
+  function puff(x, y, n, vx, vy) { if (GB.on) return; for (var i = 0; i < n; i++) dust.push({ x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 2, vx: vx + (Math.random() - 0.5) * 30, vy: vy - Math.random() * 20, life: 0.25 + Math.random() * 0.15, t: 0 }); }
   function drawDust(dt) {
     for (var i = dust.length - 1; i >= 0; i--) {
       var d = dust[i]; d.t += dt; if (d.t >= d.life) { dust.splice(i, 1); continue; }
@@ -2668,7 +2683,7 @@
       steps = Math.max(1, Math.ceil(Math.max(Math.abs(qx - px), Math.abs(qy - py))));
       for (k = 0; k <= steps; k++) {
         x = Math.round(px + (qx - px) * k / steps) - pad; y = Math.round(py + (qy - py) * k / steps) - pad;
-        g.fillRect(x, y, sz, sz);
+        g.fillRect(x, y, sz, sz); hero.ph = (hero.ph * 31 + x * 977 + y) | 0;   // the pixel hash: GAME BOY skips repainting a hero that did not change
         if (x < rib.x0) rib.x0 = x; if (y < rib.y0) rib.y0 = y; if (x + sz > rib.x1) rib.x1 = x + sz; if (y + sz > rib.y1) rib.y1 = y + sz;
       }
       px = qx; py = qy;
@@ -2677,6 +2692,7 @@
   function drawChain(an) {
     var k = HERO.chain; if (!k || !chain.a.length) return;
     var col = chain.flash > 0 ? [k.flash, k.flash] : shaky() ? (Math.floor(tick / 6) % 2 ? k.tired : [k.tired[0], k.tired[0]]) : chain.can ? k.can : k.spent;
+    hero.ph = (hero.ph * 31 + col[0].length + (col === k.can ? 1 : col === k.spent ? 2 : col === k.tired ? 3 : 4)) | 0;
     rib.x0 = rib.y0 = 1e9; rib.x1 = rib.y1 = -1e9;
     var an2 = { x: an.x, y: an.y + 1 }, an3 = chain.an3 || an;
     g.fillStyle = k.hair || '#543a30'; ribbon(an3, chain.h, 0);                 // one pixel lines, no outline: two thin tails and a lock of hair
@@ -3096,7 +3112,7 @@
   var set = { page: 'top', row: 0, topRow: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
   var SET_PAGES = {
     top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['theme', 'THEME', 'ORIGINAL COLOURS OR GAME BOY GREENS'], ['back', 'BACK', 'BACK TO THE MENU']] },
-    theme: { title: 'THEME', rows: [['t-original', 'ORIGINAL', 'THE GAME IN FULL COLOUR'], ['t-gb', 'GAME BOY', 'FOUR SHADES OF GREEN, LIKE THE OLD HANDHELD'], ['back', 'BACK', 'BACK TO SETTINGS']] },
+    theme: { title: 'THEME', rows: [['t-original', 'ORIGINAL', 'THE GAME IN FULL COLOUR'], ['t-gb', 'GAME BOY', 'FOUR GREENS. THE FAST MODE FOR THE FRAME'], ['back', 'BACK', 'BACK TO SETTINGS']] },
     controls: { title: 'CONTROLS', rows: ACTIONS.map(function (a) { return [a[0], a[1], 'act']; }).concat([['redo', 'REDO SETUP', 'LEARN WHICH BUTTON IS WHICH AGAIN'], ['reset', 'RESET BUTTONS', 'BACK TO THE STARTING JOBS'], ['back', 'BACK', 'BACK TO SETTINGS']]) },
     graphics: { title: 'GRAPHICS', rows: [['fx', 'PARTICLES', 'WEATHER DRAWN OVER THE ROOM'], ['shake', 'SHAKE', 'A SMALL KICK ON HARD LANDINGS AND HITS'], ['city', 'CITY LIFE', 'WINDOWS TRAFFIC AND STEAM IN NEON ROW'],
                                  ['speed', 'SPEED READOUT', 'FPS IN THE TOP BAR WHILE PLAYING'], ['back', 'BACK', 'BACK TO SETTINGS']] }
@@ -3126,6 +3142,7 @@
     set.row = k; set.note = ''; lastSig = '';
     if (id === 'back') { setBack(); return; }
     if (set.page === 'top') { set.topRow = k; set.page = id; set.row = 0; return; }
+    if (GB.on && (id === 'shake' || id === 'city' || id === 'fx')) { set.note = 'OFF IN THE GAME BOY THEME, FOR SPEED'; return; }
     if (id === 'shake') { setShake(!shakeOn); set.note = shakeOn ? 'SCREEN SHAKE ON' : 'SCREEN SHAKE OFF. CHECK THE SPEED READOUT.'; return; }
     if (id === 'city') { setCity(!cityOn); set.note = cityOn ? 'CITY LIFE ON. CHECK THE SPEED READOUT.' : 'CITY LIFE OFF. THE CITY STANDS STILL.'; return; }
     if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
