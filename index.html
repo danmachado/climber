@@ -947,6 +947,109 @@
   function parOf(room) { return room.par > 0 ? room.par : 20 + 6 * (room.difficulty || 1); }
 
 
+  // ---- theme: ORIGINAL or GAME BOY (Settings, THEME; climber.theme.v1, read once at start, a change reloads) ----
+  // GAME BOY draws everything in four greens (2-bit, lightest to darkest). Nothing extra runs per frame: the static
+  // layer and the hero sheets are snapped to the four shades once when they are built (gbSnap), and every colour the
+  // game sets while playing goes through gbColor, cached per colour string, via the 2D context's own setters.
+  // Bands keep the old handheld read: sky and backdrop use the two light shades, walls the two dark ones, hazards and
+  // movers are dark ink on the light background, and the menus and HUD are inverted (dark ink on the lightest green).
+  // There is no see-through on a Game Boy: while playing, an alpha under one half draws nothing and anything over draws
+  // solid, and the painted glows are left out. Pins give gameplay signals a fixed shade (dash ready is the darkest, spent
+  // is light) so they read without colour.
+  var THEME_KEY = 'climber.theme.v1', GB = { on: false, live: true, cache: {}, pins: { obj: {}, ui: {} } };
+  try { GB.on = localStorage.getItem(THEME_KEY) === 'gb'; } catch (e) {}
+  var GB_PAL = [[140, 173, 40], [108, 148, 33], [48, 98, 48], [24, 52, 30]];   // lightest, light, dark, darkest
+  var GB_HEX = GB_PAL.map(function (c) { return '#' + c.map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join(''); });
+  function gbLum(r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+  // the live mapping for things drawn while playing ('obj'), and the inverted one for menus and the HUD ('ui')
+  function gbObj(L) { return L > 0.86 ? 0 : L > 0.66 ? 1 : L > 0.34 ? 2 : 3; }
+  function gbUi(L) { return L > 0.62 ? 3 : L > 0.4 ? 2 : L > 0.2 ? 1 : 0; }
+  function gbRgb(str) {                              // any CSS colour to [r, g, b, a] (a 0..1), through the canvas's own parser
+    var x = GB.parse || (GB.parse = document.createElement('canvas').getContext('2d'));
+    GB.set.call(x, '#000'); GB.set.call(x, str); var v = GB.get.call(x);
+    if (v.charAt(0) === '#') return [parseInt(v.substr(1, 2), 16), parseInt(v.substr(3, 2), 16), parseInt(v.substr(5, 2), 16), 1];
+    var m = v.match(/[\d.]+/g) || [0, 0, 0, 1];
+    return [+m[0], +m[1], +m[2], m[3] == null ? 1 : +m[3]];
+  }
+  function gbColor(str, band) {
+    var key = band + str, hit = GB.cache[key];
+    if (hit) return hit;
+    var c = gbRgb(str), pin = GB.pins[band === 'ui' ? 'ui' : 'obj'][c[0] + ',' + c[1] + ',' + c[2]], s, out;
+    if (c[3] < 0.5) out = 'rgba(0,0,0,0)';
+    else {
+      s = pin != null ? pin : band === 'ui' ? gbUi(gbLum(c[0], c[1], c[2])) : gbObj(gbLum(c[0], c[1], c[2]));   // pins hold on every band
+      out = GB_HEX[s];
+    }
+    GB.cache[key] = out;
+    return out;
+  }
+  function gbPin(list, shade, band) {             // band: 'obj' (play), 'ui' (menus and HUD) or both when left out
+    list.forEach(function (c) { var v = typeof c === 'string' ? gbRgb(c) : c; (band ? [band] : ['obj', 'ui']).forEach(function (b) { GB.pins[b][v[0] + ',' + v[1] + ',' + v[2]] = shade; }); });
+  }
+  if (GB.on) {
+    (function () {
+      var P2 = CanvasRenderingContext2D.prototype, fs = Object.getOwnPropertyDescriptor(P2, 'fillStyle'), ss = Object.getOwnPropertyDescriptor(P2, 'strokeStyle'), ga = Object.getOwnPropertyDescriptor(P2, 'globalAlpha');
+      GB.set = fs.set; GB.get = fs.get;
+      function wrap(d) {
+        return { get: d.get, configurable: true, set: function (v) { d.set.call(this, GB.live && typeof v === 'string' ? gbColor(v, this.gbBand || 'obj') : v); } };
+      }
+      Object.defineProperty(P2, 'fillStyle', wrap(fs)); Object.defineProperty(P2, 'strokeStyle', wrap(ss));
+      Object.defineProperty(P2, 'globalAlpha', { get: ga.get, configurable: true, set: function (v) { ga.set.call(this, GB.live && v < 1 ? (v < 0.5 ? 0 : 1) : v); } });
+    })();
+    // gameplay signals: the bandana and tails are darkest while a dash is ready, light once it is spent, a pale flash on refill
+    gbPin(HERO.chain.can.concat([HERO.dashColor], HERO.spentPairs.map(function (p) { return p[0]; })), 3, 'obj');
+    gbPin(HERO.chain.spent.concat([HERO.spentColor], HERO.spentPairs.map(function (p) { return p[1]; })), 1, 'obj');
+    gbPin([HERO.chain.tired[0]], 2, 'obj'); gbPin([HERO.chain.tired[1], HERO.chain.flash], 0, 'obj');
+    gbPin([C.teal], 3); gbPin([C.tealDim], 1);                                 // refills and the exit: dark when ready, light when used
+    gbPin([C.hurt], 2, 'ui'); gbPin(['#ffc4b8'], 1, 'ui');                               // the meter: darkest cells while a dash is affordable, a step lighter with a pale top when not
+    drawGlow = function () {};                                                 // no painted light on a Game Boy
+  }
+  // Snaps canvases to the shades of a band once (the static layer as it is built, the hero sheets). The cut points come
+  // from the canvases' own brightness, so every world keeps its contrast: 'back' puts the darkest 30% of the sky and
+  // backdrop on the light shade and the rest on the lightest; 'wall' lights the brightest 18% of the walls, the next third
+  // is dark and the rest darkest; 'ice' is mostly the light shade with dark edges and a few pale glints; 'deco' splits decals between light and dark; 'ink' (spikes, tracks, vents) is the two
+  // dark shades so a hazard is a dark shape on any background; 'obj' (the hero) uses the fixed live mapping. Several canvases can share one set of cut points (the city layers).
+  // Alpha is cut at one half. The canvas is read through a throwaway so it stays on the GPU.
+  var GB_BANDS = { back: [[0.3, 1], [1, 0]], wall: [[0.49, 3], [0.82, 2], [1, 1]], ice: [[0.3, 2], [0.9, 1], [1, 0]], deco: [[0.5, 2], [1, 1]] };
+  function gbSnap(list, band) {
+    if (!GB.on) return;
+    var reads = list.map(function (cv) {
+      var t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height;
+      var tg = t.getContext('2d', { willReadFrequently: true }); tg.drawImage(cv, 0, 0);
+      return { cv: cv, t: t, tg: tg, d: tg.getImageData(0, 0, cv.width, cv.height) };
+    });
+    var plan = GB_BANDS[band], cuts = null, i, j, p, n;
+    if (plan) {                                      // brightness cut points, from a histogram of every opaque pixel
+      var hist = new Uint32Array(256), tot = 0, acc = 0;
+      for (j = 0; j < reads.length; j++) for (p = reads[j].d.data, i = 0; i < p.length; i += 4) if (p[i + 3] >= 128) { hist[Math.round(gbLum(p[i], p[i + 1], p[i + 2]) * 255)]++; tot++; }
+      cuts = []; n = 0;
+      for (i = 0; i < 256 && n < plan.length; i++) { acc += hist[i]; while (n < plan.length && acc >= plan[n][0] * tot) cuts.push([i, plan[n++][1]]); }
+      while (n < plan.length) cuts.push([255, plan[n++][1]]);
+    }
+    for (j = 0; j < reads.length; j++) {
+      var R = reads[j];
+      for (p = R.d.data, i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 128) { p[i + 3] = 0; continue; }
+        var pin = GB.pins.obj[p[i] + ',' + p[i + 1] + ',' + p[i + 2]], L = Math.round(gbLum(p[i], p[i + 1], p[i + 2]) * 255), s;
+        if (pin != null) s = pin;
+        else if (cuts) { for (n = 0; n < cuts.length - 1 && L > cuts[n][0]; n++); s = cuts[n][1]; }
+        else if (band === 'ink') s = L > 178 ? 2 : 3;   // hazards are solid dark shapes, pale parts a step lighter
+        else s = gbObj(L / 255);
+        var c = GB_PAL[s]; p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255;
+      }
+      R.tg.putImageData(R.d, 0, 0);
+      var cg = R.cv.getContext('2d'); cg.clearRect(0, 0, R.cv.width, R.cv.height); cg.drawImage(R.t, 0, 0);
+    }
+  }
+  // Runs a drawing step on its own layer, snaps it to a band and lays it on b (GAME BOY), or just draws on b.
+  function gbStage(b, band, fn) {
+    if (!GB.on) return fn(b);
+    var t = document.createElement('canvas'); t.width = b.canvas.width; t.height = b.canvas.height;
+    var out = fn(t.getContext('2d'));
+    gbSnap([t], band); b.drawImage(t, 0, 0);
+    return out;
+  }
+
   // ---- level loading: rooms are data, never hard-coded ----
   // ---- where published rooms live (this key is the public, read-only kind and is safe to ship) ----
   var BACKEND = window.CLIMBER_BACKEND || {
@@ -1865,6 +1968,10 @@
   var buf = makeCanvas(LW, LH), g = buf.getContext('2d');
   g.imageSmoothingEnabled = false;                      // stretched sprites stay crisp pixel art
   var hud = makeCanvas(LW, LH), h = hud.getContext('2d');
+  if (GB.on) {                                          // GAME BOY: menus and the HUD are dark ink on the lightest green; the page around matches
+    h.gbBand = 'ui';
+    document.body.style.background = GB_HEX[3]; stage.style.background = GB_HEX[0];
+  }
   var CW = 45, CH = 48, chunks = [], dirtyNow = [], dirtyPrev = [], allDirty = true, chunkCopies = 0;   // chunkCopies: a running count, for measuring what an effect costs
   // The chunks live in a "world" layer as tall as the room. A tall room scrolls by sliding that layer with a
   // transform (no repainting), the same cheap move the screen shake uses.
@@ -2248,7 +2355,7 @@
     tileLayer = document.createElement('canvas');
     tileLayer.width = LW; tileLayer.height = RH; allDirty = true;
     var b = tileLayer.getContext('2d'), tb = b, r, c, i, CL = null;
-    city = null;
+    city = null; GB.live = false;                                         // GAME BOY: the static layer is drawn in full colour, then snapped (gbSnap)
     if (themeOf(room).skyline === 'towers') {                             // Neon Row: the city is painted in depth layers so a few things can move in it
       CL = {}; ['sky', 'far', 'farWin', 'near', 'nearWin', 'cables', 'front'].forEach(function (k) { var cv = document.createElement('canvas'); cv.width = LW; cv.height = RH; CL[k] = cv; });
       b = CL.front.getContext('2d');
@@ -2258,18 +2365,26 @@
     var wallAt = function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr][cc] === 1 || grid[rr][cc] === 2; };
     var backAt = function (cc, rr) { return wallAt(cc, rr) || !!backs[rr * cols + cc]; };
     for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) if (backs[r * cols + c]) drawBack(b, c * T, r * T, backAt, c, r);
+    if (CL) gbSnap(['sky', 'far', 'farWin', 'near', 'nearWin', 'cables', 'front'].map(function (k) { return CL[k]; }), 'back'); else gbSnap([tileLayer], 'back');
     var wl = document.createElement('canvas'), wb;                        // walls on their own layer: roughen() clears chips to transparent
     wl.width = LW; wl.height = RH; wb = wl.getContext('2d');
+    var il = wl, ib = wb;                                                  // GAME BOY: ice gets its own layer and lighter shades, so it still reads as ice
+    if (GB.on) { il = document.createElement('canvas'); il.width = LW; il.height = RH; ib = il.getContext('2d'); }
     for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
-      if (grid[r][c] === 1 || grid[r][c] === 2) drawSolid(wb, c * T, r * T, grid[r][c] === 2 ? 'ice' : 'brick', wallAt, c, r);
+      if (grid[r][c] === 1 || grid[r][c] === 2) drawSolid(grid[r][c] === 2 ? ib : wb, c * T, r * T, grid[r][c] === 2 ? 'ice' : 'brick', wallAt, c, r);
     }
+    gbSnap([wl], 'wall');
     b.drawImage(wl, 0, 0);
+    if (il !== wl) { gbSnap([il], 'ice'); b.drawImage(il, 0, 0); }
     var seed = skyHash((room.name || '') + '/' + (room.world | 0) + '/' + (room.level | 0));
-    var lamps = drawDecals(b, cols, rows, function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols ? '#' : room.tiles[rr].charAt(cc); }, seed);
+    var lamps = gbStage(b, 'deco', function (d) { return drawDecals(d, cols, rows, function (cc, rr) { return rr < 0 || rr >= rows || cc < 0 || cc >= cols ? '#' : room.tiles[rr].charAt(cc); }, seed); });
     signs = []; if (lamps.signs) for (i = 0; i < lamps.signs.length; i++) if (lamps.signs[i].kind !== 'still') { lamps.signs[i].shown = 0; signs.push(lamps.signs[i]); }   // only the animated ones are kept
-    for (i = 0; i < tracks.length; i++) drawTrack(b, tracks[i].x, tracks[i].y, tracks[i].v);
-    for (i = 0; i < hazards.length; i++) if (hazards[i].dir < 4) drawSpike(b, hazards[i].tx, hazards[i].ty, hazards[i].dir);
-    for (i = 0; i < jets.length; i++) if (jets[i].holo) drawHoloBase(b, jets[i].x, jets[i].y); else if (jets[i].laser) drawEmitter(b, jets[i].x, jets[i].y); else drawVent(b, jets[i].x, jets[i].y);
+    gbStage(b, 'ink', function (d) {
+      for (i = 0; i < tracks.length; i++) drawTrack(d, tracks[i].x, tracks[i].y, tracks[i].v);
+      for (i = 0; i < hazards.length; i++) if (hazards[i].dir < 4) drawSpike(d, hazards[i].tx, hazards[i].ty, hazards[i].dir);
+      for (i = 0; i < jets.length; i++) if (jets[i].holo) drawHoloBase(d, jets[i].x, jets[i].y); else if (jets[i].laser) drawEmitter(d, jets[i].x, jets[i].y); else drawVent(d, jets[i].x, jets[i].y);
+    });
+    GB.live = true;                                                       // from here on colours snap as they are set (the exit's pinned shades)
     if (exits.length) {
       var x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0;
       for (i = 0; i < exits.length; i++) {
@@ -2462,6 +2577,7 @@
         sx.putImageData(sd, 0, 0);
         hero.sheets.push(sc);
       }
+      gbSnap(hero.sheets, 'obj');                    // GAME BOY: every sheet in the four greens (the dash badge keeps its pinned shades)
       hero.ready = true; allDirty = true;
     };
     if (HERO.enabled) img.src = HERO.src; // otherwise the simple lantern character is drawn in code
@@ -2979,7 +3095,8 @@
   // and the speed readout). Back from a page returns to the list, back from the list returns to the menu.
   var set = { page: 'top', row: 0, topRow: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
   var SET_PAGES = {
-    top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['back', 'BACK', 'BACK TO THE MENU']] },
+    top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['theme', 'THEME', 'ORIGINAL COLOURS OR GAME BOY GREENS'], ['back', 'BACK', 'BACK TO THE MENU']] },
+    theme: { title: 'THEME', rows: [['t-original', 'ORIGINAL', 'THE GAME IN FULL COLOUR'], ['t-gb', 'GAME BOY', 'FOUR SHADES OF GREEN, LIKE THE OLD HANDHELD'], ['back', 'BACK', 'BACK TO SETTINGS']] },
     controls: { title: 'CONTROLS', rows: ACTIONS.map(function (a) { return [a[0], a[1], 'act']; }).concat([['redo', 'REDO SETUP', 'LEARN WHICH BUTTON IS WHICH AGAIN'], ['reset', 'RESET BUTTONS', 'BACK TO THE STARTING JOBS'], ['back', 'BACK', 'BACK TO SETTINGS']]) },
     graphics: { title: 'GRAPHICS', rows: [['fx', 'PARTICLES', 'WEATHER DRAWN OVER THE ROOM'], ['shake', 'SHAKE', 'A SMALL KICK ON HARD LANDINGS AND HITS'], ['city', 'CITY LIFE', 'WINDOWS TRAFFIC AND STEAM IN NEON ROW'],
                                  ['speed', 'SPEED READOUT', 'FPS IN THE TOP BAR WHILE PLAYING'], ['back', 'BACK', 'BACK TO SETTINGS']] }
@@ -2996,6 +3113,8 @@
     if (id === 'shake') return shakeOn ? 'ON' : 'OFF';
     if (id === 'city') return cityOn ? 'ON' : 'OFF';
     if (id === 'speed') return check === 1 ? 'ON' : 'OFF';
+    if (id === 't-original') return GB.on ? '' : 'ON';
+    if (id === 't-gb') return GB.on ? 'ON' : '';
     return '';
   }
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
@@ -3011,6 +3130,13 @@
     if (id === 'city') { setCity(!cityOn); set.note = cityOn ? 'CITY LIFE ON. CHECK THE SPEED READOUT.' : 'CITY LIFE OFF. THE CITY STANDS STILL.'; return; }
     if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
     if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON' : 'SPEED READOUT OFF'; return; }
+    if (id === 't-original' || id === 't-gb') {    // a theme is set up as the page loads, so a change saves it and reloads onto this page
+      var want = id === 't-gb' ? 'gb' : 'original';
+      if ((want === 'gb') === GB.on) { set.note = 'ALREADY IN USE'; return; }
+      try { localStorage.setItem(THEME_KEY, want); sessionStorage.setItem(THEME_KEY + '.back', '1'); } catch (e) {}
+      set.note = 'SWITCHING THEME'; setTimeout(function () { window.location.reload(); }, 150);
+      return;
+    }
     if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
     if (id === 'redo' || !cfgFor(gp)) { startWiz(gp); return; }
     if (id === 'reset') { ownCfg(gp).act = JSON.parse(JSON.stringify(DEF_ACT)); savePads(); set.note = 'BUTTONS RESET'; return; }
@@ -3108,10 +3234,21 @@
     }
     if (set.page === 'top') {
       for (i = 0; i < rows.length; i++) {
-        y = 150 + i * 44 + (rows[i][0] === 'back' ? 16 : 0);                                   // a gap before BACK
+        y = 130 + i * 44 + (rows[i][0] === 'back' ? 16 : 0);                                   // a gap before BACK
         row(i, 45, y, 180, 30, rows[i][1], '');
       }
-      pxText(rows[set.row][2], 135, 316, 1, C.text, 'center');
+      pxText(rows[set.row][2], 135, 330, 1, C.text, 'center');
+    } else if (set.page === 'theme') {
+      for (i = 0; i < rows.length; i++) {
+        y = 110 + i * 32 + (rows[i][0] === 'back' ? 16 : 0);
+        row(i, 25, y, 220, 24, rows[i][1], setValue(rows[i][0]));
+      }
+      pxText(rows[set.row][2], 135, 230, 1, C.text, 'center');
+      // the four greens, drawn as they are (outside the GAME BOY colour mapping)
+      GB.live = false;
+      for (i = 0; i < 4; i++) { box(63 + i * 38, 252, 30, 30, GB.on ? GB_HEX[3] : '#05070f'); box(65 + i * 38, 254, 26, 26, GB_HEX[i]); }
+      GB.live = true;
+      pxText('THE GAME RELOADS TO SWITCH', 135, 300, 1, C.dim, 'center');
     } else if (set.page === 'graphics') {
       for (i = 0; i < rows.length; i++) {
         y = 110 + i * 32 + (rows[i][0] === 'back' ? 16 : 0);
@@ -3392,6 +3529,12 @@
   rebuildLevels();
   resetRun();
   if (!embedded) { fetchLive(); scene = 'menu'; }
+  try {                                              // just switched theme: come back to the THEME page
+    if (!embedded && sessionStorage.getItem(THEME_KEY + '.back')) {
+      sessionStorage.removeItem(THEME_KEY + '.back'); openSettings();
+      set.topRow = 2; set.page = 'theme'; set.row = GB.on ? 1 : 0; set.note = GB.on ? 'GAME BOY ON' : 'ORIGINAL ON';
+    }
+  } catch (e) {}
 
   // The room builder runs this same game in a frame and hands it the room being edited.
   window.addEventListener('message', function (e) {

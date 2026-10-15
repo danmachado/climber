@@ -1,4 +1,5 @@
-// Settings: a category list (CONTROLS, GRAPHICS, BACK), each opening its own page; back steps up one level at a time.
+// Settings: a category list (CONTROLS, GRAPHICS, THEME, BACK), each opening its own page; back steps up one level at a time.
+// THEME switches between ORIGINAL and GAME BOY: it saves, reloads and comes back to the THEME page.
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
@@ -30,8 +31,28 @@ const { chromium } = require('playwright');
   v = await nav({ jump: true }); ok(v.scene === 'settings' && v.set.page === 'top', 'menu remembers SETTINGS');
   await p.waitForTimeout(150);
   const bx = await p.evaluate(() => { const c = document.getElementById('stage').getBoundingClientRect(); return { x: c.left, y: c.top, w: c.width, h: c.height }; });
-  for (let k = 0; k < 2; k++) { await p.mouse.click(bx.x + 135 / 270 * bx.w, bx.y + 165 / 480 * bx.h); await p.waitForTimeout(150); }   // the first click asks for fullscreen
+  for (let k = 0; k < 2; k++) { await p.mouse.click(bx.x + 135 / 270 * bx.w, bx.y + 145 / 480 * bx.h); await p.waitForTimeout(150); }   // the first click asks for fullscreen
   v = await p.evaluate(() => window.__climber.view()); ok(v.set.page === 'controls', 'mouse click on CONTROLS opens it (page ' + v.set.page + ')');
+  // THEME: ORIGINAL is in use, GAME BOY switches (a reload), and the page comes back with GAME BOY on
+  v = await nav({ back: true }); v = await nav({ y: 1 }); v = await nav({ y: 1 }); v = await nav({ jump: true });
+  ok(v.set.page === 'theme' && v.set.row === 0, 'THEME opens the theme page');
+  v = await nav({ jump: true }); ok(v.set.note === 'ALREADY IN USE', 'ORIGINAL is the theme in use');
+  await nav({ y: 1 }); await shot('4-theme');
+  await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
+  v = await nav({}); let th = await p.evaluate(() => localStorage.getItem('climber.theme.v1'));
+  ok(th === 'gb' && v.scene === 'settings' && v.set.page === 'theme' && v.set.row === 1 && v.set.note === 'GAME BOY ON', 'GAME BOY saves, reloads and returns to THEME (' + th + ', ' + v.set.page + ')');
+  await shot('5-theme-gb');
+  const greens = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  ok(greens === 'rgb(24, 52, 30)', 'GAME BOY: the page around the game is the darkest green (' + greens + ')');
+  await p.evaluate(() => window.__climber.startLevel(0, 0)); await p.waitForTimeout(600);
+  const pal = await p.evaluate(() => { const cs = document.querySelectorAll('#world canvas'), seen = {}; for (const c of cs) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) seen[d[i] + ',' + d[i + 1] + ',' + d[i + 2]] = 1; } return Object.keys(seen); });
+  ok(pal.length <= 4, 'GAME BOY: a level on screen uses only the four greens (' + pal.join(' ') + ')');
+  await p.evaluate(() => { const G = window.__climber; G.nav({ back: true }); });
+  await p.reload(); await p.waitForTimeout(700);
+  await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true }); await nav({ y: 1 }); await nav({ y: 1 }); await nav({ jump: true });
+  await Promise.all([p.waitForEvent('load'), nav({ jump: true })]); await p.waitForTimeout(800);
+  th = await p.evaluate(() => localStorage.getItem('climber.theme.v1')); v = await nav({});
+  ok(th === 'original' && v.set.page === 'theme' && v.set.note === 'ORIGINAL ON', 'ORIGINAL switches back (' + th + ')');
   console.log('errors', JSON.stringify(errs));
   console.log(fails ? fails + ' FAILED' : 'ALL PASS');
   await b.close();
