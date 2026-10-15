@@ -754,6 +754,16 @@
   var STD = { fb: 0, fr: 1, fl: 2, ft: 3, l1: 4, r1: 5, l2: 6, r2: 7, select: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
   var DEF_ACT = { fb: 'jump', fl: 'dash', fr: 'dash', l1: 'grab', r1: 'grab', l2: 'grab', r2: 'grab' };
   var ASSIGNABLE = ['fb', 'fr', 'fl', 'ft', 'l1', 'r1', 'l2', 'r2'];
+  // Everything a button can do. Settings, Controls lists these in order; a new action (an attack, say) is one more entry
+  // here, a key in KEY_ACT, its flag in readInput and its handling in step(). Every action keeps at least one button.
+  var ACTIONS = [['jump', 'JUMP'], ['dash', 'DASH'], ['grab', 'GRAB']];
+  var KEY_ACT = { jump: 'C', dash: 'X', grab: 'Z' };
+  function actName(id) { for (var i = 0; i < ACTIONS.length; i++) if (ACTIONS[i][0] === id) return ACTIONS[i][1]; return ''; }
+  // Say buttons the way they are printed: 8BitDo and Nintendo pads put B at the bottom and A on the right.
+  function padLetters(id) {
+    return /8bitdo|nintendo|pro controller|switch/i.test(id || '') ? { fb: 'B', fr: 'A', fl: 'Y', ft: 'X', l1: 'L', r1: 'R', l2: 'L2', r2: 'R2', start: 'START' }
+      : { fb: 'A', fr: 'B', fl: 'X', ft: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', start: 'START' };
+  }
   function cfgFor(gp) { return padCfg[gp.id] || (gp.mapping === 'standard' ? { layout: null, act: DEF_ACT } : null); }
   function isDown(gp, c, name) { return c.layout ? bound(gp, c.layout[name]) : btn(gp, STD[name]); }
   function axisFree(gp, c, ax) {                   // the left stick moves you unless that axis is really the d-pad or a trigger
@@ -834,10 +844,9 @@
         if (isDown(gp, c, 'right')) x = 1;
         if (isDown(gp, c, 'up')) y = -1;
         if (isDown(gp, c, 'down')) y = 1;
-        for (i = 0; i < ASSIGNABLE.length; i++) {
-          var an = ASSIGNABLE[i], what = c.act[an];
-          if (what && isDown(gp, c, an)) { if (what === 'jump') jump = true; else if (what === 'dash') dash = true; else if (what === 'grab') grab = true; }
-        }
+        var acts = {};
+        for (i = 0; i < ASSIGNABLE.length; i++) { var an = ASSIGNABLE[i]; if (c.act[an] && isDown(gp, c, an)) acts[c.act[an]] = true; }
+        if (acts.jump) jump = true; if (acts.dash) dash = true; if (acts.grab) grab = true;
         if (isDown(gp, c, 'start')) back = true;   // Start: back to the map or menu
       }
       // Start or Select: back to the map or menu
@@ -1905,7 +1914,7 @@
   var set = { page: 'top', row: 0, topRow: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
   var SET_PAGES = {
     top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['back', 'BACK', 'BACK TO THE MENU']] },
-    controls: { title: 'CONTROLS', rows: [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['back', 'BACK']] },
+    controls: { title: 'CONTROLS', rows: ACTIONS.map(function (a) { return [a[0], a[1], 'act']; }).concat([['redo', 'REDO SETUP', 'LEARN WHICH BUTTON IS WHICH AGAIN'], ['reset', 'RESET BUTTONS', 'BACK TO THE STARTING JOBS'], ['back', 'BACK', 'BACK TO SETTINGS']]) },
     graphics: { title: 'GRAPHICS', rows: [['fx', 'PARTICLES', 'WEATHER DRAWN OVER THE ROOM'], ['shake', 'SHAKE', 'A SMALL KICK ON HARD LANDINGS AND HITS'], ['city', 'CITY LIFE', 'WINDOWS TRAFFIC AND STEAM IN NEON ROW'],
                                  ['speed', 'SPEED READOUT', 'FPS IN THE TOP BAR WHILE PLAYING'], ['back', 'BACK', 'BACK TO SETTINGS']] }
   };
@@ -1952,16 +1961,25 @@
     if (!c) { set.mode = 'idle'; return; }
     if (!set.armed) { if (down.length) set.quiet = 0; else if (++set.quiet > 10) set.armed = true; return; }
     for (i = 0; i < down.length; i++) if (ASSIGNABLE.indexOf(down[i]) >= 0) {
-      var own = ownCfg(gp), name = down[i], was = own.act[name], left = 0;
-      if (was && was !== set.action) { for (var k in own.act) if (own.act[k] === was && k !== name) left++; if (!left) { set.note = was.toUpperCase() + ' NEEDS A BUTTON. GIVE IT ANOTHER ONE FIRST.'; set.mode = 'idle'; set.wait = 20; lastSig = ''; return; } }
+      var own = ownCfg(gp), name = down[i], was = own.act[name], left = 0, L = padLetters(gp.id), k;
+      for (k in own.act) if (own.act[k] === was && k !== name) left++;
+      set.mode = 'idle'; set.wait = 20; lastSig = '';
+      if (was === set.action) {                    // a button it already has: take it off, unless it is the last one
+        if (left) { delete own.act[name]; savePads(); set.note = L[name] + ' NO LONGER ' + actName(was); }
+        else set.note = actName(was) + ' NEEDS AT LEAST ONE BUTTON';
+        return;
+      }
+      if (was && !left) { set.note = actName(was) + ' NEEDS A BUTTON. GIVE IT ANOTHER ONE FIRST.'; return; }
       own.act[name] = set.action; savePads();
-      set.note = set.action.toUpperCase() + ' ADDED'; set.mode = 'idle'; set.wait = 20; lastSig = '';
+      set.note = L[name] + ' IS NOW ' + actName(set.action);
       return;
     }
   }
-  // The controller picture. lit: button name -> colour. labels: button name -> text (drawn with a line to the button).
-  function drawPad(u, cy, lit, labels) {
+  // The controller picture, centred at x 135, scaled by sc about its middle. lit: button name -> colour.
+  // Returns pt(name): where that button sits on screen in game pixels, for callout lines ('dpad' for the whole pad).
+  function drawPad(u, cy, lit, sc) {
     var BODY = '#222c57', EDGE = '#4a5a9e', KEY = '#0e1429';
+    sc = sc || 1;
     function rr(x, y, w, hh, r, fill) {
       h.fillStyle = fill; h.beginPath();
       h.moveTo((x + r) * u, y * u); h.arcTo((x + w) * u, y * u, (x + w) * u, (y + hh) * u, r * u); h.arcTo((x + w) * u, (y + hh) * u, x * u, (y + hh) * u, r * u);
@@ -1972,25 +1990,19 @@
     var B = { l2: [66, cy - 54, 26, 11], r2: [178, cy - 54, 26, 11], l1: [60, cy - 42, 40, 9], r1: [170, cy - 42, 40, 9],
               up: [79.5, cy - 21.5, 9, 9], down: [79.5, cy - 3.5, 9, 9], left: [70.5, cy - 12.5, 9, 9], right: [88.5, cy - 12.5, 9, 9],
               fb: [186, cy + 3, 5.5], ft: [186, cy - 19, 5.5], fl: [175, cy - 8, 5.5], fr: [197, cy - 8, 5.5], select: [122, cy - 16, 3.2], start: [148, cy - 16, 3.2] };
-    function mid(n) { var b = B[n]; return b.length === 4 ? [b[0] + b[2] / 2, b[1] + b[3] / 2] : [b[0], b[1]]; }
     function key(n, base) { var b = B[n], f = (lit && lit[n]) || base; if (b.length === 4) rr(b[0], b[1], b[2], b[3], n.length === 2 ? 4 : 1.5, f); else cc(b[0], b[1], b[2], f); }
+    h.save(); h.translate(135 * u, cy * u); h.scale(sc, sc); h.translate(-135 * u, -cy * u);
     key('l2', EDGE); key('r2', EDGE); key('l1', EDGE); key('r1', EDGE);
     el(74, cy + 30, 23, 34, EDGE); el(196, cy + 30, 23, 34, EDGE); rr(48, cy - 34, 174, 64, 24, EDGE);
     el(74, cy + 30, 21, 32, BODY); el(196, cy + 30, 21, 32, BODY); rr(50, cy - 32, 170, 60, 22, BODY);
     rr(79.5, cy - 12.5, 9, 9, 0, KEY); key('up', KEY); key('down', KEY); key('left', KEY); key('right', KEY);
     key('fb', KEY); key('ft', KEY); key('fl', KEY); key('fr', KEY); key('select', KEY); key('start', KEY);
     cc(112, cy + 12, 10, KEY); cc(112, cy + 12, 6.5, EDGE); cc(158, cy + 12, 10, KEY); cc(158, cy + 12, 6.5, EDGE);
-    if (!labels) return;
-    var SPOT = { l2: [4, cy - 52, 0], l1: [4, cy - 40, 0], r2: [266, cy - 52, 1], r1: [266, cy - 40, 1], ft: [266, cy - 26, 1], fr: [266, cy - 12, 1], fl: [266, cy + 2, 1], fb: [266, cy + 16, 1],
-                 left: [4, cy - 11, 0], start: [148, cy - 74, 2] };
-    for (var n in SPOT) if (labels[n]) {
-      var sp = SPOT[n], m = mid(n), w = labels[n].length * 6 - 1, col = (lit && lit[n]) || C.dim;
-      h.strokeStyle = col; h.lineWidth = Math.max(1, u * 0.8); h.beginPath();
-      if (sp[2] === 2) { h.moveTo(m[0] * u, (sp[1] + 10) * u); h.lineTo(m[0] * u, (m[1] - 4) * u); }
-      else { var x0 = sp[2] ? sp[0] - w - 3 : sp[0] + w + 3, bend = sp[2] ? Math.max(m[0] + 8, 226) : Math.min(m[0] - 8, 44); h.moveTo(x0 * u, (sp[1] + 3.5) * u); h.lineTo(bend * u, (sp[1] + 3.5) * u); h.lineTo(m[0] * u, m[1] * u); }
-      h.stroke();
-      pxText(labels[n], sp[0], sp[1], 1, (lit && lit[n]) || C.text, sp[2] === 2 ? 'center' : (sp[2] ? 'right' : 'left'));
-    }
+    h.restore();
+    return function (n) {
+      var b = n === 'dpad' ? [84, cy - 8] : B[n], m = b.length === 4 ? [b[0] + b[2] / 2, b[1] + b[3] / 2] : [b[0], b[1]];
+      return [135 + (m[0] - 135) * sc, cy + (m[1] - cy) * sc];
+    };
   }
   function drawWiz(u) {
     function box(x, y, w, hh, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round(w * u), Math.round(hh * u)); }
@@ -1999,10 +2011,10 @@
     box(0, 0, LW, LH, '#070914');
     pxText('CONTROLLER SETUP', 135, 70, 2, C.flame, 'center');
     pxText((wiz.i + 1) + ' OF ' + WIZ.length, 135, 92, 1, C.dim, 'center');
-    drawPad(u, 200, wiz.armed ? lit : null, null);
+    drawPad(u, 200, wiz.armed ? lit : null);
     pxText(wiz.armed ? 'PRESS' : 'LET GO OF EVERYTHING', 135, 286, 2, wiz.armed ? C.text : C.dim, 'center');
     // say it the way the buttons are printed: 8BitDo and Nintendo pads put B at the bottom and A on the right
-    var nin = /8bitdo|nintendo|pro controller|switch/i.test(wiz.id), LET = nin ? { fb: 'B', fr: 'A', fl: 'Y', ft: 'X', l1: 'L', r1: 'R', l2: nin ? 'L2' : 'LT', r2: 'R2' } : { fb: 'A', fr: 'B', fl: 'X', ft: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT' };
+    var LET = padLetters(wiz.id);
     var FACE = { fb: 'BOTTOM', fr: 'RIGHT', fl: 'LEFT', ft: 'TOP' };
     if (wiz.armed) {
       if (FACE[step[0]]) { pxText('THE ' + LET[step[0]] + ' BUTTON', 135, 308, 2, C.flame, 'center'); pxText('THE ' + FACE[step[0]] + ' ONE OF THE FOUR ON THE RIGHT', 135, 326, 1, C.text, 'center'); }
@@ -2021,7 +2033,10 @@
     function row(k, x, y, w, hh, label, value) {
       var on = k === set.row;
       box(x, y, w, hh, on ? C.flame : '#131a33');
-      if (value) { pxText(label, x + 8, y + (hh - 14) / 2, 2, on ? INK : C.dim, 'left'); pxText(value, x + w - 8, y + (hh - 14) / 2, 2, on ? INK : (value === 'ON' ? C.teal : C.dim), 'right'); }
+      if (value) {
+        var vs = (label.length + value.length) * 12 + 22 > w ? 1 : 2, vc = on ? INK : (value === 'ON' ? C.teal : value === 'OFF' ? C.dim : C.text);
+        pxText(label, x + 8, y + (hh - 14) / 2, 2, on ? INK : C.dim, 'left'); pxText(value, x + w - 8, y + (hh - 7 * vs) / 2, vs, vc, 'right');
+      }
       else pxText(label, x + w / 2, y + (hh - 14) / 2, 2, on ? INK : C.dim, 'center');
       hits.push({ x: x, y: y, w: w, h: hh, fn: (function (kk) { return function () { setPick(kk); }; })(k) });
     }
@@ -2038,26 +2053,58 @@
       }
       pxText(rows[set.row][2], 135, 300, 1, C.text, 'center');
     } else {
-      var gp = firstPad(), c = gp ? cfgFor(gp) : null, lit = {}, labels = {}, n, focus = set.mode === 'listen' ? set.action : rows[set.row][0];
-      var NAME = { jump: 'JUMP', dash: 'DASH', grab: 'GRAB' }, down = set.lit ? set.lit.split(',') : [];
-      pxText(gp ? gp.id.toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 40) : 'NO CONTROLLER SEEN', 135, 66, 1, C.dim, 'center');
-      if (c) {
-        for (i = 0; i < ASSIGNABLE.length; i++) { n = ASSIGNABLE[i]; if (c.act[n]) { labels[n] = NAME[c.act[n]]; if (c.act[n] === focus) lit[n] = C.flame; } }
-        labels.left = 'MOVE'; labels.start = 'BACK';
-        for (i = 0; i < down.length; i++) lit[down[i]] = C.teal;        // whatever you are holding lights up, so you can check the layout
-      }
-      drawPad(u, 170, lit, c ? labels : null);
-      if (gp && !c) pxText('THIS CONTROLLER NEEDS SETTING UP FIRST', 135, 240, 1, C.text, 'center');
-      if (set.mode === 'listen') {
-        box(25, 262, 220, 60, C.flame);
-        pxText('PRESS THE BUTTON FOR', 135, 274, 1, INK, 'center'); pxText(NAME[set.action], 135, 290, 3, INK, 'center');
-        pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
-      } else {
-        for (i = 0; i < rows.length; i++) row(i, 55, 250 + i * 23 + (rows[i][0] === 'back' ? 8 : 0), 160, 20, rows[i][1], '');
-      }
+      drawControls(u, rows, row, box);
     }
     if (set.note) pxText(set.note, 135, 440, 1, C.teal, 'center');
     pxText(usedPad ? 'UP/DOWN CHOOSE - JUMP PICKS - DASH BACK' : 'ARROWS CHOOSE - C PICKS - X OR ESC BACK', 135, 464, 1, C.dim, 'center');
+  }
+  // Settings, Controls: a small controller with every button called out (its printed name and what it does), then one
+  // row per action listing its buttons. Choose an action and press a button to give it that job; press one it already
+  // has to take it off. Whatever you hold lights up teal, the chosen action's buttons light up orange.
+  function drawControls(u, rows, row, box) {
+    var gp = firstPad(), c = gp ? cfgFor(gp) : null, act = c ? c.act : DEF_ACT, L = padLetters(gp && gp.id), INK = '#101426';
+    var cur = set.mode === 'listen' ? set.action : rows[set.row][0], down = set.lit ? set.lit.split(',') : [], lit = {}, i, n;
+    for (i = 0; i < ASSIGNABLE.length; i++) { n = ASSIGNABLE[i]; if (act[n] && act[n] === cur) lit[n] = C.flame; }
+    for (i = 0; i < down.length; i++) lit[down[i]] = C.teal;
+    pxText(gp ? gp.id.toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 40) : 'NO CONTROLLER SEEN', 135, 64, 1, C.dim, 'center');
+    var pt = drawPad(u, 152, lit, 0.62);
+    // callouts: the right column for the right shoulder and face buttons, the left for the left shoulder, d-pad and Start
+    function callout(n, side, y) {
+      var job = n === 'dpad' ? 'MOVE' : n === 'start' ? 'BACK' : (act[n] ? actName(act[n]) : '-'), name = n === 'dpad' ? 'PAD' : L[n];
+      var m = pt(n), nameW = name.length * 6 - 1, w = nameW + 5 + job.length * 6 - 1, x0 = side ? 266 - w : 4;
+      var lx = side ? x0 - 3 : x0 + w + 3, bend = side ? Math.max(m[0] + 5, Math.min(lx - 6, m[0] + 22)) : Math.min(m[0] - 5, Math.max(lx + 6, m[0] - 22));
+      h.strokeStyle = lit[n] || '#3a4677'; h.lineWidth = Math.max(1, u * 0.6); h.beginPath();
+      h.moveTo(lx * u, (y + 3.5) * u); h.lineTo(bend * u, (y + 3.5) * u); h.lineTo(m[0] * u, m[1] * u); h.stroke();
+      h.fillStyle = lit[n] || '#3a4677'; h.fillRect(Math.round((m[0] - 1) * u), Math.round((m[1] - 1) * u), Math.round(2 * u), Math.round(2 * u));
+      pxText(name, x0, y, 1, lit[n] || C.dim, 'left');
+      pxText(job, x0 + nameW + 5, y, 1, lit[n] || (job === '-' ? C.dim : C.text), 'left');
+    }
+    var R = ['r2', 'r1', 'ft', 'fr', 'fl', 'fb'], Lf = ['l2', 'l1', 'dpad'];
+    for (i = 0; i < R.length; i++) callout(R[i], 1, 106 + i * 15);
+    for (i = 0; i < Lf.length; i++) callout(Lf[i], 0, [106, 121, 147][i]);
+    var st = pt('start');                                                         // Start: above the pad, a straight drop between the triggers
+    h.strokeStyle = lit.start || '#3a4677'; h.lineWidth = Math.max(1, u * 0.6); h.beginPath(); h.moveTo(st[0] * u, 95 * u); h.lineTo(st[0] * u, st[1] * u); h.stroke();
+    pxText(L.start, st[0] - 3, 85, 1, C.dim, 'right'); pxText('BACK', st[0] + 3, 85, 1, C.text, 'left');
+    if (gp && !c) pxText('THIS CONTROLLER NEEDS SETTING UP FIRST', 135, 210, 1, C.flame, 'center');
+    if (set.mode === 'listen') {
+      box(25, 232, 220, 80, C.flame);
+      pxText('PRESS A BUTTON FOR', 135, 244, 1, INK, 'center'); pxText(actName(set.action), 135, 260, 3, INK, 'center');
+      pxText('ONE IT ALREADY HAS TAKES IT OFF', 135, 292, 1, INK, 'center');
+      pxText('CLICK THE MOUSE TO CANCEL', 135, 326, 1, C.dim, 'center');
+      return;
+    }
+    var y = 228;
+    for (i = 0; i < rows.length; i++) {
+      var id = rows[i][0], isA = rows[i][2] === 'act', val = '';
+      if (isA) { var bs = []; for (var k = 0; k < ASSIGNABLE.length; k++) if (act[ASSIGNABLE[k]] === id) bs.push(L[ASSIGNABLE[k]]); val = bs.join(' ') || 'NONE'; }
+      if (!isA && rows[i - 1] && rows[i - 1][2] === 'act') y += 8;                 // a gap between the actions and the rest
+      if (id === 'back') y += 6;
+      row(i, 25, y, 220, 20, rows[i][1], val);
+      y += 23;
+    }
+    var r = rows[set.row];
+    pxText(r[2] === 'act' ? 'SELECT THEN PRESS A BUTTON FOR ' + r[1] : r[2], 135, y + 8, 1, C.text, 'center');
+    pxText('KEYBOARD  ' + ACTIONS.map(function (a) { return KEY_ACT[a[0]] + ' ' + a[1]; }).join('  '), 135, 424, 1, C.dim, 'center');
   }
   function nodePos(k) { var row = Math.floor(k / 3), p = k % 3; return { x: 55 + (row % 2 ? 2 - p : p) * 80, y: 392 - row * 76, row: row }; }
   function screenInput(inp) {
