@@ -20,11 +20,13 @@ C = {
     'y': '#CDAA5A',                                   # buckle
     'Q': '#5C6478', 'P': '#424858', 'p': '#2A2F3A',   # near leg lit, pants highlight, pants
     'c': '#604C3C', 'C': '#80665A',                   # boots, boot highlight
+    'g': '#3B414E', 'G': '#9AA4B8', 'a': '#FFB74A',   # blaster body, its lit top and muzzle, the amber cell on its side
 }
 NAMES = {
     'o': 'Outline', 'd': 'Hair', 'D': 'Hair tuft', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
     's': 'Skin', 'S': 'Skin shadow', 'T': 'Far arm shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
     'y': 'Buckle', 'Q': 'Pants lit', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
+    'g': 'Blaster', 'G': 'Blaster highlight', 'a': 'Blaster cell',
 }
 
 def G(s): return [r for r in s.strip('\n').split('\n')]
@@ -198,6 +200,15 @@ class Pose:
             else: cells.setdefault((x, y + 1), shade)
         cells[pix[-1]] = lit                                           # the hand
         for (x, y), ch in cells.items(): self.px(x, y, ch, who)
+        if near: self.hand = pix[-1]
+    def gun(self):
+        # The blaster, held level over the near hand: a two-row body (lit top, dark underside) from the forearm to a
+        # pale muzzle one pixel past the hand, with an amber cell on its side. Original pixels.
+        hx, hy = self.hand
+        for x in range(hx - 3, min(16, hx + 2)): self.px(x, hy - 1, 'g', 'gun')
+        for x in range(hx - 2, min(16, hx + 1)): self.px(x, hy - 2, 'G', 'gun')
+        self.px(hx - 2, hy - 1, 'a', 'gun')
+        if hx + 1 < 16: self.px(hx + 1, hy - 1, 'G', 'gun')             # the muzzle
 
     def boot(self, x, y, near, kind='flat', toe=1, leg=None):
         # Tall, narrow boots (two wide, the width of the leg): a sole on the given row and a cuff on the row above it,
@@ -222,7 +233,7 @@ def outline(fr):
     return fr
 
 def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg=None, near_boot=None, far_boot=None,
-         near_arm=None, far_arm=None, hips=True, near_behind=False, shift=0):
+         near_arm=None, far_arm=None, hips=True, near_behind=False, shift=0, gun=False):
     """hip: the belt row. tx: torso column. Legs and arms are joint lists in frame coords (x right, y down).
     A boot is (x, y[, kind[, toe]]). The head is placed so its chin row is the row above the torso: it cannot float.
     near_behind: the near arm goes behind the head (hands at the back of the head). shift: move the whole pose sideways."""
@@ -241,6 +252,7 @@ def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg
     if near_arm and near_behind: P.arm(near_arm, True)
     put(P.fr, HEAD[head], tx + hdx, ty - HEAD_H)
     if near_arm and not near_behind: P.arm(near_arm, True)
+    if gun: P.gun()
     fr = outline(P.fr)
     if shift: fr = [(['.'] * shift + row)[:16] if shift > 0 else (row[-shift:] + ['.'] * -shift) for row in fr]
     fr = Frame(fr); fr.arms = P.arm_lengths
@@ -332,6 +344,34 @@ def slide(k):                                                             # lean
     return pose(hip=hip, tx=1, torso='side', far_arm=[(6, top + 1), (9, top + 1), (11, top + 1 + k)], near_arm=[(7, top), (10, top + 1), (12, top + 1 - k)],
                 far_leg=[(5, 13), (8, 14)], far_boot=(10, 14, 'toe'), near_leg=[(6, 13), (8, 15)], near_boot=(10, 15, 'toe'))
 
+# ---------------------------------------------------------------- aiming: the same poses with the near arm out level, holding the blaster
+# The game swaps to these for a moment after each shot (anim name + '_aim'). The hand sits a row under the shoulder and
+# the gun lies on the shoulder row, so the shot leaves at chest height in every frame (the manifest records each muzzle).
+def AIM(top, sx=11): return [(sx, top), (sx + 2, top + 1), (sx + 3, top + 1)]
+def stand_aim(state=0, head='normal'):
+    top = {0: 9, 1: 8, 2: 10}[state]
+    return _stand_gun(state, head, top)
+def _stand_gun(state, head, top):
+    if state == 1:
+        return pose(hip=12, torso='tall', head=head, **LEGS_STAND, far_arm=[(4, 8), (4, 9), (3, 10)], near_arm=AIM(top), gun=True)
+    if state == 2:
+        return pose(hip=13, torso='mid', head=head, **LEGS_GIVE, far_arm=[(4, 10), (4, 11), (4, 12)], near_arm=AIM(top), gun=True)
+    return pose(hip=12, torso='mid', head=head, **LEGS_STAND, far_arm=[(4, 9), (4, 10), (4, 11)], near_arm=AIM(top), gun=True)
+JUMP_AIM = [
+    pose(hip=11, torso='mid', far_leg=[(5, 12), (5, 14)], far_boot=(5, 15, 'toe'), near_leg=[(8, 12), (8, 14)], near_boot=(8, 15, 'toe'),
+         far_arm=[(4, 8), (3, 6), (3, 4)], near_arm=AIM(8), gun=True),
+    pose(hip=11, torso='mid', far_leg=[(5, 12), (6, 13)], far_boot=(5, 14, 'toe'), near_leg=[(8, 12), (10, 13)], near_boot=(9, 14),
+         far_arm=[(4, 8), (3, 7), (3, 5)], near_arm=AIM(8), gun=True),
+]
+FALL_AIM = [
+    pose(hip=12, torso='short', far_leg=[(5, 13), (6, 14)], far_boot=(5, 15, 'toe'), near_leg=[(8, 13), (10, 14)], near_boot=(10, 15),
+         far_arm=[(5, 10), (3, 10), (2, 9)], near_arm=AIM(10, 10), gun=True),
+    pose(hip=12, torso='mid', far_leg=[(5, 13), (5, 14)], far_boot=(4, 15, 'toe'), near_leg=[(8, 13), (8, 14)], near_boot=(8, 15, 'toe'),
+         far_arm=[(4, 9), (3, 7), (3, 5)], near_arm=AIM(9), gun=True),
+    pose(hip=12, torso='mid', far_leg=[(5, 13), (4, 14)], far_boot=(3, 15, 'toe'), near_leg=[(8, 13), (9, 14)], near_boot=(9, 15, 'toe'),
+         far_arm=[(4, 9), (2, 8), (2, 6)], near_arm=AIM(9), gun=True),
+]
+
 def LG(row, s): return (row, G(s))
 RUN_LEGS = [   # per phase: hip (belt) row, lead leg, trail leg
     (12, LG(13, """
@@ -395,7 +435,7 @@ def leg_grid(P, lg, near):
         cells = [(x, y, 'P' if ch == 'Q' and (x - 1, y) not in mine else ch) for x, y, ch in cells]
     for x, y, ch in cells: P.px(x, y, ch, 'nl' if near else 'fl')
 
-def run_frame(k):
+def run_frame(k, aim=False):
     ph = k % 4; near_leads = k < 4
     hip, lead, trail = RUN_LEGS[ph]
     near, far = (lead, trail) if near_leads else (trail, lead)
@@ -410,7 +450,8 @@ def run_frame(k):
         for y in range(ty, hip + 1): P.mask.pop((x, y), None)
     leg_grid(P, near, True)
     put(P.fr, HEAD['normal'], tx + 1, ty - HEAD_H)
-    P.arm(near_arm, True)
+    if aim: P.arm([(8, top), (10, top + 1), (12, top + 1)], True); P.gun()   # aiming: the near arm holds the blaster level, the far arm keeps swinging
+    else: P.arm(near_arm, True)
     fr = Frame(outline(P.fr)); fr.arms = P.arm_lengths
     return fr
 
@@ -444,6 +485,10 @@ ANIMS = [
     ('skid', 0, False, [SKID]),
     ('spawn', 12, False, [LAND[0], LAND[1], JUMP[0], stand(1), stand(0)]),
     ('exit', 10, False, exit_frames()),
+    ('idle_aim', 6, True, [stand_aim(0), stand_aim(0), stand_aim(1), stand_aim(1), stand_aim(1, 'tuft'), stand_aim(0), stand_aim(2), stand_aim(2, 'tuft')]),
+    ('run_aim', 14, True, [run_frame(k, True) for k in range(8)]),
+    ('jump_up_aim', 12, False, JUMP_AIM),
+    ('fall_aim', 8, 1, FALL_AIM),
 ]
 
 def hexrgb(h): h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
@@ -464,8 +509,13 @@ def write(anims=None):
         for fr in frames:
             ks = [(x, y) for y in range(16) for x in range(16) if fr[y][x] == 'k']
             anchors.append([min(x for x, y in ks), round(sum(y for x, y in ks) / len(ks), 1)] if ks else None)
+        muzzles = []                                       # where a shot leaves the blaster: its front-most pixel, per frame (aim animations only)
+        for fr in frames:
+            gs = [(x, y) for y in range(16) for x in range(16) if fr[y][x] in 'gGa']
+            muzzles.append([max(x for x, y in gs), [y for x, y in gs if x == max(x for x, y in gs)][0]] if gs else None)
         row = {'name': name, 'frameCount': len(frames), 'fps': fps, 'loop': loop is True, 'anchors': anchors,
-               'arms': [getattr(fr, 'arms', None) for fr in frames]}   # arm lengths per frame (shoulder to hand), checked by audit.py
+               'arms': [getattr(fr, 'arms', None) for fr in frames]}
+        if any(muzzles): row['muzzles'] = muzzles   # arm lengths per frame (shoulder to hand), checked by audit.py
         if loop is not True and loop is not False: row['loopFrom'] = loop
         manifest['animations'].append(row)
     json.dump(manifest, open('hero-animation-manifest.json', 'w'), indent=1)

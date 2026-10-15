@@ -81,7 +81,7 @@ for name, frames in FR.items():
             if min(x for x, y in ks) >= front: bad(name, 'frame %d faces the wrong way (knot is not behind the face)' % i)
 
 # ---- feet on the ground ----
-GROUNDED = ['idle', 'idle_look', 'idle_tie', 'idle_flex', 'run', 'land', 'skid', 'duck', 'look_up', 'spawn', 'hurt']           # (on the wall the feet hang wherever the wall is)
+GROUNDED = ['idle', 'idle_look', 'idle_tie', 'idle_flex', 'run', 'idle_aim', 'run_aim', 'land', 'skid', 'duck', 'look_up', 'spawn', 'hurt']           # (on the wall the feet hang wherever the wall is)
 for name in GROUNDED:
     for i, g in enumerate(FR[name]):
         if not is_blank(g) and not [x for x, y in cells(g, 'cC') if y == 15]: bad(name, 'frame %d: no boot on the ground row (feet float)' % i)

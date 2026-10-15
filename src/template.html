@@ -42,7 +42,13 @@
     bounceH: 170 * K, bounceV: -160 * K, bounceVarTime: 0.25, bounceForce: 0.2, bounceCheck: 5,   // wall bounce: dash up beside a wall, then jump
     climbUp: -45 * K, climbDown: 80 * K, climbAccel: 900 * K, climbHop: -120 * K, mantleSpeed: 90 * K, mantleTime: 0.35,
     stamina: 110, dashCost: 60, climbUpCost: 45.45, climbStillCost: 10, climbJumpCost: 27.5, tiredBelow: 20,
-    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, zipSpeed: 160, zipWind: 0.1, zipRest: 0.5, zipBack: 45, jetOff: 1.3, jetWarn: 0.35, jetOn: 0.75, droneSpeed: 40, droneWait: 0.6, droneFire: 0.3, lavaRise: 5, lavaDelay: 15, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5
+    cornerCorrect: 4, iceGrip: 0.1, crumbleDelay: 0.5, crumbleRespawn: 2.5, moverSpeed: 45, moverWait: 0.4, zipSpeed: 160, zipWind: 0.1, zipRest: 0.5, zipBack: 45, jetOff: 1.3, jetWarn: 0.35, jetOn: 0.75, droneSpeed: 40, droneWait: 0.6, droneFire: 0.3, lavaRise: 5, lavaDelay: 15, springV: -185 * K, fireSpeed: 60, fireWait: 0.15, exitTime: 0.35, dieTime: 0.28, hurtTime: 0.06, spawnTime: 0.3, refillRespawn: 2.5,
+    // combat (Broforce-inspired, tuned for a 270 px room): the blaster fires level from the chest, fast and short-ranged; a
+    // raider walks a short beat, sees you only on his own level and in front (height is armour), shows a ! for a moment,
+    // then fires slow shots you can jump. One hit kills either of you. A shot barrel blows up and takes raiders with it.
+    shotRate: 0.13, shotSpeed: 420, shotRange: 190, gunHold: 0.45, hitStop: 0.05,
+    foeWalk: 16, foeWait: 0.9, foeSight: 150, foeAlert: 0.6, foeFireGap: 1.1, foeShot: 125, foeForget: 1.5, foeLevel: 6,
+    blastR: 28, barrelFuse: 0.12, barrelChain: 0.1
   };
 
   var C = {
@@ -55,6 +61,8 @@
 /*SHARED_TILES*/
 
 /*SHARED_HERO*/
+
+/*SHARED_FOES*/
 
 /*SHARED_WORLDS*/
 
@@ -273,6 +281,7 @@
 
   var room, T, cols, rows, grid, spawn, hazards, exits, refills, tileLayer;
   var crumbles = [], crumbleAt = {}, movers = [], tracks = [], backs = {}, flames = [], fireballs = [], springs = [], gems = [], roomKeys = [], doors = [], doorAt = {}, jets = [], drones = [], lava = null;
+  var foes = [], barrels = [], shots = [], foeShots = [], combat = { stop: 0, ev: [] };   // raiders, barrels, the hero's shots, the raiders' shots; ev: what render should show (gibs, blasts)
   var KIND = { '#': 1, 'I': 2, 'C': 3, 'D': 4 }; // 1 brick, 2 ice, 3 crumbling block, 4 locked door
 
   function buildRoom(data) {
@@ -285,6 +294,7 @@
     setRoomHeight(rows * T);
     grid = []; hazards = []; exits = []; refills = []; spawn = { x: T, y: T };
     crumbles = []; crumbleAt = {}; movers = []; tracks = []; backs = {}; flames = []; fireballs = []; springs = []; gems = []; roomKeys = []; doors = []; doorAt = {}; jets = []; drones = []; lava = null;
+    foes = []; barrels = []; shots = []; foeShots = []; combat = { stop: 0, ev: [] }; gibs = []; blasts = []; sparks = [];
     for (var r = 0; r < rows; r++) {
       grid.push([]);
       for (var c = 0; c < cols; c++) {
@@ -308,9 +318,11 @@
         else if (ch === 'J' || ch === 'L' || ch === '%') jets.push({ x: x, y: y, ph: (c * 0.55) % (P.jetOff + P.jetWarn + P.jetOn), on: false, warn: false, laser: ch === 'L', holo: ch === '%' });   // a fire jet (or a laser emitter in the Temple, a holo sign in Neon Row): fires a column on a cycle
         else if (ch === 'O') drones.push({ x: x, y: y, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, fire: 0 });   // a patrol drone: rides a track, fires straight down at each stop
         else if (ch === '~') { if (!lava) lava = { y0: y, y: y }; else lava.y0 = lava.y = Math.min(lava.y0, y); }                  // lava: everything below the top lava tile, and it rises
+        else if (ch === 'R') foes.push({ c: c, r: r, x0: x + 1, y0: y, x: x + 1, y: y, w: 8, h: 10 });                       // a raider: walks a short beat on his floor, shoots on sight
+        else if (ch === 'B') barrels.push({ x: x + 1, y: y, w: 8, h: 10, state: 'idle', t: 0 });                             // a barrel: blows up when shot
       }
     }
-    findMovers(data.tiles); findFireballs(data.tiles); findDrones(data.tiles);
+    findMovers(data.tiles); findFireballs(data.tiles); findDrones(data.tiles); findFoes(data.tiles);
     drawTileLayer();
   }
 
@@ -347,6 +359,7 @@
     for (i = 0; i < roomKeys.length; i++) { roomKeys[i].state = 'idle'; roomKeys[i].fx = roomKeys[i].x; roomKeys[i].fy = roomKeys[i].y; }
     for (i = 0; i < doors.length; i++) { doors[i].open = false; doors[i].t = 0; doors[i].dirty = true; }
     if (lava) { lava.y = lava.y0; lava.shown = -1; }
+    resetCombat();
   }
   // Fire jets fire on a shared clock (offset per column) so the pattern is the same every attempt.
   function jetPhase(j) { var per = P.jetOff + P.jetWarn + P.jetOn, t = (run.time + j.ph) % per; return t < P.jetOff ? { on: false, warn: false, left: P.jetOff - t } : t < P.jetOff + P.jetWarn ? { on: false, warn: true, left: P.jetOff + P.jetWarn - t } : { on: true, warn: false, left: per - t }; }
@@ -506,6 +519,115 @@
   function overlap(a, x, y, w, h) { return x < a.x + a.w && x + w > a.x && y < a.y + a.h && y + h > a.y; }
   function approach(v, target, amount) { return v < target ? Math.min(v + amount, target) : Math.max(v - amount, target); }
 
+  // ---- combat: the hero's blaster, raiders and barrels (CLAUDE.md, Combat) ----
+  // A raider's beat: up to three tiles each way along his floor, stopping at a wall, a drop or a hazard. He starts
+  // facing the more open side of his row (the side trouble can come from), so a raider by a wall looks out.
+  function findFoes(t) {
+    function at(c, r) { return (r >= 0 && r < rows && c >= 0 && c < cols) ? t[r].charAt(c) : '#'; }
+    function free(c, r) { var ch = at(c, r); return '#ICDvJLO%F^<>~'.indexOf(ch) < 0 && 'IC#D'.indexOf(at(c, r + 1)) >= 0; }
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i], a = f.c, b = f.c;
+      while (a > f.c - 3 && free(a - 1, f.r)) a--;
+      while (b < f.c + 3 && free(b + 1, f.r)) b++;
+      var L = 0, Rr = 0; while (!solidTile(f.c - L - 1, f.r)) L++; while (!solidTile(f.c + Rr + 1, f.r)) Rr++;
+      f.min = a * T + 1; f.max = b * T + 1; f.dir0 = L > Rr ? -1 : 1;
+    }
+  }
+  function resetCombat() {
+    for (var i = 0; i < foes.length; i++) { var f = foes[i]; f.x = f.x0; f.y = f.y0; f.dir = f.dir0; f.state = 'patrol'; f.t = 0; f.cd = 0; f.wait = P.foeWait; f.rem = 0; f.lost = 0; f.shotT = 9; f.q = 0; f.walkT = 0; }
+    for (i = 0; i < barrels.length; i++) { barrels[i].state = 'idle'; barrels[i].t = 0; }
+    shots = []; foeShots = []; combat.stop = 0;
+  }
+  function foeBox(f) { return { x: f.x, y: f.y, w: f.w, h: f.h }; }
+  // Line of sight: the hero on the raider's level (feet within foeLevel px), in front of him (or right behind him,
+  // close enough to hear), in range, and no wall on the chest row between them.
+  function foeSees(f) {
+    if (pl.dead || fx.mode !== 'none') return false;
+    var dx = (pl.x + pl.w / 2) - (f.x + f.w / 2);
+    if (Math.abs(pl.y + pl.h - f.y - f.h) > P.foeLevel || Math.abs(dx) > P.foeSight) return false;
+    if ((dx > 0 ? 1 : -1) !== f.dir && Math.abs(dx) > 18) return false;
+    var x0 = Math.min(pl.x + pl.w / 2, f.x + f.w / 2), x1 = Math.max(pl.x + pl.w / 2, f.x + f.w / 2);
+    return !hitTiles(Math.round(x0), f.y + 3, Math.max(1, Math.round(x1 - x0)), 1);
+  }
+  function killFoe(f, dir, how) {
+    if (f.state === 'dead') return;
+    f.state = 'dead'; combat.stop = P.hitStop; addShake(1.5, 0.12);
+    pushEv({ kind: 'gib', x: f.x + f.w / 2, y: f.y + 4, dir: dir, how: how || 'shot' });
+  }
+  function pushEv(e) { combat.ev.push(e); if (combat.ev.length > 40) combat.ev.shift(); }   // nothing reads these while stepping headless, so keep the list short
+  function blowBarrel(bl) {
+    bl.state = 'gone';
+    var cx = bl.x + bl.w / 2, cy = bl.y + bl.h / 2, i;
+    pushEv({ kind: 'blast', x: cx, y: cy }); addShake(3, 0.25); combat.stop = P.hitStop * 1.5;
+    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead' && Math.hypot(f.x + f.w / 2 - cx, f.y + f.h / 2 - cy) < P.blastR) killFoe(f, f.x + f.w / 2 < cx ? -1 : 1, 'blast'); }
+    for (i = 0; i < barrels.length; i++) { var o = barrels[i]; if (o.state === 'idle' && Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy) < P.blastR) { o.state = 'lit'; o.t = P.barrelChain; } }
+    if (!pl.dead && fx.mode === 'none' && Math.hypot(pl.x + pl.w / 2 - cx, pl.y + pl.h / 2 - cy) < P.blastR - 4) die();
+  }
+  // The hero's shots fly level and fast, a pixel at a time so nothing thin is skipped; a wall stops them, a raider or a
+  // barrel takes the hit. A shot that has flown its range fizzles.
+  function stepShots(dt) {
+    for (var i = shots.length - 1; i >= 0; i--) {
+      var s = shots[i], n = Math.round(Math.abs(s.vx) * dt), d = s.vx > 0 ? 1 : -1, gone = false, k, j;
+      for (k = 0; k < n && !gone; k++) {
+        s.x += d; s.dist++;
+        var tip = d > 0 ? s.x + 3 : s.x;
+        if (s.dist > P.shotRange || tip < 0 || tip >= LW) { gone = true; break; }
+        if (solidTile(Math.floor(tip / T), Math.floor((s.y + 1) / T))) { pushEv({ kind: 'spark', x: tip - d, y: s.y + 1, dir: -d }); gone = true; break; }
+        for (j = 0; j < foes.length; j++) { var f = foes[j]; if (f.state !== 'dead' && overlap(foeBox(f), s.x, s.y, 4, 2)) { killFoe(f, d, 'shot'); gone = true; break; } }
+        for (j = 0; j < barrels.length && !gone; j++) { var bl = barrels[j]; if (bl.state === 'idle' && overlap(bl, s.x, s.y, 4, 2)) { bl.state = 'lit'; bl.t = P.barrelFuse; gone = true; } }
+      }
+      if (gone) shots.splice(i, 1);
+    }
+  }
+  function stepFoes(dt) {
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i];
+      if (f.state === 'dead') continue;
+      f.shotT += dt; if (f.q > 0) f.q -= dt;
+      var sees = foeSees(f);
+      if (sees) { f.dir = pl.x + pl.w / 2 > f.x + f.w / 2 ? 1 : -1; f.lost = 0; }
+      if (f.state === 'patrol') {
+        if (sees) { f.state = 'alert'; f.t = P.foeAlert; continue; }
+        if (f.wait > 0) { f.wait -= dt; continue; }
+        if (f.min === f.max) continue;
+        f.rem += P.foeWalk * dt; f.walkT += dt;
+        var n = Math.floor(f.rem); f.rem -= n;
+        while (n-- > 0) {
+          if ((f.dir > 0 && f.x >= f.max) || (f.dir < 0 && f.x <= f.min)) { f.dir = -f.dir; f.wait = P.foeWait; f.rem = 0; break; }
+          f.x += f.dir;
+        }
+      } else if (f.state === 'alert') {
+        f.t -= dt;
+        if (f.t <= 0) { f.state = 'fire'; f.cd = 0; }
+      } else if (f.state === 'fire') {
+        if (!sees) { f.lost += dt; if (f.lost > P.foeForget) { f.state = 'patrol'; f.wait = P.foeWait; f.q = 0.8; } continue; }
+        f.cd -= dt;
+        if (f.cd <= 0) {
+          f.cd = P.foeFireGap; f.shotT = 0;
+          foeShots.push({ x: f.dir > 0 ? f.x + f.w + 1 : f.x - 4, y: f.y + 3, vx: f.dir * P.foeShot, rem: 0 });
+        }
+      }
+    }
+  }
+  // The raiders' shots are slow and bright (you can see them coming and jump them). A wall stops them.
+  function stepFoeShots(dt) {
+    for (var i = foeShots.length - 1; i >= 0; i--) {
+      var s = foeShots[i];
+      s.rem += Math.abs(s.vx) * dt;
+      var n = Math.floor(s.rem), d = s.vx > 0 ? 1 : -1, gone = false; s.rem -= n;
+      while (n-- > 0) {
+        s.x += d;
+        var tip = d > 0 ? s.x + 3 : s.x;
+        if (tip < 0 || tip >= LW || solidTile(Math.floor(tip / T), Math.floor((s.y + 1) / T))) { pushEv({ kind: 'spark', x: tip - d, y: s.y + 1, dir: -d, foe: true }); gone = true; break; }
+      }
+      if (gone) foeShots.splice(i, 1);
+    }
+  }
+  function stepBarrels(dt) {
+    for (var i = 0; i < barrels.length; i++) { var bl = barrels[i]; if (bl.state === 'lit') { bl.t -= dt; if (bl.t <= 0) blowBarrel(bl); } }
+  }
+  function canShoot() { return !pl.dead && fx.mode === 'none' && pl.state === 'normal' && !pl.mantle; }
+
   // ---- player ----
   var pl, run, fx = { mode: 'none', t: 0, x: 0, y: 0, facing: 1 };
   function resetPlayer() {
@@ -514,7 +636,7 @@
       state: 'normal', onGround: false, coyote: 0, jumpBuf: 0, dashBuf: 0,
       varJumpTimer: 0, varJumpSpeed: 0, dashes: 1, dashTimer: 0, dashCooldown: 0, dashDirX: 0, dashDirY: 0,
       freeze: 0, forceMove: 0, forceDir: 0, mantle: null, climbDir: 0, stamina: P.stamina, wallSlide: P.wallSlideTime, boostT: 0, boostDir: 0,
-      dead: false, prevJump: false, prevDash: false, trail: [], trailTick: 0
+      dead: false, prevJump: false, prevDash: false, trail: [], trailTick: 0, shotCD: 0, gunT: 0, shotT: 9
     };
     for (var i = 0; i < refills.length; i++) refills[i].timer = 0;
   }
@@ -702,6 +824,7 @@
 
     if (jumpPressed) pl.jumpBuf = P.jumpBuffer; else pl.jumpBuf -= dt;
     if (dashPressed) pl.dashBuf = P.dashBuffer; else pl.dashBuf -= dt;
+    if (combat.stop > 0) { combat.stop -= dt; return; }   // hit-stop: a kill holds everything still for a few frames (presses stay buffered)
     if (pl.freeze > 0) { pl.freeze -= dt; return; }
 
     pl.inX = inp.x; pl.inY = inp.y;                       // what is being held, for the pose picker (render only)
@@ -845,6 +968,16 @@
     for (i = 0; i < doors.length; i++) if (doors[i].t > 0) doors[i].t -= dt;
     for (i = 0; i < jets.length; i++) if (jetPhase(jets[i]).on && overlap(jetRect(jets[i]), pl.x, pl.y, pl.w, pl.h)) { die(); return; }
     for (i = 0; i < drones.length; i++) { var dn = drones[i]; if (overlap({ x: dn.x + 1, y: dn.y + 1, w: T - 2, h: T - 2 }, pl.x, pl.y, pl.w, pl.h) || (dn.fire > 0 && overlap(droneBeam(dn), pl.x, pl.y, pl.w, pl.h))) { die(); return; } }
+    // combat: the blaster (hold to keep firing), a dash straight through a raider takes him out, raiders and their shots
+    pl.shotCD -= dt; pl.gunT -= dt; pl.shotT += dt;
+    if (inp.shoot && pl.shotCD <= 0 && canShoot()) {
+      pl.shotCD = P.shotRate; pl.gunT = P.gunHold; pl.shotT = 0;
+      shots.push({ x: pl.facing > 0 ? pl.x + pl.w + 2 : pl.x - 6, y: pl.y + 3, vx: pl.facing * P.shotSpeed, dist: 0 });
+    }
+    for (i = 0; i < foes.length; i++) if (pl.state === 'dash' && foes[i].state !== 'dead' && overlap(foeBox(foes[i]), pl.x, pl.y, pl.w, pl.h)) killFoe(foes[i], pl.facing, 'dash');
+    stepShots(dt); stepFoes(dt); stepFoeShots(dt); stepBarrels(dt);
+    if (pl.dead) return;
+    for (i = 0; i < foeShots.length; i++) if (overlap(pl, foeShots[i].x, foeShots[i].y, 4, 2)) { foeShots.splice(i, 1); die(); return; }
     if (lava) { if (run.time > P.lavaDelay) lava.y -= P.lavaRise * dt; if (pl.y + pl.h > lava.y + 2) { die(); return; } }
     if (pl.y > rows * T + 20) { die(); return; }
     for (i = 0; i < refills.length; i++) {
@@ -885,12 +1018,14 @@
   try { padCfg = JSON.parse(localStorage.getItem(PAD_KEY)) || {}; } catch (e) { padCfg = {}; }
   function savePads() { padVer++; try { localStorage.setItem(PAD_KEY, JSON.stringify(padCfg)); } catch (e) {} }
   var STD = { fb: 0, fr: 1, fl: 2, ft: 3, l1: 4, r1: 5, l2: 6, r2: 7, select: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
-  var DEF_ACT = { fb: 'jump', fl: 'dash', fr: 'dash', l1: 'grab', r1: 'grab', l2: 'grab', r2: 'grab' };
+  var DEF_ACT = { fb: 'jump', fl: 'shoot', fr: 'dash', l1: 'grab', r1: 'grab', l2: 'grab', r2: 'grab' };   // the left face button shoots (Y on Nintendo and 8BitDo pads, X on Xbox)
   var ASSIGNABLE = ['fb', 'fr', 'fl', 'ft', 'l1', 'r1', 'l2', 'r2'];
   // Everything a button can do. Settings, Controls lists these in order; a new action (an attack, say) is one more entry
   // here, a key in KEY_ACT, its flag in readInput and its handling in step(). Every action keeps at least one button.
-  var ACTIONS = [['jump', 'JUMP'], ['dash', 'DASH'], ['grab', 'GRAB']];
-  var KEY_ACT = { jump: 'C', dash: 'X', grab: 'Z' };
+  var ACTIONS = [['jump', 'JUMP'], ['dash', 'DASH'], ['grab', 'GRAB'], ['shoot', 'SHOOT']];
+  var KEY_ACT = { jump: 'C', dash: 'X', grab: 'Z', shoot: 'V' };
+  // Pads set up before SHOOT existed: the left face button was a second DASH, so it becomes SHOOT (once, then saved).
+  (function () { var ch = false; for (var id in padCfg) { var a = padCfg[id] && padCfg[id].act; if (!a) continue; var has = false; for (var b in a) if (a[b] === 'shoot') has = true; if (has) continue; if (a.fl === 'dash' && a.fr === 'dash') a.fl = 'shoot'; else if (!a.ft) a.ft = 'shoot'; else if (!a.fl) a.fl = 'shoot'; ch = true; } if (ch) savePads(); })();
   function actName(id) { for (var i = 0; i < ACTIONS.length; i++) if (ACTIONS[i][0] === id) return ACTIONS[i][1]; return ''; }
   // Say buttons the way they are printed: 8BitDo and Nintendo pads put B at the bottom and A on the right.
   function padLetters(id) {
@@ -962,7 +1097,7 @@
   }
 
   function readInput() {
-    var x = 0, y = 0, jump = false, dash = false, grab = false, back = !!keys[27], i, pageL = !!keys[81], pageR = !!keys[69];   // pageL/R: the map's world switch (Q and E on a keyboard)
+    var x = 0, y = 0, jump = false, dash = false, grab = false, shoot = false, back = !!keys[27], i, pageL = !!keys[81], pageR = !!keys[69];   // pageL/R: the map's world switch (Q and E on a keyboard)
     var gp = firstPad();
     padInfo = 'none seen yet, press a button on it';
     if (gp) {
@@ -979,13 +1114,13 @@
         if (isDown(gp, c, 'down')) y = 1;
         var acts = {};
         for (i = 0; i < ASSIGNABLE.length; i++) { var an = ASSIGNABLE[i]; if (c.act[an] && isDown(gp, c, an)) acts[c.act[an]] = true; }
-        if (acts.jump) jump = true; if (acts.dash) dash = true; if (acts.grab) grab = true;
+        if (acts.jump) jump = true; if (acts.dash) dash = true; if (acts.grab) grab = true; if (acts.shoot) shoot = true;
         if (isDown(gp, c, 'start')) back = true;   // Start: back to the map or menu
         if (isDown(gp, c, 'l2')) pageL = true;       // the triggers flip worlds on the map, whatever job they have in play
         if (isDown(gp, c, 'r2')) pageR = true;
       }
       // Start or Select: back to the map or menu
-      if (x || y || jump || dash || grab) usedPad = true;
+      if (x || y || jump || dash || grab || shoot) usedPad = true;
     }
     if (keys[37] || keys[65]) x = -1;
     if (keys[39] || keys[68]) x = 1;
@@ -994,7 +1129,8 @@
     if (keys[67] || keys[32]) jump = true;
     if (keys[88]) dash = true;
     if (keys[90] || keys[16]) grab = true;
-    return { x: x, y: y, jump: jump, dash: dash, grab: grab, back: back, pageL: pageL, pageR: pageR };
+    if (keys[86]) shoot = true;
+    return { x: x, y: y, jump: jump, dash: dash, grab: grab, shoot: shoot, back: back, pageL: pageL, pageR: pageR };
   }
 
   // ---- demo: the game plays the starter room by itself when nobody is at the controls ----
@@ -1002,6 +1138,7 @@
   var DEMO_IDLE = 15;
   // Recorded runs of the built-in levels (the auto-player's inputs, saved by tests/gentest.js 0). The game steps at a
   // fixed rate, so playing the same inputs back gives the same run. Format: [input code, frames, input code, frames, ...].
+  // A code is x+1 + 3(y+1) + 9 jump + 18 dash + 36 grab + 72 shoot.
   var DEMOS = /*DEMOS*/;
   function pickDemo() {
     var list = [starters[0]], i;
@@ -1010,9 +1147,13 @@
     demo.room = list[Math.floor(Math.random() * list.length)];
     demo.rec = demo.room === starters[0] ? null : DEMOS[demo.room.id]; demo.rk = 0; demo.rleft = demo.rec ? demo.rec[1] : 0;
   }
+  function foeAhead() {
+    for (var i = 0; i < foes.length; i++) { var f = foes[i], dx = f.x - pl.x; if (f.state !== 'dead' && Math.abs(f.y + f.h - pl.y - pl.h) <= P.foeLevel && (dx > 0 ? 1 : -1) === pl.facing && Math.abs(dx) < P.shotRange - 10) return true; }
+    return false;
+  }
   function startDemo() { pickDemo(); scene = 'play'; allDirty = true; lastSig = ''; demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun(); }
   function demoInput() {
-    var inp = { x: 0, y: 0, jump: false, dash: false, grab: false };
+    var inp = { x: 0, y: 0, jump: false, dash: false, grab: false, shoot: false };
     function I(o) { for (var k in o) inp[k] = o[k]; }
     function next() { demo.stage++; demo.t0 = demo.f; }
     if (run.won) { if (++demo.winT > 100) startDemo(); return inp; }
@@ -1020,7 +1161,7 @@
       if (pl.dead || demo.rk >= demo.rec.length) { startDemo(); return inp; }
       var code = demo.rec[demo.rk];
       if (--demo.rleft <= 0) { demo.rk += 2; demo.rleft = demo.rec[demo.rk + 1] || 0; }
-      inp.x = code % 3 - 1; inp.y = Math.floor(code / 3) % 3 - 1; inp.jump = !!(Math.floor(code / 9) % 2); inp.dash = !!(Math.floor(code / 18) % 2); inp.grab = code >= 36;
+      inp.x = code % 3 - 1; inp.y = Math.floor(code / 3) % 3 - 1; inp.jump = !!(Math.floor(code / 9) % 2); inp.dash = !!(Math.floor(code / 18) % 2); inp.grab = !!(Math.floor(code / 36) % 2); inp.shoot = code >= 72;
       return inp;
     }
     if (pl.dead) { demo.stage = 1; demo.back = false; demo.t0 = demo.f; return inp; }
@@ -1070,6 +1211,7 @@
         break;
       default: I({ x: 1 });
     }
+    if (foeAhead()) inp.shoot = true;              // a raider on this level, in front: blast him
     demo.f++;
     return inp;
   }
@@ -1646,6 +1788,9 @@
       mark(tr.x - 5, tr.y - 7, 18, 18);
     }
     g.globalAlpha = 1;
+    var cdt = Math.max(0, Math.min(0.1, run.time - fxLast)); fxLast = run.time;
+    if (combat.ev.length) takeEvents();
+    drawCombat(cdt);
     var heroMarks = dirtyNow.length; hero.ph = 0;
     if (fx.mode === 'none') mark(pl.x - 10, pl.y - 16, 28, 28);
     else mark(fx.x - 22, fx.y - 30, 52, 60);
@@ -1664,6 +1809,7 @@
       hero.lastPh = hero.ph; hero.lastPx = pl.x + ',' + pl.y;
     }
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
+    drawShots(); drawSparks(cdt); if (gibs.length) stepGibs(cdt); if (blasts.length) drawBlasts(cdt);
     var sig = [pause.on, pause.pick, padVer, mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     drawWeather();
@@ -1733,6 +1879,166 @@
     if (sx === 1 && sy === 1) g.drawImage(sheet, f * F, a.row * F, F, F, dx, dy, F, F);
     else { g.save(); g.translate(dx + F / 2, dy + F); g.scale(sx, sy); g.drawImage(sheet, f * F, a.row * F, F, F, -F / 2, -F, F, F); g.restore(); }   // squash and stretch about the feet
     return true;
+  }
+  // ---- combat, drawn (render only: nothing here changes the physics, so recorded runs replay the same) ----
+  // The raider sheet is prepared once facing right and once mirrored (no transform per draw), snapped for GAME BOY.
+  var foeArt = { ready: false, R: null, L: null };
+  (function () {
+    var img = new Image();
+    img.onload = function () {
+      var F = FOES.frame, r = makeCanvas(img.width, img.height), l = makeCanvas(img.width, img.height), lg = l.getContext('2d');
+      r.getContext('2d').drawImage(img, 0, 0);
+      for (var y = 0; y < img.height; y += F) for (var x = 0; x < img.width; x += F) { lg.save(); lg.translate(x + F, y); lg.scale(-1, 1); lg.drawImage(img, x, y, F, F, 0, 0, F, F); lg.restore(); }
+      if (GB.kind === 'bw') bwFoe([r, l]); else gbSnap([r, l], 'obj');
+      foeArt.R = r; foeArt.L = l; foeArt.ready = true; allDirty = true;
+    };
+    img.src = FOES.src;
+  })();
+  // BLACK AND WHITE: the hero is the white figure, so a raider is grey (outline black, the lit bits of him white).
+  function bwFoe(list) {
+    list.forEach(function (cv) {
+      var t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height;
+      var tg = t.getContext('2d', { willReadFrequently: true }); tg.drawImage(cv, 0, 0);
+      var d = tg.getImageData(0, 0, cv.width, cv.height), p = d.data;
+      for (var i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 128) { p[i + 3] = 0; continue; }
+        var L = gbLum(p[i], p[i + 1], p[i + 2]), c = GB_PAL[L < 0.1 ? 0 : L < 0.45 ? 2 : 3];
+        p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255;
+      }
+      tg.putImageData(d, 0, 0); var cg = cv.getContext('2d'); cg.clearRect(0, 0, cv.width, cv.height); cg.drawImage(t, 0, 0);
+    });
+  }
+  var gibs = [], blasts = [], sparks = [], fxLast = 0;
+  var BLOOD = ['#D42A2E', '#F04438', '#A81C24'], STAIN = ['#8E1B22', '#B02228'];
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function stainCtxs() { var out = [tileLayer.getContext('2d')]; if (city && city.L && city.L.front) out.push(city.L.front.getContext('2d')); return out; }
+  // Paint into the static layer (and the city's terrain layer, which repaints it), so blood and debris stay put for
+  // free: the room is redrawn from that layer every frame anyway. Never in GAME BOY (the fast mode keeps it clean).
+  function bake(x, y, w, hh, col) { if (GB.on) return; stainCtxs().forEach(function (b) { b.fillStyle = col; b.fillRect(x, y, w, hh); }); mark(x - 1, y - 1, w + 2, hh + 2); }
+  function spawnGibs(e) {
+    var i, n = GB.on ? 5 : 7, cols = e.cols || FOES.gibs;
+    for (i = 0; i < n; i++) gibs.push({ x: e.x + rnd(-2, 2), y: e.y + rnd(-3, 3), vx: e.dir * rnd(25, 120) + rnd(-45, 45), vy: -rnd(70, 190), w: i % 3 ? 2 : 3, h: 2, col: cols[i % cols.length], kind: 'chunk', t: 0 });
+    if (GB.on || e.cols) return;
+    for (i = 0; i < 30; i++) { var big = i % 4 === 0; gibs.push({ x: e.x + rnd(-2, 2), y: e.y + rnd(-3, 3), vx: e.dir * rnd(15, 160) + rnd(-80, 80), vy: -rnd(30, 220), w: big ? 2 : 1, h: big ? 2 : 1, col: BLOOD[i % 3], kind: 'drop', t: 0 }); }
+    blasts.push({ x: e.x, y: e.y, t: 0, pop: true });                  // a short red pop where he stood
+    if (gibs.length > 90) gibs.splice(0, gibs.length - 90);
+  }
+  // Gibs fly, bounce and come to rest. Blood drops that touch a wall or floor leave a stain where they hit; chunks that
+  // settle are painted into the floor. Each moves at most a pixel per check so none tunnels into a wall.
+  function stepGibs(dt) {
+    for (var i = gibs.length - 1; i >= 0; i--) {
+      var p = gibs[i], done = false;
+      p.t += dt; p.vy = Math.min(p.vy + 520 * dt, 260);
+      var ox = p.x, oy = p.y, tx = p.x + p.vx * dt, ty = p.y + p.vy * dt;
+      mark(Math.round(Math.min(ox, tx)) - 1, Math.round(Math.min(oy, ty)) - 1, Math.abs(tx - ox) + p.w + 3, Math.abs(ty - oy) + p.h + 3);
+      var steps = Math.max(1, Math.ceil(Math.max(Math.abs(tx - ox), Math.abs(ty - oy))));
+      for (var k = 1; k <= steps; k++) {
+        var nx = ox + (tx - ox) * k / steps, ny = oy + (ty - oy) * k / steps;
+        if (ny > RH + 10) { done = true; break; }
+        if (!hitTiles(Math.round(nx), Math.round(ny), p.w, p.h)) { p.x = nx; p.y = ny; continue; }
+        if (p.kind === 'drop') { bake(Math.round(nx), Math.round(ny), p.w, p.h, STAIN[i % 2]); done = true; break; }   // blood: a stain where it hit
+        if (hitTiles(Math.round(nx), Math.round(p.y), p.w, p.h)) p.vx = -p.vx * 0.4;                             // a wall: bounce back
+        else if (p.vy > 0) {                                                                                        // the floor: bounce lower each time, then settle
+          p.vy = -p.vy * 0.32; p.vx *= 0.55;
+          if (Math.abs(p.vy) < 28) { bake(Math.round(p.x), Math.round(p.y), p.w, p.h, p.col); done = true; }
+        } else p.vy = 0;                                                                                            // a ceiling
+        break;
+      }
+      if (!done && p.t > 3) done = true;
+      if (done) { gibs.splice(i, 1); continue; }
+      g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y), p.w, p.h);
+    }
+  }
+  function disc(cx, cy, r, col) { g.fillStyle = col; for (var dy = -r; dy <= r; dy++) { var w = Math.floor(Math.sqrt(r * r - dy * dy)); g.fillRect(Math.round(cx) - w, Math.round(cy) + dy, 2 * w + 1, 1); } }
+  // An explosion: one white frame, a fireball that shrinks to a yellow core, then smoke puffs that rise and thin out.
+  // A red pop (a raider going down) is the same, small and quick. Nothing flashes more than once.
+  function drawBlasts(dt) {
+    for (var i = blasts.length - 1; i >= 0; i--) {
+      var b = blasts[i]; b.t += dt;
+      var life = b.pop ? 0.16 : (GB.on ? 0.2 : 0.75), R = b.pop ? 6 : 15;
+      mark(b.x - R - 6, b.y - R - 22, 2 * R + 12, 2 * R + 30);
+      if (b.t > life) { blasts.splice(i, 1); continue; }
+      if (b.pop) { disc(b.x, b.y, b.t < 0.05 ? 5 : 4, b.t < 0.05 ? '#FFE9B8' : '#D42A2E'); continue; }
+      if (b.t < 0.05) { disc(b.x, b.y, R - 2, '#FFE9B8'); disc(b.x, b.y, R - 7, '#FFFFFF'); continue; }   // one pale frame, not a white screen: nothing strobes
+      var k = Math.min(1, (b.t - 0.05) / 0.3);
+      if (k < 1) { disc(b.x, b.y - k * 4, Math.round(R * (1 - k * 0.5)), '#E2491F'); disc(b.x, b.y - k * 5, Math.round(R * (0.7 - k * 0.45)), '#FF9A3C'); disc(b.x, b.y - k * 6, Math.max(1, Math.round(R * (0.4 - k * 0.35))), '#FFE08A'); }
+      if (!GB.on && b.t > 0.15) {
+        var q = (b.t - 0.15) / (life - 0.15);
+        g.globalAlpha = Math.max(0, 0.8 - q * 0.8);
+        for (var p = 0; p < 5; p++) disc(b.x + (p - 2) * 5 + Math.sin(p * 2.1 + b.t * 3) * 2, b.y - 4 - q * (14 + p * 3), Math.round(3 + q * 2 + (p % 2)), p % 2 ? '#3A3A44' : '#55555F');
+        g.globalAlpha = 1;
+      }
+    }
+  }
+  function drawSparks(dt) {
+    for (var i = sparks.length - 1; i >= 0; i--) {
+      var s = sparks[i]; s.t += dt; mark(s.x - 4, s.y - 4, 9, 9);
+      if (s.t > 0.1) { sparks.splice(i, 1); continue; }
+      g.fillStyle = s.t < 0.05 ? '#FFFFFF' : (s.foe ? '#FF7A4A' : '#FFD27A');
+      g.fillRect(Math.round(s.x), Math.round(s.y), 1, 1); g.fillRect(Math.round(s.x + s.dir * (1 + s.t * 30)), Math.round(s.y - 1 - s.t * 20), 1, 1); g.fillRect(Math.round(s.x + s.dir * (1 + s.t * 25)), Math.round(s.y + 1 + s.t * 15), 1, 1);
+    }
+  }
+  function takeEvents() {
+    for (var i = 0; i < combat.ev.length; i++) {
+      var e = combat.ev[i];
+      if (e.kind === 'gib') spawnGibs(e);
+      else if (e.kind === 'spark') sparks.push({ x: e.x, y: e.y, dir: e.dir, foe: e.foe, t: 0 });
+      else if (e.kind === 'blast') {
+        blasts.push({ x: e.x, y: e.y, t: 0 });
+        spawnGibs({ x: e.x, y: e.y, dir: 1, cols: ['#B8352A', '#4A1610', '#F2C23A', '#6E2016', '#2A1A10'] });
+        spawnGibs({ x: e.x, y: e.y, dir: -1, cols: ['#B8352A', '#4A1610', '#6E2016'] });
+        var fy = Math.floor((e.y + 5) / T) * T + T;                    // the floor under the barrel gets a scorch mark
+        if (solidTile(Math.floor(e.x / T), fy / T)) { bake(Math.round(e.x) - 7, fy, 14, 1, 'rgba(12,8,8,0.7)'); bake(Math.round(e.x) - 5, fy + 1, 10, 1, 'rgba(12,8,8,0.5)'); bake(Math.round(e.x) - 9, fy, 2, 1, 'rgba(12,8,8,0.35)'); bake(Math.round(e.x) + 7, fy, 2, 1, 'rgba(12,8,8,0.35)'); }
+      }
+    }
+    combat.ev.length = 0;
+  }
+  // A raider: walking, idle (breathing) or the kick of a shot, with a ! while he draws a bead and a ? when he lost you.
+  // He is only repainted when his picture changes.
+  function drawFoe(f) {
+    if (!foeArt.ready) return;
+    var A = FOES.anims, F = FOES.frame, name, fr;
+    if (f.shotT < 0.15) { name = 'fire'; fr = Math.min(A.fire.n - 1, Math.floor(f.shotT * A.fire.fps)); }
+    else if (f.state === 'patrol' && f.wait <= 0 && f.min !== f.max) { name = 'walk'; fr = Math.floor(f.walkT * A.walk.fps) % A.walk.n; }
+    else { name = 'idle'; fr = GB.on ? 0 : Math.floor(run.time * A.idle.fps + f.c) % A.idle.n; }
+    var a = A[name], dx = Math.round(f.x + f.w / 2 - F / 2), dy = f.y + f.h - F;
+    g.drawImage(f.dir > 0 ? foeArt.R : foeArt.L, fr * F, a.row * F, F, F, dx, dy, F, F);
+    var mz = a.muzzles[fr], mx = dx + (f.dir > 0 ? mz[0] : F - 1 - mz[0]), my = dy + mz[1];
+    if (f.shotT < 0.06) { g.fillStyle = '#FFE08A'; g.fillRect(mx + f.dir, my - 1, 1, 3); g.fillRect(mx + f.dir * 2, my, 2 * f.dir, 1); g.fillStyle = '#FFFFFF'; g.fillRect(mx + f.dir, my, 1, 1); }
+    var glyph = f.state === 'alert' ? '!' : (f.q > 0 ? '?' : '');
+    if (glyph) {                                                      // drawn as pixels over his head, amber with a dark edge
+      var gx = Math.round(f.x + f.w / 2) - 1, gy = dy - 1;
+      g.fillStyle = '#0D0F18'; g.fillRect(gx - 1, gy - 1, glyph === '!' ? 4 : 5, 9);
+      g.fillStyle = '#FFD23F';
+      if (glyph === '!') { g.fillRect(gx, gy, 2, 4); g.fillRect(gx, gy + 5, 2, 2); }
+      else { g.fillRect(gx, gy, 3, 1); g.fillRect(gx + 2, gy + 1, 1, 2); g.fillRect(gx + 1, gy + 3, 1, 1); g.fillRect(gx + 1, gy + 5, 1, 2); }
+    }
+    var sig = name + fr + ',' + dx + ',' + f.dir + glyph + (f.shotT < 0.06);
+    if (sig !== f.sig) { f.sig = sig; mark(dx - 3, dy - 10, F + 6, F + 12); }
+  }
+  function drawCombat(dt) {
+    var i;
+    for (i = 0; i < barrels.length; i++) {
+      var bl = barrels[i], bs = bl.state + (bl.state === 'lit' ? Math.floor(bl.t * 40) % 2 : '');
+      if (bl.state !== 'gone') drawBarrel(g, bl.x - 1, bl.y, bl.state === 'lit' && Math.floor(bl.t * 40) % 2 === 0);
+      if (bs !== bl.sig) { bl.sig = bs; mark(bl.x - 2, bl.y - 2, 12, 14); }
+    }
+    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead') drawFoe(f); else if (f.sig) { f.sig = ''; mark(Math.round(f.x) - 7, f.y - 16, 22, 28); } }
+    for (i = 0; i < foeShots.length; i++) {                           // the raiders' shots: a hot orange slug with a pale core
+      var s = foeShots[i];
+      g.fillStyle = '#B8301E'; g.fillRect(s.x - (s.vx > 0 ? 2 : -4), s.y + 1, 2, 1);
+      g.fillStyle = '#FF5A3C'; g.fillRect(s.x, s.y, 4, 2);
+      g.fillStyle = '#FFD0A0'; g.fillRect(s.x + (s.vx > 0 ? 2 : 0), s.y, 2, 1);
+      mark(s.x - 5, s.y - 1, 14, 4);
+    }
+  }
+  function drawShots() {                                              // the hero's shots: a pale tracer with a hot head
+    for (var i = 0; i < shots.length; i++) {
+      var s = shots[i], d = s.vx > 0 ? 1 : -1, hx = d > 0 ? s.x + 3 : s.x;
+      g.fillStyle = '#FFB74A'; g.fillRect(d > 0 ? hx - 6 : hx + 1, s.y + 1, 6, 1);
+      g.fillStyle = '#FFF3C4'; g.fillRect(d > 0 ? hx - 1 : hx, s.y, 2, 2);
+      mark(Math.min(hx - 8, hx - 2), s.y - 1, 12, 4);
+    }
   }
   // Dust: a few pale pixels kicked up on a hard landing, a run start, a skid and a wall slide. Render only.
   var dust = [];
@@ -1852,9 +2158,14 @@
     else if (pl.inY > 0 && HERO.anims.duck) name = 'duck';
     else if (pl.inY < 0 && HERO.anims.look_up) name = 'look_up';
     else name = 'idle';
+    // the blaster: for a moment after each shot the hero holds it out (the '_aim' twin of the pose; poses without one
+    // use the standing aim). The base animation keeps its clock, so a run does not restart its stride.
+    var aim = null;
+    if (pl.gunT > 0 && pl.state === 'normal' && !pl.mantle) aim = HERO.anims[name + '_aim'] ? name + '_aim' : (name === 'land' || name === 'skid' || name === 'duck' || name === 'look_up' ? 'idle_aim' : null);
+    if (aim) hero.os = null;
     if (name === 'wall_slide' && tick % 6 === 0) puff(pl.x + (facing > 0 ? pl.w : 0), pl.y + pl.h - 1, 1, -facing * 8, -12);   // scraping the wall
     if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += name === 'run' ? dt * Math.max(0.55, Math.min(1, Math.abs(pl.vx) / P.maxRun)) : dt;   // the stride slows with the speed, so a run start does not paddle
-    if (name === 'idle' && HERO.anims.idle_look) {                                                // idle one-shots: after 3 s still, one loop in five
+    if (name === 'idle' && HERO.anims.idle_look && !aim) {                                                // idle one-shots: after 3 s still, one loop in five
       hero.idleT += dt;
       if (hero.os) { hero.osT += dt; var oa = HERO.anims[hero.os]; if (hero.osT >= oa.n / oa.fps) { hero.os = null; hero.idleT = 0; } }
       else {
@@ -1864,9 +2175,19 @@
       if (hero.os) { name = hero.os; }
     } else { hero.os = null; hero.idleT = 0; }
     var a = HERO.anims[name], t = hero.os ? hero.osT : reverse ? (a.n / a.fps) - (hero.t % (a.n / a.fps)) - 0.001 : hero.t;
+    if (aim) name = aim;
     var an = heroAnchor(name, t, pl.x + tremble(), pl.y, facing);
     if (an) { stepChain(an, facing); drawChain(an); }
     drawHero(name, t, pl.x + tremble(), pl.y, facing, (pl.dashes > 0 ? 0 : 1) | (shaky() ? 2 : 0));
+    if (aim && pl.shotT < 0.05 && HERO.anims[aim].muzzles) {         // muzzle flash: one bright frame or two at the blaster's tip
+      var ma = HERO.anims[aim], mz = ma.muzzles[heroFrame(ma, t)], F = HERO.frame;
+      if (mz) {
+        var mdx = pl.x + tremble() + pl.w / 2 - F / 2, mx = Math.round(facing > 0 ? mdx + mz[0] + 1 : mdx + F - 2 - mz[0]), my = pl.y + pl.h - F + mz[1];
+        g.fillStyle = '#FFB74A'; g.fillRect(mx + (facing > 0 ? 1 : -2), my - 1, 2, 3); g.fillRect(mx + (facing > 0 ? 3 : -4), my, 2, 1);
+        g.fillStyle = '#FFFFFF'; g.fillRect(mx, my, 1, 1); g.fillRect(mx + (facing > 0 ? 1 : -1), my, 1, 1);
+        mark(mx - 6, my - 3, 13, 7); hero.ph = (hero.ph * 31 + 4243) | 0;
+      }
+    }
     drawDust(dt);
   }
 
@@ -2648,7 +2969,7 @@
       }
       var inp = readInput();
       if (wiz.on) { wizTick(); acc = 0; render(); window.requestAnimationFrame(frame); return; }
-      var any = inp.x || inp.y || inp.jump || inp.dash || inp.grab || inp.back || inp.pageL || inp.pageR;
+      var any = inp.x || inp.y || inp.jump || inp.dash || inp.grab || inp.shoot || inp.back || inp.pageL || inp.pageR;
       if (scene !== 'play') {                      // menu or map: nothing moves, so nothing is redrawn until you press something
         if (any) demo.idle = 0;
         else { demo.idle += Math.min(dt, 0.1); if (demo.idle >= DEMO_IDLE || location.hash === '#demo') startDemo(); }
@@ -2701,7 +3022,8 @@
                fireballs: fireballs.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, wait: f.wait }; }), gem: gotGem(), cam: cam.y,
                keys: roomKeys.map(function (k) { return k.state; }), doors: doors.map(function (d) { return d.open; }),
                jets: jets.map(function (j) { var p = jetPhase(j); return { x: j.x, y: j.y, on: p.on, warn: p.warn, left: p.left }; }), lava: lava ? lava.y : null,
-               drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }) };
+               drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }),
+               foes: foes.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, state: f.state }; }), barrels: barrels.map(function (b) { return b.state; }), shots: shots.length, foeShots: foeShots.map(function (s) { return { x: s.x, y: s.y }; }) };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, pause: { on: pause.on, pick: pause.pick }, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
@@ -2741,13 +3063,15 @@
     snap: function () {
       var cp = function (a) { return a.map(function (o) { return Object.assign({}, o); }); };
       return JSON.parse(JSON.stringify({ pl: pl, run: run, fx: fx, cr: cp(crumbles), mv: cp(movers), fb: cp(fireballs), dn: cp(drones), sp: cp(springs),
-        gm: cp(gems), ky: cp(roomKeys), dr: cp(doors), rf: cp(refills), lava: lava ? Object.assign({}, lava) : null }));
+        gm: cp(gems), ky: cp(roomKeys), dr: cp(doors), rf: cp(refills), lava: lava ? Object.assign({}, lava) : null,
+        fo: cp(foes), br: cp(barrels), sh: cp(shots), fs: cp(foeShots), stop: combat.stop }));
     },
     restore: function (s) {
       var put = function (a, b) { for (var i = 0; i < a.length; i++) Object.assign(a[i], b[i]); };
       pl = JSON.parse(JSON.stringify(s.pl)); run = Object.assign({}, s.run); fx = Object.assign({}, s.fx);
       put(crumbles, s.cr); put(movers, s.mv); put(fireballs, s.fb); put(drones, s.dn); put(springs, s.sp);
       put(gems, s.gm); put(roomKeys, s.ky); put(doors, s.dr); put(refills, s.rf); if (lava && s.lava) Object.assign(lava, s.lava);
+      if (s.fo) { put(foes, s.fo); put(barrels, s.br); shots = s.sh.map(function (o) { return Object.assign({}, o); }); foeShots = s.fs.map(function (o) { return Object.assign({}, o); }); combat.stop = s.stop; }
     },
     demoRun: function (n) { startDemo(); demo.room = starters[0]; demo.rec = null; resetRun(); for (var i = 0; i < n && !run.won; i++) step(demoInput()); return { steps: i, won: run.won, deaths: run.deaths, stage: demo.stage }; }
   };

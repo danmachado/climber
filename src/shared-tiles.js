@@ -816,6 +816,17 @@
     b.fillStyle = '#ff4fa3'; b.fillRect(x + 4, y + 10, 2, 30);
     b.fillStyle = '#ffd6ea'; b.fillRect(x + (f ? 4 : 5), y + 10, 1, 30);
   }
+  // Barrel (any world): a squat red drum with dark rims, a lit left edge and a yellow hazard band with dark stripes.
+  // Shot, it flashes (lit) and blows up. Original pixels.
+  function drawBarrel(b, x, y, lit) {
+    b.fillStyle = '#4A1610'; b.fillRect(x + 1, y + 1, 8, 9);
+    b.fillStyle = lit ? '#FFE9B8' : '#B8352A'; b.fillRect(x + 2, y + 2, 6, 7);
+    b.fillStyle = lit ? '#FFFFFF' : '#E0614A'; b.fillRect(x + 2, y + 2, 1, 7);
+    b.fillStyle = '#6E2016'; b.fillRect(x + 1, y + 1, 8, 1); b.fillRect(x + 1, y + 9, 8, 1);
+    b.fillStyle = '#F2C23A'; b.fillRect(x + 2, y + 4, 6, 2);
+    b.fillStyle = '#2A1A10'; b.fillRect(x + 3, y + 4, 1, 1); b.fillRect(x + 5, y + 5, 1, 1); b.fillRect(x + 7, y + 4, 1, 1);
+    b.fillStyle = '#8A2A1E'; b.fillRect(x + 4, y + 0, 2, 1);
+  }
   // Lava: a tile for the builder and the static layer, and the rising body the game draws over everything below the surface.
   function drawLava(b, x, y, surface) {
     b.fillStyle = '#c2401c'; b.fillRect(x, y, 10, 10);
