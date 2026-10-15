@@ -1031,8 +1031,8 @@
     var shown = Math.round(cam.y * view.scale) / (window.devicePixelRatio || 1);
     if (shown !== cam.shown) { cam.shown = shown; world.style.transform = 'translateY(' + (-shown) + 'px)'; }
   }
-  var TOP_H = 26, BOT_H = 0; // HUD strips, in game pixels. The top bar is 14 deep at the sides and 24 in the middle (HB), the rest is transparent.
-  var HB = { side: 14, deep: 24, cl: 92, cr: 178, ch: 8 };   // the top bar's outline: the middle panel runs cl to cr and drops to deep with ch-wide chamfers
+  var TOP_H = 30, BOT_H = 0; // HUD strips, in game pixels. The top bar is 17 deep at the sides and 28 in the middle (HB), the rest is transparent.
+  var HB = { side: 17, deep: 28, cl: 92, cr: 178, ch: 8 };   // the top bar's outline: the middle panel runs cl to cr and drops to deep with ch-wide chamfers
   var hudTop = makeCanvas(1, 1, true), hudBot = makeCanvas(1, 1, true), hudMid = makeCanvas(1, 1, true);
   var tctx = hudTop.getContext('2d'), bctx = hudBot.getContext('2d'), mctx = hudMid.getContext('2d');
   function mark(x, y, w, hh) { dirtyNow.push([x, y, w, hh]); }
@@ -1814,23 +1814,26 @@
     hudPoly(u, [[0, S - 0.5], [L0 - K, S - 0.5], [L0, D - 0.5], [R0, D - 0.5], [R0 + K, S - 0.5], [LW, S - 0.5]], null, EDGE, 1);
     hudPoly(u, [[L0 + 2, D + 0.6], [R0 - 2, D + 0.6]], null, th.accent, 1.2);
     hudPoly(u, [[L0 - K + 1, S + 0.6], [L0 + 1.5, D + 0.6]], null, th.accentLo, 0.8); hudPoly(u, [[R0 + K - 1, S + 0.6], [R0 - 1.5, D + 0.6]], null, th.accentLo, 0.8);
-    if (check === 1) { t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS' + (city ? (cityOn ? '  CITY ' + Math.max(0, fps.city) : '  CITY OFF') : ''), 135, 9, 7, C.flame, 'center'); return; }
+    if (check === 1) { t(fps.secs < 2 ? 'measuring' : fps.now + ' FPS  LOW ' + fps.low + '  GAME ' + fps.ms + ' MS' + (city ? (cityOn ? '  CITY ' + Math.max(0, fps.city) : '  CITY OFF') : ''), 135, 10.5, 7, C.flame, 'center'); return; }
 
-    // left: the stamina capsule. Ten cells, amber while a dash is affordable, red when not; ticks mark the dash cost.
+    // Every item on the top row sits in one band, y 3 to 14: boxes are 11 tall, text 7 tall at y 5, so the space above
+    // the row and below it to the pale edge (at S) is the same, and the room name is centred in the middle panel below.
+    // left: a bolt and the stamina capsule. Ten cells, amber while a dash is affordable, red when not; a tick marks the dash cost.
     var segs = Math.max(0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001)), canDash = pl.stamina >= P.dashCost, wob = shaky() ? Math.floor(tick / 6) % 2 : -1;
-    hudRound(u, 3, 2.5, 58, 9, 4.5, EDGE); hudRound(u, 4, 3.5, 56, 7, 3.5, '#05070e');
-    for (i = 0; i < 10; i++) hudBox(u, 7 + i * 5, 5 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 4, i < segs ? (canDash ? C.flame : C.hurt) : '#1a2140');
-    for (i = 0; i < 10 && i < segs; i++) hudBox(u, 7 + i * 5, 5 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 1, canDash ? '#ffe2a8' : '#ffc4b8');   // a lit top edge on each cell
-    var nx = 6.5 + P.dashCost / P.stamina * 50;
-    hudBox(u, nx, 1, 1, 2, EDGE); hudBox(u, nx, 11.5, 1, 1.5, EDGE);
-    // the level tag, a key cap
-    var tag = testMode ? 'TEST' : demo.on ? 'DEMO' : mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : String(run.count), tw = tag.length * 6 + 5, tx = 64;
-    hudRound(u, tx, 2.5, tw, 9, 1.5, EDGE); hudRound(u, tx + 1, 3.5, tw - 2, 7, 1, '#1a2140'); hudBox(u, tx + 1, 3.5, tw - 2, 1, '#4a5a9e');
-    pxText(tag, tx + 3, 4, 1, th.accent, 'left');
+    var mc = canDash ? C.flame : C.hurt, bolt = [[3, 0, 2], [2, 1, 2], [1, 2, 2], [0, 3, 5], [2, 4, 2], [1, 5, 2], [0, 6, 2]];
+    for (i = 0; i < bolt.length; i++) hudBox(u, 3 + bolt[i][0], 5 + bolt[i][1], bolt[i][2], 1, mc);
+    hudRound(u, 10, 3, 56, 11, 5.5, EDGE); hudRound(u, 11, 4, 54, 9, 4.5, '#05070e');
+    for (i = 0; i < 10; i++) hudBox(u, 13 + i * 5, 6 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 5, i < segs ? mc : '#1a2140');
+    for (i = 0; i < 10 && i < segs; i++) hudBox(u, 13 + i * 5, 6 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 1, canDash ? '#ffe2a8' : '#ffc4b8');   // a lit top edge on each cell
+    hudBox(u, 12.5 + P.dashCost / P.stamina * 50, 1, 1, 2, EDGE);
+    // the level tag, a key cap: a lighter top border, the number inside with a pixel of room all round
+    var tag = testMode ? 'TEST' : demo.on ? 'DEMO' : mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : String(run.count), tw = tag.length * 6 + 5, tx = 69;
+    hudRound(u, tx, 3, tw, 11, 1.5, EDGE); hudRound(u, tx + 1, 4, tw - 2, 9, 1, '#1a2140');
+    pxText(tag, tx + 3, 5, 1, th.accent, 'left');
 
     // middle: hourglass and par bar, the room name under it
     var par = mode === 'map' && !testMode && !demo.on ? parOf(room) : 0, late = par && run.time > par, cs = clock(run.time);
-    var hgc = late ? C.hurt : th.accent, hx = L0 + 5, hy = 3;
+    var hgc = late ? C.hurt : th.accent, hx = L0 + 9, hy = 4;
     hudBox(u, hx, hy, 7, 1, hgc); hudBox(u, hx, hy + 8, 7, 1, hgc);                                       // an hourglass: caps, glass, sand
     hudPoly(u, [[hx + 1, hy + 1], [hx + 6, hy + 1], [hx + 3.5, hy + 4.5], [hx + 6, hy + 8], [hx + 1, hy + 8], [hx + 3.5, hy + 4.5]], null, EDGE, 0.8);
     var sand = par ? Math.max(0, Math.min(1, 1 - run.time / par)) : 0.5;
@@ -1838,31 +1841,31 @@
     hudPoly(u, [[hx + 1.8, hy + 7.6], [hx + 5.2, hy + 7.6], [hx + 3.5, hy + 7.6 - (1 - sand) * 2.6]], hgc);
     var bx = hx + 10, bw = R0 - 4 - bx;
     if (par) {
-      hudBox(u, bx, 4, bw, 7, '#3a4677'); hudBox(u, bx + 1, 5, bw - 2, 5, '#05070e');
+      hudBox(u, bx, 5, bw, 7, '#3a4677'); hudBox(u, bx + 1, 6, bw - 2, 5, '#05070e');
       var fw = Math.round((bw - 2) * sand);
       if (fw > 0) {
         var g = h.createLinearGradient((bx + 1) * u, 0, (bx + bw - 1) * u, 0); g.addColorStop(0, C.teal); g.addColorStop(1, th.accent);
-        h.fillStyle = g; h.fillRect(Math.round((bx + 1) * u), Math.round(5 * u), Math.round(fw * u), Math.round(5 * u));
-        hudBox(u, bx + 1, 5, fw, 1, 'rgba(255,255,255,0.35)');
+        h.fillStyle = g; h.fillRect(Math.round((bx + 1) * u), Math.round(6 * u), Math.round(fw * u), Math.round(5 * u));
+        hudBox(u, bx + 1, 6, fw, 1, 'rgba(255,255,255,0.35)');
       }
-    } else pxText(cs, bx + bw / 2, 4, 1, C.text, 'center');
+    } else pxText(cs, bx + bw / 2, 5, 1, C.text, 'center');
     var nm = demo.on ? 'ANY BUTTON TO PLAY' : hudClean(room.name), maxN = Math.floor((R0 - L0 - 6) / 6);
     if (nm.length > maxN) nm = nm.substring(0, maxN - 1).replace(/ +$/, '') + '.';
-    pxText(nm, 135, 14.5, 1, demo.on ? th.accent : C.text, 'center');
+    pxText(nm, 135, 17.5, 1, demo.on ? th.accent : C.text, 'center');
 
     // right: clock, falls, then the stars you would earn if you finished now
     var rx = 266;
-    if (par) { pxText(cs, rx, 4, 1, late ? C.hurt : C.text, 'right'); rx -= cs.length * 6 - 1 + 7; }
+    if (par) { pxText(cs, rx, 5, 1, late ? C.hurt : C.text, 'right'); rx -= cs.length * 6 - 1 + 7; }
     var fs = String(run.deaths);
-    pxText(fs, rx, 4, 1, par && run.deaths > STAR_FALLS ? C.hurt : C.text, 'right'); rx -= fs.length * 6 - 1 + 7;
-    hudBox(u, rx + 2, 3.5, 1, 5, C.dim); hudBox(u, rx, 6.5, 1, 1, C.dim); hudBox(u, rx + 4, 6.5, 1, 1, C.dim); hudBox(u, rx + 1, 7.5, 3, 1, C.dim); hudBox(u, rx + 2, 8.5, 1, 2, C.dim);   // a falls mark: an arrow down
+    pxText(fs, rx, 5, 1, par && run.deaths > STAR_FALLS ? C.hurt : C.text, 'right'); rx -= fs.length * 6 - 1 + 7;
+    hudBox(u, rx + 2, 5, 1, 4, C.dim); hudBox(u, rx, 8, 1, 1, C.dim); hudBox(u, rx + 4, 8, 1, 1, C.dim); hudBox(u, rx + 1, 9, 3, 1, C.dim); hudBox(u, rx + 2, 10, 1, 2, C.dim);   // a falls mark: an arrow down
     if (!par) return;
     var on = [true, run.deaths <= STAR_FALLS, run.time <= par];
     if (gems.length) on.push(gotGem());
-    var sx = Math.max(R0 + K + 2, rx - 7 - on.length * 9);
+    var sx = Math.max(R0 + K, rx - 4 - on.length * 8.5);
     for (i = 0; i < on.length; i++) {
       var gemStar = i === 3, col = gemStar ? (on[i] ? C.teal : C.tealDim) : (on[i] ? th.accent : '#3a4677');
-      pxStar(sx + i * 9, 3, 0.62, col, on[i] ? col : null);
+      pxStar(sx + i * 8.5, 4.5, 0.62, col, on[i] ? col : null);
     }
   }
   function drawHud() {
