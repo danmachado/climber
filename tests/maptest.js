@@ -31,11 +31,12 @@ const { chromium } = require('playwright');
   // mouse: click MAP, then click level 1-2 twice
   const st = await p.locator('#stage').boundingBox(), at = (x, y) => p.mouse.click(st.x + x / 270 * st.width, st.y + y / 480 * st.height);
   await at(135, 224); await p.waitForTimeout(150); await at(135, 224); await p.waitForTimeout(150); v = await V(); console.log('click MAP ->', v.scene);
-  await at(135, 392); await p.waitForTimeout(100); await at(135, 392); await p.waitForTimeout(200); v = await V(); console.log('click 1-2 twice ->', v.scene, v.room);
+  const t2 = await p.evaluate(() => window.__climber.mapTile(1));
+  await at(t2.x, t2.y); await p.waitForTimeout(100); await at(t2.x, t2.y); await p.waitForTimeout(200); v = await V(); console.log('click 1-2 twice ->', v.scene, v.room);
   // world 2 with everything unlocked
   await p.goto('file:///home/claude/climber/index.html#unlock'); await p.reload(); await p.waitForTimeout(300);
   await p.evaluate(() => { const G = window.__climber; G.nav({ jump: true }); G.nav({ x: -1 }); G.nav({ x: -1 }); });
-  v = await p.evaluate(() => window.__climber.nav({ x: 1 })); v = await p.evaluate(() => window.__climber.nav({ x: 1 })); v = await p.evaluate(() => window.__climber.nav({ x: 1 }));
+  for (let k = 0; k < 4; k++) v = await p.evaluate(() => window.__climber.nav({ x: 1 }));   // four tiles to a row: the fourth step runs off the side into world 2
   console.log('world switch sel', JSON.stringify(v.sel)); await shot('map-5-world2');
   await p.evaluate(() => window.__climber.startLevel(1, 4)); await p.waitForTimeout(700); await shot('map-6-ice');
   console.log('errors', JSON.stringify(errs));
