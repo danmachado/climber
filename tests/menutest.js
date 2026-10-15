@@ -23,7 +23,8 @@ const { chromium } = require('playwright');
   const st = await p.locator('#stage').boundingBox(), at = (x, y) => p.mouse.click(st.x + x / 270 * st.width, st.y + y / 480 * st.height);
   await at(85, 344); await p.waitForTimeout(150); await at(85, 344); await p.waitForTimeout(200);
   v = await p.evaluate(() => window.__climber.view()); ok(v.scene === 'settings', 'clicking the gear opens settings');
-  await nav({ back: true }); await at(135, 280); await p.waitForTimeout(800); v = await p.evaluate(() => window.__climber.view());
+  await nav({ back: true }); await p.waitForTimeout(150);   // let the menu redraw first: clicks hit what is on screen
+  await at(135, 280); await p.waitForTimeout(600); v = await p.evaluate(() => window.__climber.view());
   ok(v.scene === 'play' && v.mode === 'endless', 'clicking ENDLESS starts endless');
   console.log('errors', JSON.stringify(errs)); console.log(fails ? fails + ' FAILED' : 'ALL PASS'); await b.close();
 })();
