@@ -28,6 +28,7 @@ const { chromium } = require('playwright');
   // menu: down twice to SETTINGS, select with the bottom button
   await press(A(1, 1), A(1, 0), 200); await press(A(1, 1), A(1, 0), 200); await tap(1, 200); await p.waitForTimeout(250);
   let v = await V(); console.log('settings opened:', v.scene);
+  await tap(1, 250); await p.waitForTimeout(250); v = await V(); console.log('controls page opened:', v.set.page);   // the list starts on CONTROLS
   await p.evaluate(B(3, true)); await p.waitForTimeout(200); await p.screenshot({ path: __dirname + '/pad-2-settings.png' }); await p.evaluate(B(3, false));
   // CHANGE DASH (row 1) -> press the top button
   await press(A(1, 1), A(1, 0), 250); await tap(1, 250); await p.waitForTimeout(300); await p.screenshot({ path: __dirname + '/pad-3-listen.png' });

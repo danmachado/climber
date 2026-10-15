@@ -1384,7 +1384,7 @@
     tick++; applyShake();
     if (scene === 'play') applyCam();
     if (scene !== 'play') {
-      var ssig = [scene, hero.ready, menuNote, set.row, weather.on, shakeOn, cityOn, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
+      var ssig = [scene, hero.ready, menuNote, set.page, set.row, weather.on, shakeOn, cityOn, set.mode, set.action, set.note, set.lit, padVer, (firstPad() || {}).id, hud.width, sel.menu, sel.w, sel.i, dataVer, usedPad, check, fps.now, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : ''].join('|');
       if (ssig !== lastSig) { lastSig = ssig; drawScreen(); blitHud(); }
       drawWeather();
       return;
@@ -1878,7 +1878,7 @@
   var hits = [], navPrev = { x: 0, y: 0, jump: false, dash: false, back: false };
   var MENU = [['MAP', 'Climb through the worlds, level by level', function () { sel.w = Math.min(sel.w, levels.length - 1); toMap(); }],
               ['ENDLESS', 'Every level you have unlocked, shuffled', startEndless],
-              ['SETTINGS', 'Controller buttons', function () { scene = 'settings'; set.row = 0; set.mode = 'idle'; lastSig = ''; }],
+              ['SETTINGS', 'Controls and graphics', openSettings],
               ['RELOAD', 'Fetch the newest version of the game', reloadGame],
               ['EXIT', 'Close the game', exitGame]];
   var menuNote = '';
@@ -1899,21 +1899,43 @@
     }, 300);
   }
 
-  // ---- settings: the controller picture, what each button does, and changing it ----
-  var set = { row: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
-  var SET_ROWS = [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['speed', 'SPEED READOUT'], ['fx', 'PARTICLES'], ['shake', 'SHAKE'], ['city', 'CITY LIFE'], ['back', 'BACK']];
+  // ---- settings: a list of categories, each opening its own page ----
+  // SETTINGS -> CONTROLS (the controller picture, what each button does, and changing it) or GRAPHICS (effect switches
+  // and the speed readout). Back from a page returns to the list, back from the list returns to the menu.
+  var set = { page: 'top', row: 0, topRow: 0, mode: 'idle', action: '', armed: false, quiet: 0, wait: 0, note: '', lit: '' };
+  var SET_PAGES = {
+    top: { title: 'SETTINGS', rows: [['controls', 'CONTROLS', 'BUTTONS AND CONTROLLER SETUP'], ['graphics', 'GRAPHICS', 'EFFECTS AND THE SPEED READOUT'], ['back', 'BACK', 'BACK TO THE MENU']] },
+    controls: { title: 'CONTROLS', rows: [['jump', 'CHANGE JUMP'], ['dash', 'CHANGE DASH'], ['grab', 'CHANGE GRAB'], ['redo', 'REDO SETUP'], ['reset', 'RESET BUTTONS'], ['back', 'BACK']] },
+    graphics: { title: 'GRAPHICS', rows: [['fx', 'PARTICLES', 'WEATHER DRAWN OVER THE ROOM'], ['shake', 'SHAKE', 'A SMALL KICK ON HARD LANDINGS AND HITS'], ['city', 'CITY LIFE', 'WINDOWS TRAFFIC AND STEAM IN NEON ROW'],
+                                 ['speed', 'SPEED READOUT', 'FPS IN THE TOP BAR WHILE PLAYING'], ['back', 'BACK', 'BACK TO SETTINGS']] }
+  };
+  function setRows() { return SET_PAGES[set.page].rows; }
+  function openSettings() { scene = 'settings'; set.page = 'top'; set.row = 0; set.topRow = 0; set.mode = 'idle'; set.note = ''; lastSig = ''; }
+  function setBack() {                             // one level up: a page goes back to the list, the list to the menu
+    set.note = ''; set.mode = 'idle'; lastSig = '';
+    if (set.page === 'top') { toMenu(); return; }
+    set.page = 'top'; set.row = set.topRow;
+  }
+  function setValue(id) {                          // the ON / OFF shown next to a switch, or '' for a plain row
+    if (id === 'fx') return weather.on ? 'ON' : 'OFF';
+    if (id === 'shake') return shakeOn ? 'ON' : 'OFF';
+    if (id === 'city') return cityOn ? 'ON' : 'OFF';
+    if (id === 'speed') return check === 1 ? 'ON' : 'OFF';
+    return '';
+  }
   function ownCfg(gp) {                            // a saved, editable copy of this pad's settings
     if (!padCfg[gp.id]) { var c = cfgFor(gp); if (!c) return null; padCfg[gp.id] = { layout: c.layout, act: JSON.parse(JSON.stringify(c.act)) }; }
     return padCfg[gp.id];
   }
   function setPick(k) {
-    var id = SET_ROWS[k][0], gp = firstPad();
+    var id = setRows()[k][0], gp = firstPad();
     set.row = k; set.note = ''; lastSig = '';
-    if (id === 'back') { toMenu(); return; }
+    if (id === 'back') { setBack(); return; }
+    if (set.page === 'top') { set.topRow = k; set.page = id; set.row = 0; return; }
     if (id === 'shake') { setShake(!shakeOn); set.note = shakeOn ? 'SCREEN SHAKE ON' : 'SCREEN SHAKE OFF. CHECK THE SPEED READOUT.'; return; }
-    if (id === 'city') { setCity(!cityOn); set.note = cityOn ? 'CITY LIFE ON (NEON ROW). CHECK THE SPEED READOUT.' : 'CITY LIFE OFF. THE CITY STANDS STILL.'; return; }
+    if (id === 'city') { setCity(!cityOn); set.note = cityOn ? 'CITY LIFE ON. CHECK THE SPEED READOUT.' : 'CITY LIFE OFF. THE CITY STANDS STILL.'; return; }
     if (id === 'fx') { setWeather(!weather.on); set.note = weather.on ? 'PARTICLES ON. CHECK THE SPEED READOUT.' : 'PARTICLES OFF'; return; }
-    if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON. IT SHOWS IN THE TOP BAR WHILE PLAYING.' : 'SPEED READOUT OFF'; return; }
+    if (id === 'speed') { check = check === 1 ? 0 : 1; set.note = check ? 'SPEED READOUT ON' : 'SPEED READOUT OFF'; return; }
     if (!gp) { set.note = 'NO CONTROLLER SEEN. PRESS A BUTTON ON IT.'; return; }
     if (id === 'redo' || !cfgFor(gp)) { startWiz(gp); return; }
     if (id === 'reset') { ownCfg(gp).act = JSON.parse(JSON.stringify(DEF_ACT)); savePads(); set.note = 'BUTTONS RESET'; return; }
@@ -1992,32 +2014,50 @@
   }
   function drawSettings(u) {
     function box(x, y, w, hh, color) { h.fillStyle = color; h.fillRect(Math.round(x * u), Math.round(y * u), Math.round(w * u), Math.round(hh * u)); }
-    var gp = firstPad(), c = gp ? cfgFor(gp) : null, lit = {}, labels = {}, i, n, focus = set.mode === 'listen' ? set.action : SET_ROWS[set.row][0];
-    var NAME = { jump: 'JUMP', dash: 'DASH', grab: 'GRAB' }, down = set.lit ? set.lit.split(',') : [];
+    var pg = SET_PAGES[set.page], rows = pg.rows, INK = '#101426', i, y, on, id;
     box(0, 0, LW, LH, THEMES.brick.bg);
-    pxText('SETTINGS', 135, 34, 3, C.flame, 'center');
-    pxText(gp ? gp.id.toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 40) : 'NO CONTROLLER SEEN', 135, 66, 1, C.dim, 'center');
-    if (c) {
-      for (i = 0; i < ASSIGNABLE.length; i++) { n = ASSIGNABLE[i]; if (c.act[n]) { labels[n] = NAME[c.act[n]]; if (c.act[n] === focus) lit[n] = C.flame; } }
-      labels.left = 'MOVE'; labels.start = 'BACK';
-      for (i = 0; i < down.length; i++) lit[down[i]] = C.teal;        // whatever you are holding lights up, so you can check the layout
+    if (set.page !== 'top') pxText('SETTINGS', 135, 16, 1, C.dim, 'center');                 // where you are: SETTINGS above the page name
+    pxText(pg.title, 135, 34, 3, C.flame, 'center');
+    function row(k, x, y, w, hh, label, value) {
+      var on = k === set.row;
+      box(x, y, w, hh, on ? C.flame : '#131a33');
+      if (value) { pxText(label, x + 8, y + (hh - 14) / 2, 2, on ? INK : C.dim, 'left'); pxText(value, x + w - 8, y + (hh - 14) / 2, 2, on ? INK : (value === 'ON' ? C.teal : C.dim), 'right'); }
+      else pxText(label, x + w / 2, y + (hh - 14) / 2, 2, on ? INK : C.dim, 'center');
+      hits.push({ x: x, y: y, w: w, h: hh, fn: (function (kk) { return function () { setPick(kk); }; })(k) });
     }
-    drawPad(u, 170, lit, c ? labels : null);
-    if (gp && !c) pxText('THIS CONTROLLER NEEDS SETTING UP FIRST', 135, 240, 1, C.text, 'center');
-    if (set.mode === 'listen') {
-      box(25, 262, 220, 60, C.flame);
-      pxText('PRESS THE BUTTON FOR', 135, 274, 1, '#101426', 'center'); pxText(NAME[set.action], 135, 290, 3, '#101426', 'center');
-      pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
+    if (set.page === 'top') {
+      for (i = 0; i < rows.length; i++) {
+        y = 150 + i * 44 + (rows[i][0] === 'back' ? 16 : 0);                                   // a gap before BACK
+        row(i, 45, y, 180, 30, rows[i][1], '');
+      }
+      pxText(rows[set.row][2], 135, 316, 1, C.text, 'center');
+    } else if (set.page === 'graphics') {
+      for (i = 0; i < rows.length; i++) {
+        y = 110 + i * 32 + (rows[i][0] === 'back' ? 16 : 0);
+        row(i, 25, y, 220, 24, rows[i][1], setValue(rows[i][0]));
+      }
+      pxText(rows[set.row][2], 135, 300, 1, C.text, 'center');
     } else {
-      for (i = 0; i < SET_ROWS.length; i++) {
-        var y = 234 + i * 21, on = i === set.row, id = SET_ROWS[i][0];
-        box(55, y, 160, 19, on ? C.flame : '#131a33');
-        pxText(id === 'fx' ? 'PARTICLES ' + (weather.on ? 'ON' : 'OFF') : id === 'shake' ? 'SHAKE ' + (shakeOn ? 'ON' : 'OFF') : id === 'city' ? 'CITY LIFE ' + (cityOn ? 'ON' : 'OFF') : SET_ROWS[i][1], 135, y + 4, 2, on ? '#101426' : C.dim, 'center');
-        hits.push({ x: 55, y: y, w: 160, h: 19, fn: (function (k) { return function () { setPick(k); }; })(i) });
+      var gp = firstPad(), c = gp ? cfgFor(gp) : null, lit = {}, labels = {}, n, focus = set.mode === 'listen' ? set.action : rows[set.row][0];
+      var NAME = { jump: 'JUMP', dash: 'DASH', grab: 'GRAB' }, down = set.lit ? set.lit.split(',') : [];
+      pxText(gp ? gp.id.toUpperCase().replace(/[^A-Z0-9 .:\/-]/g, '').substring(0, 40) : 'NO CONTROLLER SEEN', 135, 66, 1, C.dim, 'center');
+      if (c) {
+        for (i = 0; i < ASSIGNABLE.length; i++) { n = ASSIGNABLE[i]; if (c.act[n]) { labels[n] = NAME[c.act[n]]; if (c.act[n] === focus) lit[n] = C.flame; } }
+        labels.left = 'MOVE'; labels.start = 'BACK';
+        for (i = 0; i < down.length; i++) lit[down[i]] = C.teal;        // whatever you are holding lights up, so you can check the layout
+      }
+      drawPad(u, 170, lit, c ? labels : null);
+      if (gp && !c) pxText('THIS CONTROLLER NEEDS SETTING UP FIRST', 135, 240, 1, C.text, 'center');
+      if (set.mode === 'listen') {
+        box(25, 262, 220, 60, C.flame);
+        pxText('PRESS THE BUTTON FOR', 135, 274, 1, INK, 'center'); pxText(NAME[set.action], 135, 290, 3, INK, 'center');
+        pxText('CLICK THE MOUSE TO CANCEL', 135, 336, 1, C.dim, 'center');
+      } else {
+        for (i = 0; i < rows.length; i++) row(i, 55, 250 + i * 23 + (rows[i][0] === 'back' ? 8 : 0), 160, 20, rows[i][1], '');
       }
     }
-    if (set.note) pxText(set.note, 135, 450, 1, C.teal, 'center');
-    pxText(usedPad ? 'UP AND DOWN CHOOSE - JUMP SELECTS' : 'ARROWS CHOOSE - C SELECTS - OR CLICK', 135, 464, 1, C.dim, 'center');
+    if (set.note) pxText(set.note, 135, 440, 1, C.teal, 'center');
+    pxText(usedPad ? 'UP/DOWN CHOOSE - JUMP PICKS - DASH BACK' : 'ARROWS CHOOSE - C PICKS - X OR ESC BACK', 135, 464, 1, C.dim, 'center');
   }
   function nodePos(k) { var row = Math.floor(k / 3), p = k % 3; return { x: 55 + (row % 2 ? 2 - p : p) * 80, y: 392 - row * 76, row: row }; }
   function screenInput(inp) {
@@ -2025,8 +2065,9 @@
     var go = inp.jump && !p.jump, cancel = (inp.dash && !p.dash) || (inp.back && !p.back);
     navPrev = inp;
     if (scene === 'settings') {
-      if (dy) { set.row = (set.row + dy + SET_ROWS.length) % SET_ROWS.length; set.note = ''; }
-      if (cancel) toMenu(); else if (go) setPick(set.row);
+      var nr = setRows().length;
+      if (dy) { set.row = (set.row + dy + nr) % nr; set.note = ''; }
+      if (cancel) setBack(); else if (go) setPick(set.row);
       return;
     }
     if (scene === 'menu') {
@@ -2207,7 +2248,7 @@
                drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }) };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
-    view: function () { return { scene: scene, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
+    view: function () { return { scene: scene, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     weather: function (on) { setWeather(on); return weather.on; },
     city: function (on) { if (on === 'ship') { if (city) city.nextShip = ct; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick, ms: fps.ms, fps: fps.now }; },
     nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
