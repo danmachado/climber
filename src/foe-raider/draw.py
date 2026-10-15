@@ -48,6 +48,8 @@ def walk(k):
     try: return H.run_frame(k, True)
     finally: H.HEAD['normal'] = keep
 
+import heavy as HV                                                 # the heavy: drawn full size in heavy.py
+
 ANIMS = [
     ('idle', 4, True, [stand(0), stand(0), stand(1), stand(1), stand(0), stand(2)]),
     ('walk', 9, True, [walk(k) for k in range(8)]),
@@ -55,32 +57,45 @@ ANIMS = [
 ]
 
 def hexrgb(h): h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
-def strip(frames):
+def strip(frames, pal=None):
+    pal = pal or C
     im = Image.new('RGBA', (16 * len(frames), 16), (0, 0, 0, 0))
     for i, fr in enumerate(frames):
         for y in range(16):
             for x in range(16):
-                if fr[y][x] != '.': im.putpixel((i * 16 + x, y), hexrgb(C[fr[y][x]]))
+                if fr[y][x] != '.': im.putpixel((i * 16 + x, y), hexrgb(pal[fr[y][x]]))
     return im
 
 if __name__ == '__main__':
     os.chdir(HERE)
     atlas = Image.new('RGBA', (16 * max(len(a[3]) for a in ANIMS), 16 * len(ANIMS)), (0, 0, 0, 0)); meta = {}
-    for i, (name, fps, loop, frames) in enumerate(ANIMS):
-        im = strip(frames); im.save('raider-%s.png' % name); atlas.paste(im, (0, i * 16))
+    for i, a in enumerate(ANIMS):
+        name, fps, loop, frames = a[:4]; pal = a[4] if len(a) > 4 else C
+        im = strip(frames, pal); im.save('raider-%s.png' % name); atlas.paste(im, (0, i * 16))
         muz = []
         for fr in frames:
             gs = [(x, y) for y in range(16) for x in range(16) if fr[y][x] in 'gGa']
             mx = max(x for x, y in gs); muz.append([mx, [y for x, y in gs if x == mx][0]])
         meta[name] = {'row': i, 'n': len(frames), 'fps': fps, 'loop': loop, 'muzzles': muz}
     buf = io.BytesIO(); atlas.save(buf, 'PNG', optimize=True)
+    hatlas = Image.new('RGBA', (HV.W * max(len(a[3]) for a in HV.ANIMS), HV.H * len(HV.ANIMS)), (0, 0, 0, 0)); hmeta = {}
+    for i, (name, fps, loop, frames, muz) in enumerate(HV.ANIMS):
+        for k, fr in enumerate(frames):
+            for y in range(HV.H):
+                for x in range(HV.W):
+                    if fr[y][x] != '.': hatlas.putpixel((k * HV.W + x, i * HV.H + y), hexrgb(HV.PAL[fr[y][x]]))
+        hmeta[name] = {'row': i, 'n': len(frames), 'fps': fps, 'loop': loop, 'muzzles': muz}
+    hatlas.save('heavy-sheet.png'); hbuf = io.BytesIO(); hatlas.save(hbuf, 'PNG', optimize=True)
     cfg = {'frame': 16, 'anims': meta, 'gibs': [C['m'], C['M'], C['H'], C['h'], C['Q'], C['p'], C['g'], C['l']],
-           'src': 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()}
+           'heavyGibs': HV.GIBS,
+           'src': 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode(),
+           'heavy': {'w': HV.W, 'h': HV.H, 'cx': HV.CX, 'anims': hmeta, 'src': 'data:image/png;base64,' + base64.b64encode(hbuf.getvalue()).decode()}}
     open(os.path.join(HERE, '..', 'shared-foes.js'), 'w').write(
         '  // ---- bad guys: the raider sheet, 16 x 16 frames facing right (drawn by src/foe-raider/draw.py, original art) ----\n'
         '  var FOES = ' + json.dumps(cfg) + ';\n')
     Z = 8; sheet = Image.new('RGB', (16 * Z * 8 + 80, len(ANIMS) * (16 * Z + 12) + 10), (70, 80, 110)); d = ImageDraw.Draw(sheet)
-    for r, (name, fps, loop, frames) in enumerate(ANIMS):
+    for r, a in enumerate(ANIMS):
+        name, fps, loop, frames = a[:4]
         y0 = 6 + r * (16 * Z + 12); d.text((4, y0), name, fill=(255, 220, 120))
-        big = strip(frames).resize((16 * Z * len(frames), 16 * Z), Image.NEAREST); sheet.paste(big, (76, y0), big)
-    sheet.save('sheet.png'); print('raider written:', ', '.join(a[0] for a in ANIMS))
+        big = strip(frames, a[4] if len(a) > 4 else C).resize((16 * Z * len(frames), 16 * Z), Image.NEAREST); sheet.paste(big, (76, y0), big)
+    sheet.save('sheet.png'); print('raider written:', ', '.join(a[0] for a in ANIMS), '| heavy:', ', '.join(hmeta))

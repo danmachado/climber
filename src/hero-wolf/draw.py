@@ -372,6 +372,15 @@ FALL_AIM = [
          far_arm=[(4, 9), (2, 8), (2, 6)], near_arm=AIM(9), gun=True),
 ]
 
+# On a wall, shooting: the hero hangs with his back to the wall (the wall is to the LEFT here, columns 0 to 3), the far
+# hand reaching up behind to grip it at column 4, boots braced against it, and the near arm holds the blaster out
+# away from the wall. The game draws this facing away from the wall while SHOOT is used on a climb.
+def wall_aim(k):
+    return pose(hip=12, tx=3, torso='mid' if k == 0 else 'tall', hdx=0,
+                far_arm=[(5, 9 - k), (3, 7 - k), (3, 4 - k)], near_arm=AIM(9 - k), gun=True,
+                far_leg=[(5, 13), (4, 14)], far_boot=(3, 15, 'toe', -1), near_leg=[(8, 13), (9, 14)], near_boot=(9, 15))
+WALL_AIM = [wall_aim(0), wall_aim(1)]
+
 def LG(row, s): return (row, G(s))
 RUN_LEGS = [   # per phase: hip (belt) row, lead leg, trail leg
     (12, LG(13, """
@@ -489,6 +498,7 @@ ANIMS = [
     ('run_aim', 14, True, [run_frame(k, True) for k in range(8)]),
     ('jump_up_aim', 12, False, JUMP_AIM),
     ('fall_aim', 8, 1, FALL_AIM),
+    ('wall_aim', 3, True, WALL_AIM),
 ]
 
 def hexrgb(h): h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)

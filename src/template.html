@@ -48,7 +48,10 @@
     // then fires slow shots you can jump. One hit kills either of you. A shot barrel blows up and takes raiders with it.
     shotRate: 0.13, shotSpeed: 420, shotRange: 190, gunHold: 0.45, hitStop: 0.05,
     foeWalk: 16, foeWait: 0.9, foeSight: 150, foeAlert: 0.6, foeFireGap: 1.1, foeShot: 125, foeForget: 1.5, foeLevel: 6,
-    blastR: 28, barrelFuse: 0.12, barrelChain: 0.1
+    blastR: 28, barrelFuse: 0.12, barrelChain: 0.1,
+    // the heavy: the raider three times bigger. Takes heavyHP shots (a dash through him is heavyDash, a barrel heavyBlast),
+    // walks slower, and fires bursts of heavyBurst shots at hip height
+    heavyHP: 12, heavyDash: 3, heavyBlast: 8, heavyWalk: 9, heavyAlert: 0.5, heavyBurst: 3, heavyBurstGap: 0.14, heavyGap: 1.5, heavyShot: 140
   };
 
   var C = {
@@ -318,7 +321,8 @@
         else if (ch === 'J' || ch === 'L' || ch === '%') jets.push({ x: x, y: y, ph: (c * 0.55) % (P.jetOff + P.jetWarn + P.jetOn), on: false, warn: false, laser: ch === 'L', holo: ch === '%' });   // a fire jet (or a laser emitter in the Temple, a holo sign in Neon Row): fires a column on a cycle
         else if (ch === 'O') drones.push({ x: x, y: y, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, fire: 0 });   // a patrol drone: rides a track, fires straight down at each stop
         else if (ch === '~') { if (!lava) lava = { y0: y, y: y }; else lava.y0 = lava.y = Math.min(lava.y0, y); }                  // lava: everything below the top lava tile, and it rises
-        else if (ch === 'R') foes.push({ c: c, r: r, x0: x + 1, y0: y, x: x + 1, y: y, w: 8, h: 10 });                       // a raider: walks a short beat on his floor, shoots on sight
+        else if (ch === 'R') foes.push({ c: c, r: r, x0: x + 1, y0: y, x: x + 1, y: y, w: 8, h: 10, big: 0 });               // a raider: walks a short beat on his floor, shoots on sight
+        else if (ch === 'H') foes.push({ c: c, r: r, x0: x - 7, y0: y - 30, x: x - 7, y: y - 30, w: 24, h: 40, big: 1 });     // a heavy: the tile is his feet, middle column; he fills 3 tiles across and 4 up
         else if (ch === 'B') barrels.push({ x: x + 1, y: y, w: 8, h: 10, state: 'idle', t: 0 });                             // a barrel: blows up when shot
       }
     }
@@ -524,17 +528,20 @@
   // facing the more open side of his row (the side trouble can come from), so a raider by a wall looks out.
   function findFoes(t) {
     function at(c, r) { return (r >= 0 && r < rows && c >= 0 && c < cols) ? t[r].charAt(c) : '#'; }
-    function free(c, r) { var ch = at(c, r); return '#ICDvJLO%F^<>~'.indexOf(ch) < 0 && 'IC#D'.indexOf(at(c, r + 1)) >= 0; }
+    function free1(c, r) { var ch = at(c, r); return '#ICDvJLO%F^<>~E'.indexOf(ch) < 0 && 'IC#D'.indexOf(at(c, r + 1)) >= 0; }
+    function clear(c, r) { var ch = at(c, r); return '#ICDvJLO%F^<>~E'.indexOf(ch) < 0; }
     for (var i = 0; i < foes.length; i++) {
-      var f = foes[i], a = f.c, b = f.c;
+      var f = foes[i], a = f.c, b = f.c, sz = f.big ? 1 : 0;
+      var free = function (c, r) { for (var k = -sz; k <= sz; k++) { if (!free1(c + k, r)) return false; for (var u = 1; u <= 3 * sz; u++) if (!clear(c + k, r - u)) return false; } return true; };   // a heavy needs his whole body's room
       while (a > f.c - 3 && free(a - 1, f.r)) a--;
       while (b < f.c + 3 && free(b + 1, f.r)) b++;
       var L = 0, Rr = 0; while (!solidTile(f.c - L - 1, f.r)) L++; while (!solidTile(f.c + Rr + 1, f.r)) Rr++;
-      f.min = a * T + 1; f.max = b * T + 1; f.dir0 = L > Rr ? -1 : 1;
+      var off = f.x0 - f.c * T;
+      f.min = a * T + off; f.max = b * T + off; f.dir0 = L > Rr ? -1 : 1;
     }
   }
   function resetCombat() {
-    for (var i = 0; i < foes.length; i++) { var f = foes[i]; f.x = f.x0; f.y = f.y0; f.dir = f.dir0; f.state = 'patrol'; f.t = 0; f.cd = 0; f.wait = P.foeWait; f.rem = 0; f.lost = 0; f.shotT = 9; f.q = 0; f.walkT = 0; }
+    for (var i = 0; i < foes.length; i++) { var f = foes[i]; f.x = f.x0; f.y = f.y0; f.dir = f.dir0; f.state = 'patrol'; f.t = 0; f.cd = 0; f.wait = P.foeWait; f.rem = 0; f.lost = 0; f.shotT = 9; f.q = 0; f.walkT = 0; f.hp = f.big ? P.heavyHP : 1; f.burst = 0; f.hurtT = 9; f.dashHit = -1; }
     for (i = 0; i < barrels.length; i++) { barrels[i].state = 'idle'; barrels[i].t = 0; }
     shots = []; foeShots = []; combat.stop = 0;
   }
@@ -547,19 +554,28 @@
     if (Math.abs(pl.y + pl.h - f.y - f.h) > P.foeLevel || Math.abs(dx) > P.foeSight) return false;
     if ((dx > 0 ? 1 : -1) !== f.dir && Math.abs(dx) > 18) return false;
     var x0 = Math.min(pl.x + pl.w / 2, f.x + f.w / 2), x1 = Math.max(pl.x + pl.w / 2, f.x + f.w / 2);
-    return !hitTiles(Math.round(x0), f.y + 3, Math.max(1, Math.round(x1 - x0)), 1);
+    return !hitTiles(Math.round(x0), f.y + f.h - 7, Math.max(1, Math.round(x1 - x0)), 1);
   }
   function killFoe(f, dir, how) {
     if (f.state === 'dead') return;
-    f.state = 'dead'; combat.stop = P.hitStop; addShake(1.5, 0.12);
-    pushEv({ kind: 'gib', x: f.x + f.w / 2, y: f.y + 4, dir: dir, how: how || 'shot' });
+    f.state = 'dead'; combat.stop = P.hitStop * (f.big ? 2 : 1); addShake(f.big ? 3 : 1.5, f.big ? 0.25 : 0.12);
+    pushEv({ kind: 'gib', x: f.x + f.w / 2, y: f.y + (f.big ? 12 : 4), dir: dir, how: how || 'shot', big: f.big });
+  }
+  // A hit: a raider goes down; a heavy loses n and spurts blood where the shot landed, and goes down at zero. Being
+  // hit makes him turn to face it and skip straight to firing.
+  function hurtFoe(f, dir, n, how, hy) {
+    if (f.state === 'dead') return;
+    f.hp -= n;
+    if (f.hp <= 0) { killFoe(f, dir, how); return; }
+    f.hurtT = 0; pushEv({ kind: 'hurt', x: dir > 0 ? f.x + 2 : f.x + f.w - 2, y: hy, dir: dir });
+    if (f.state === 'patrol') { f.dir = -dir; f.state = 'alert'; f.t = P.heavyAlert; }
   }
   function pushEv(e) { combat.ev.push(e); if (combat.ev.length > 40) combat.ev.shift(); }   // nothing reads these while stepping headless, so keep the list short
   function blowBarrel(bl) {
     bl.state = 'gone';
     var cx = bl.x + bl.w / 2, cy = bl.y + bl.h / 2, i;
     pushEv({ kind: 'blast', x: cx, y: cy }); addShake(3, 0.25); combat.stop = P.hitStop * 1.5;
-    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead' && Math.hypot(f.x + f.w / 2 - cx, f.y + f.h / 2 - cy) < P.blastR) killFoe(f, f.x + f.w / 2 < cx ? -1 : 1, 'blast'); }
+    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead' && Math.hypot(f.x + f.w / 2 - cx, f.y + f.h / 2 - cy) < P.blastR + (f.big ? 10 : 0)) hurtFoe(f, f.x + f.w / 2 < cx ? -1 : 1, f.big ? P.heavyBlast : 1, 'blast', cy); }
     for (i = 0; i < barrels.length; i++) { var o = barrels[i]; if (o.state === 'idle' && Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy) < P.blastR) { o.state = 'lit'; o.t = P.barrelChain; } }
     if (!pl.dead && fx.mode === 'none' && Math.hypot(pl.x + pl.w / 2 - cx, pl.y + pl.h / 2 - cy) < P.blastR - 4) die();
   }
@@ -573,7 +589,7 @@
         var tip = d > 0 ? s.x + 3 : s.x;
         if (s.dist > P.shotRange || tip < 0 || tip >= LW) { gone = true; break; }
         if (solidTile(Math.floor(tip / T), Math.floor((s.y + 1) / T))) { pushEv({ kind: 'spark', x: tip - d, y: s.y + 1, dir: -d }); gone = true; break; }
-        for (j = 0; j < foes.length; j++) { var f = foes[j]; if (f.state !== 'dead' && overlap(foeBox(f), s.x, s.y, 4, 2)) { killFoe(f, d, 'shot'); gone = true; break; } }
+        for (j = 0; j < foes.length; j++) { var f = foes[j]; if (f.state !== 'dead' && overlap(foeBox(f), s.x, s.y, 4, 2)) { hurtFoe(f, d, 1, 'shot', s.y + 1); gone = true; break; } }
         for (j = 0; j < barrels.length && !gone; j++) { var bl = barrels[j]; if (bl.state === 'idle' && overlap(bl, s.x, s.y, 4, 2)) { bl.state = 'lit'; bl.t = P.barrelFuse; gone = true; } }
       }
       if (gone) shots.splice(i, 1);
@@ -583,14 +599,14 @@
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i];
       if (f.state === 'dead') continue;
-      f.shotT += dt; if (f.q > 0) f.q -= dt;
+      f.shotT += dt; f.hurtT += dt; if (f.q > 0) f.q -= dt;
       var sees = foeSees(f);
       if (sees) { f.dir = pl.x + pl.w / 2 > f.x + f.w / 2 ? 1 : -1; f.lost = 0; }
       if (f.state === 'patrol') {
-        if (sees) { f.state = 'alert'; f.t = P.foeAlert; continue; }
+        if (sees) { f.state = 'alert'; f.t = f.big ? P.heavyAlert : P.foeAlert; continue; }
         if (f.wait > 0) { f.wait -= dt; continue; }
         if (f.min === f.max) continue;
-        f.rem += P.foeWalk * dt; f.walkT += dt;
+        f.rem += (f.big ? P.heavyWalk : P.foeWalk) * dt; f.walkT += dt;
         var n = Math.floor(f.rem); f.rem -= n;
         while (n-- > 0) {
           if ((f.dir > 0 && f.x >= f.max) || (f.dir < 0 && f.x <= f.min)) { f.dir = -f.dir; f.wait = P.foeWait; f.rem = 0; break; }
@@ -603,8 +619,11 @@
         if (!sees) { f.lost += dt; if (f.lost > P.foeForget) { f.state = 'patrol'; f.wait = P.foeWait; f.q = 0.8; } continue; }
         f.cd -= dt;
         if (f.cd <= 0) {
-          f.cd = P.foeFireGap; f.shotT = 0;
-          foeShots.push({ x: f.dir > 0 ? f.x + f.w + 1 : f.x - 4, y: f.y + 3, vx: f.dir * P.foeShot, rem: 0 });
+          if (f.big) { if (f.burst <= 0) f.burst = P.heavyBurst; f.burst--; f.cd = f.burst > 0 ? P.heavyBurstGap : P.heavyGap; }   // the heavy: a burst, then a breather
+          else f.cd = P.foeFireGap;
+          f.shotT = 0;
+          var reach = f.big ? FOES.heavy.anims.idle.muzzles[0][0] - FOES.heavy.cx - 1 : 0, mid = f.x + f.w / 2;   // a heavy's shots leave from the end of his cannon
+          foeShots.push({ x: f.big ? Math.round(f.dir > 0 ? mid + reach : mid - reach - 4) : (f.dir > 0 ? f.x + f.w + 1 : f.x - 4), y: f.y + f.h - 7, vx: f.dir * (f.big ? P.heavyShot : P.foeShot), rem: 0, big: f.big });
         }
       }
     }
@@ -626,7 +645,8 @@
   function stepBarrels(dt) {
     for (var i = 0; i < barrels.length; i++) { var bl = barrels[i]; if (bl.state === 'lit') { bl.t -= dt; if (bl.t <= 0) blowBarrel(bl); } }
   }
-  function canShoot() { return !pl.dead && fx.mode === 'none' && pl.state === 'normal' && !pl.mantle; }
+  function canShoot() { return !pl.dead && fx.mode === 'none' && (pl.state === 'normal' || pl.state === 'climb') && !pl.mantle; }
+  function shotDir() { return pl.state === 'climb' ? -pl.climbDir : pl.facing; }   // hanging on a wall: away from it
 
   // ---- player ----
   var pl, run, fx = { mode: 'none', t: 0, x: 0, y: 0, facing: 1 };
@@ -788,7 +808,7 @@
     pl.dashDirX = dx / len; pl.dashDirY = dy / len;
     pl.vx = pl.dashDirX * P.dashSpeed; pl.vy = pl.dashDirY * P.dashSpeed;
     if (dx) pl.facing = dx;
-    pl.state = 'dash'; pl.dashTimer = P.dashTime; pl.freeze = P.dashFreeze;
+    pl.state = 'dash'; pl.dashTimer = P.dashTime; pl.freeze = P.dashFreeze; pl.dashN = (pl.dashN || 0) + 1;
     pl.stamina -= P.dashCost; pl.dashes = 0; pl.dashCooldown = P.dashCooldown; pl.dashBuf = 0;
     pl.varJumpTimer = 0; pl.forceMove = 0; pl.mantle = null;
   }
@@ -972,9 +992,10 @@
     pl.shotCD -= dt; pl.gunT -= dt; pl.shotT += dt;
     if (inp.shoot && pl.shotCD <= 0 && canShoot()) {
       pl.shotCD = P.shotRate; pl.gunT = P.gunHold; pl.shotT = 0;
-      shots.push({ x: pl.facing > 0 ? pl.x + pl.w + 2 : pl.x - 6, y: pl.y + 3, vx: pl.facing * P.shotSpeed, dist: 0 });
+      var sd = shotDir(); pl.shotDir = sd;
+      shots.push({ x: sd > 0 ? pl.x + pl.w + 2 : pl.x - 6, y: pl.y + 3, vx: sd * P.shotSpeed, dist: 0 });
     }
-    for (i = 0; i < foes.length; i++) if (pl.state === 'dash' && foes[i].state !== 'dead' && overlap(foeBox(foes[i]), pl.x, pl.y, pl.w, pl.h)) killFoe(foes[i], pl.facing, 'dash');
+    for (i = 0; i < foes.length; i++) if (pl.state === 'dash' && foes[i].state !== 'dead' && foes[i].dashHit !== pl.dashN && overlap(foeBox(foes[i]), pl.x, pl.y, pl.w, pl.h)) { foes[i].dashHit = pl.dashN; hurtFoe(foes[i], pl.facing, foes[i].big ? P.heavyDash : 1, 'dash', pl.y + 4); }
     stepShots(dt); stepFoes(dt); stepFoeShots(dt); stepBarrels(dt);
     if (pl.dead) return;
     for (i = 0; i < foeShots.length; i++) if (overlap(pl, foeShots[i].x, foeShots[i].y, 4, 2)) { foeShots.splice(i, 1); die(); return; }
@@ -1148,7 +1169,7 @@
     demo.rec = demo.room === starters[0] ? null : DEMOS[demo.room.id]; demo.rk = 0; demo.rleft = demo.rec ? demo.rec[1] : 0;
   }
   function foeAhead() {
-    for (var i = 0; i < foes.length; i++) { var f = foes[i], dx = f.x - pl.x; if (f.state !== 'dead' && Math.abs(f.y + f.h - pl.y - pl.h) <= P.foeLevel && (dx > 0 ? 1 : -1) === pl.facing && Math.abs(dx) < P.shotRange - 10) return true; }
+    for (var i = 0; i < foes.length; i++) { var f = foes[i], dx = f.x - pl.x; if (f.state !== 'dead' && pl.y + 4 >= f.y && pl.y + 3 < f.y + f.h && (dx > 0 ? 1 : -1) === pl.facing && Math.abs(dx) < P.shotRange - 10) return true; }   // the shot's row crosses him
     return false;
   }
   function startDemo() { pickDemo(); scene = 'play'; allDirty = true; lastSig = ''; demo.on = true; demo.stage = 1; demo.f = 0; demo.t0 = 0; demo.back = false; demo.winT = 0; resetRun(); }
@@ -1168,8 +1189,9 @@
     var x = pl.x, y = pl.y, vy = Math.round(pl.vy), ground = pl.onGround, dashes = pl.dashes;
     var sf = demo.f - demo.t0;
     switch (demo.stage) {
-      case 1: // hop the step, jump the spikes, reach the block face
-        I({ x: 1, jump: (ground && ((x >= 40 && x < 48) || (x >= 112 && x < 132))) || (!ground && vy < 0) });
+      case 1: // hop the step, jump the spikes, reach the block face (a heavy on the floor: stop on the step and blast him)
+        if (x < 100 && foes.some(function (f) { return f.big && f.state !== 'dead'; })) I({ x: x < 80 ? 1 : 0, jump: (ground && x >= 40 && x < 48) || (!ground && vy < 0) });
+        else I({ x: 1, jump: (ground && ((x >= 40 && x < 48) || (x >= 112 && x < 132))) || (!ground && vy < 0) });
         if (x >= 190) next();
         break;
       case 2: // climb the block face
@@ -1882,18 +1904,20 @@
   }
   // ---- combat, drawn (render only: nothing here changes the physics, so recorded runs replay the same) ----
   // The raider sheet is prepared once facing right and once mirrored (no transform per draw), snapped for GAME BOY.
-  var foeArt = { ready: false, R: null, L: null };
-  (function () {
+  var foeArt = { ready: false, n: 0, R: null, L: null, HR: null, HL: null };
+  function loadFoeSheet(src, fw, fh, kr, kl) {                      // one sheet, facing right and mirrored frame by frame
     var img = new Image();
     img.onload = function () {
-      var F = FOES.frame, r = makeCanvas(img.width, img.height), l = makeCanvas(img.width, img.height), lg = l.getContext('2d');
+      var r = makeCanvas(img.width, img.height), l = makeCanvas(img.width, img.height), lg = l.getContext('2d');
       r.getContext('2d').drawImage(img, 0, 0);
-      for (var y = 0; y < img.height; y += F) for (var x = 0; x < img.width; x += F) { lg.save(); lg.translate(x + F, y); lg.scale(-1, 1); lg.drawImage(img, x, y, F, F, 0, 0, F, F); lg.restore(); }
+      for (var y = 0; y < img.height; y += fh) for (var x = 0; x < img.width; x += fw) { lg.save(); lg.translate(x + fw, y); lg.scale(-1, 1); lg.drawImage(img, x, y, fw, fh, 0, 0, fw, fh); lg.restore(); }
       if (GB.kind === 'bw') bwFoe([r, l]); else gbSnap([r, l], 'obj');
-      foeArt.R = r; foeArt.L = l; foeArt.ready = true; allDirty = true;
+      foeArt[kr] = r; foeArt[kl] = l; if (++foeArt.n === 2) foeArt.ready = true; allDirty = true;
     };
-    img.src = FOES.src;
-  })();
+    img.src = src;
+  }
+  loadFoeSheet(FOES.src, FOES.frame, FOES.frame, 'R', 'L');
+  loadFoeSheet(FOES.heavy.src, FOES.heavy.w, FOES.heavy.h, 'HR', 'HL');   // the heavy is drawn full size, not the raider scaled up
   // BLACK AND WHITE: the hero is the white figure, so a raider is grey (outline black, the lit bits of him white).
   function bwFoe(list) {
     list.forEach(function (cv) {
@@ -1916,12 +1940,12 @@
   // free: the room is redrawn from that layer every frame anyway. Never in GAME BOY (the fast mode keeps it clean).
   function bake(x, y, w, hh, col) { if (GB.on) return; stainCtxs().forEach(function (b) { b.fillStyle = col; b.fillRect(x, y, w, hh); }); mark(x - 1, y - 1, w + 2, hh + 2); }
   function spawnGibs(e) {
-    var i, n = GB.on ? 5 : 7, cols = e.cols || FOES.gibs;
-    for (i = 0; i < n; i++) gibs.push({ x: e.x + rnd(-2, 2), y: e.y + rnd(-3, 3), vx: e.dir * rnd(25, 120) + rnd(-45, 45), vy: -rnd(70, 190), w: i % 3 ? 2 : 3, h: 2, col: cols[i % cols.length], kind: 'chunk', t: 0 });
+    var i, B = e.big ? 1 : 0, n = (GB.on ? 5 : 7) * (B ? 2 : 1), cols = e.cols || (B ? FOES.heavyGibs : FOES.gibs), sp = B ? 10 : 2;
+    for (i = 0; i < n; i++) gibs.push({ x: e.x + rnd(-sp, sp), y: e.y + rnd(-sp, sp) * 1.5, vx: e.dir * rnd(25, 120) + rnd(-45, 45) * (1 + B), vy: -rnd(70, 190) - B * 40, w: (i % 3 ? 2 : 3) + B * (i % 2 + 1), h: 2 + B, col: cols[i % cols.length], kind: 'chunk', t: 0 });
     if (GB.on || e.cols) return;
-    for (i = 0; i < 30; i++) { var big = i % 4 === 0; gibs.push({ x: e.x + rnd(-2, 2), y: e.y + rnd(-3, 3), vx: e.dir * rnd(15, 160) + rnd(-80, 80), vy: -rnd(30, 220), w: big ? 2 : 1, h: big ? 2 : 1, col: BLOOD[i % 3], kind: 'drop', t: 0 }); }
-    blasts.push({ x: e.x, y: e.y, t: 0, pop: true });                  // a short red pop where he stood
-    if (gibs.length > 90) gibs.splice(0, gibs.length - 90);
+    for (i = 0; i < (B ? 70 : 30); i++) { var big = i % 4 === 0; gibs.push({ x: e.x + rnd(-sp, sp), y: e.y + rnd(-sp, sp) * 1.5, vx: e.dir * rnd(15, 160) + rnd(-80, 80) * (1 + B * 0.5), vy: -rnd(30, 220) - B * 50, w: big ? 2 : 1, h: big ? 2 : 1, col: BLOOD[i % 3], kind: 'drop', t: 0 }); }
+    blasts.push({ x: e.x, y: e.y, t: 0, pop: true, big: B });          // a short red pop where he stood
+    if (gibs.length > 140) gibs.splice(0, gibs.length - 140);
   }
   // Gibs fly, bounce and come to rest. Blood drops that touch a wall or floor leave a stain where they hit; chunks that
   // settle are painted into the floor. Each moves at most a pixel per check so none tunnels into a wall.
@@ -1955,10 +1979,10 @@
   function drawBlasts(dt) {
     for (var i = blasts.length - 1; i >= 0; i--) {
       var b = blasts[i]; b.t += dt;
-      var life = b.pop ? 0.16 : (GB.on ? 0.2 : 0.75), R = b.pop ? 6 : 15;
+      var life = b.pop ? 0.16 + (b.big ? 0.06 : 0) : (GB.on ? 0.2 : 0.75), R = b.pop ? (b.big ? 14 : 6) : 15;
       mark(b.x - R - 6, b.y - R - 22, 2 * R + 12, 2 * R + 30);
       if (b.t > life) { blasts.splice(i, 1); continue; }
-      if (b.pop) { disc(b.x, b.y, b.t < 0.05 ? 5 : 4, b.t < 0.05 ? '#FFE9B8' : '#D42A2E'); continue; }
+      if (b.pop) { disc(b.x, b.y, (b.big ? 12 : 5) - (b.t < 0.05 ? 0 : 1), b.t < 0.05 ? '#FFE9B8' : '#D42A2E'); continue; }
       if (b.t < 0.05) { disc(b.x, b.y, R - 2, '#FFE9B8'); disc(b.x, b.y, R - 7, '#FFFFFF'); continue; }   // one pale frame, not a white screen: nothing strobes
       var k = Math.min(1, (b.t - 0.05) / 0.3);
       if (k < 1) { disc(b.x, b.y - k * 4, Math.round(R * (1 - k * 0.5)), '#E2491F'); disc(b.x, b.y - k * 5, Math.round(R * (0.7 - k * 0.45)), '#FF9A3C'); disc(b.x, b.y - k * 6, Math.max(1, Math.round(R * (0.4 - k * 0.35))), '#FFE08A'); }
@@ -1982,6 +2006,10 @@
     for (var i = 0; i < combat.ev.length; i++) {
       var e = combat.ev[i];
       if (e.kind === 'gib') spawnGibs(e);
+      else if (e.kind === 'hurt') {                                     // a heavy taking a hit: a spark and a spurt of blood out the far side
+        sparks.push({ x: e.x, y: e.y, dir: -e.dir, t: 0 });
+        if (!GB.on) for (var k = 0; k < 6; k++) gibs.push({ x: e.x, y: e.y + rnd(-2, 2), vx: e.dir * rnd(10, 70) + rnd(-30, 30), vy: -rnd(20, 120), w: k % 3 ? 1 : 2, h: k % 3 ? 1 : 2, col: BLOOD[k % 3], kind: 'drop', t: 0 });
+      }
       else if (e.kind === 'spark') sparks.push({ x: e.x, y: e.y, dir: e.dir, foe: e.foe, t: 0 });
       else if (e.kind === 'blast') {
         blasts.push({ x: e.x, y: e.y, t: 0 });
@@ -1997,24 +2025,32 @@
   // He is only repainted when his picture changes.
   function drawFoe(f) {
     if (!foeArt.ready) return;
-    var A = FOES.anims, F = FOES.frame, name, fr;
+    var HV = FOES.heavy, A = f.big ? HV.anims : FOES.anims, fw = f.big ? HV.w : FOES.frame, fh = f.big ? HV.h : FOES.frame, cx = f.big ? HV.cx : fw / 2, name, fr;
     if (f.shotT < 0.15) { name = 'fire'; fr = Math.min(A.fire.n - 1, Math.floor(f.shotT * A.fire.fps)); }
     else if (f.state === 'patrol' && f.wait <= 0 && f.min !== f.max) { name = 'walk'; fr = Math.floor(f.walkT * A.walk.fps) % A.walk.n; }
     else { name = 'idle'; fr = GB.on ? 0 : Math.floor(run.time * A.idle.fps + f.c) % A.idle.n; }
-    var a = A[name], dx = Math.round(f.x + f.w / 2 - F / 2), dy = f.y + f.h - F;
-    g.drawImage(f.dir > 0 ? foeArt.R : foeArt.L, fr * F, a.row * F, F, F, dx, dy, F, F);
-    var mz = a.muzzles[fr], mx = dx + (f.dir > 0 ? mz[0] : F - 1 - mz[0]), my = dy + mz[1];
-    if (f.shotT < 0.06) { g.fillStyle = '#FFE08A'; g.fillRect(mx + f.dir, my - 1, 1, 3); g.fillRect(mx + f.dir * 2, my, 2 * f.dir, 1); g.fillStyle = '#FFFFFF'; g.fillRect(mx + f.dir, my, 1, 1); }
+    var a = A[name], kick = f.hurtT < 0.08 ? -f.dir : 0, mid = Math.round(f.x + f.w / 2);   // a hit knocks a heavy back a pixel for a moment (drawn only)
+    var dx = (f.dir > 0 ? mid - cx : mid - (fw - 1 - cx)) + kick, dy = f.y + f.h - fh;
+    g.drawImage(f.big ? (f.dir > 0 ? foeArt.HR : foeArt.HL) : (f.dir > 0 ? foeArt.R : foeArt.L), fr * fw, a.row * fh, fw, fh, dx, dy, fw, fh);
+    var mz = a.muzzles[fr], mx = dx + (f.dir > 0 ? mz[0] : fw - 1 - mz[0]), my = dy + mz[1], B = f.big;
+    if (f.shotT < 0.06) { g.fillStyle = '#FFE08A'; g.fillRect(mx + f.dir, my - 1 - B, 1 + B, 3 + 2 * B); g.fillRect(f.dir > 0 ? mx + 2 : mx - 1 - (2 + 2 * B), my, 2 + 2 * B, 1 + B); g.fillStyle = '#FFFFFF'; g.fillRect(mx + f.dir, my, 1, 1); }
+    var top = dy;
+    if (B && f.hp < P.heavyHP) {                                      // a heavy's health: a short bar over his head once he has been hit
+      var bw = 16, bx = mid - bw / 2;
+      g.fillStyle = '#0D0F18'; g.fillRect(bx - 1, top - 4, bw + 2, 4);
+      g.fillStyle = '#D42A2E'; g.fillRect(bx, top - 3, Math.max(1, Math.round(bw * f.hp / P.heavyHP)), 2);
+      top -= 5;
+    }
     var glyph = f.state === 'alert' ? '!' : (f.q > 0 ? '?' : '');
     if (glyph) {                                                      // drawn as pixels over his head, amber with a dark edge
-      var gx = Math.round(f.x + f.w / 2) - 1, gy = dy - 1;
+      var gx = mid - 1, gy = top - 9;
       g.fillStyle = '#0D0F18'; g.fillRect(gx - 1, gy - 1, glyph === '!' ? 4 : 5, 9);
       g.fillStyle = '#FFD23F';
       if (glyph === '!') { g.fillRect(gx, gy, 2, 4); g.fillRect(gx, gy + 5, 2, 2); }
       else { g.fillRect(gx, gy, 3, 1); g.fillRect(gx + 2, gy + 1, 1, 2); g.fillRect(gx + 1, gy + 3, 1, 1); g.fillRect(gx + 1, gy + 5, 1, 2); }
     }
-    var sig = name + fr + ',' + dx + ',' + f.dir + glyph + (f.shotT < 0.06);
-    if (sig !== f.sig) { f.sig = sig; mark(dx - 3, dy - 10, F + 6, F + 12); }
+    var sig = name + fr + ',' + dx + ',' + f.dir + glyph + (f.shotT < 0.06) + f.hp;
+    if (sig !== f.sig) { f.sig = sig; if (f.rect) mark(f.rect[0], f.rect[1], f.rect[2], f.rect[3]); f.rect = [dx - 6, dy - 16, fw + 12, fh + 18]; mark(f.rect[0], f.rect[1], f.rect[2], f.rect[3]); }
   }
   function drawCombat(dt) {
     var i;
@@ -2023,13 +2059,13 @@
       if (bl.state !== 'gone') drawBarrel(g, bl.x - 1, bl.y, bl.state === 'lit' && Math.floor(bl.t * 40) % 2 === 0);
       if (bs !== bl.sig) { bl.sig = bs; mark(bl.x - 2, bl.y - 2, 12, 14); }
     }
-    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead') drawFoe(f); else if (f.sig) { f.sig = ''; mark(Math.round(f.x) - 7, f.y - 16, 22, 28); } }
+    for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead') drawFoe(f); else if (f.sig) { f.sig = ''; if (f.rect) mark(f.rect[0], f.rect[1], f.rect[2], f.rect[3]); } }
     for (i = 0; i < foeShots.length; i++) {                           // the raiders' shots: a hot orange slug with a pale core
       var s = foeShots[i];
       g.fillStyle = '#B8301E'; g.fillRect(s.x - (s.vx > 0 ? 2 : -4), s.y + 1, 2, 1);
-      g.fillStyle = '#FF5A3C'; g.fillRect(s.x, s.y, 4, 2);
+      g.fillStyle = '#FF5A3C'; g.fillRect(s.x, s.y - (s.big ? 1 : 0), 4, s.big ? 4 : 2);
       g.fillStyle = '#FFD0A0'; g.fillRect(s.x + (s.vx > 0 ? 2 : 0), s.y, 2, 1);
-      mark(s.x - 5, s.y - 1, 14, 4);
+      mark(s.x - 5, s.y - 2, 14, 6);
     }
   }
   // The hero's shots: round energy pellets (Contra and Broforce style, not fire), a 4 x 4 ball with an amber rim, a
@@ -2165,6 +2201,7 @@
     // use the standing aim). The base animation keeps its clock, so a run does not restart its stride.
     var aim = null;
     if (pl.gunT > 0 && pl.state === 'normal' && !pl.mantle) aim = HERO.anims[name + '_aim'] ? name + '_aim' : (name === 'land' || name === 'skid' || name === 'duck' || name === 'look_up' ? 'idle_aim' : null);
+    else if (pl.gunT > 0 && pl.state === 'climb' && HERO.anims.wall_aim) { aim = 'wall_aim'; facing = -pl.climbDir; }   // on a wall: back to it, blaster pointing away
     if (aim) hero.os = null;
     if (name === 'wall_slide' && tick % 6 === 0) puff(pl.x + (facing > 0 ? pl.w : 0), pl.y + pl.h - 1, 1, -facing * 8, -12);   // scraping the wall
     if (name !== hero.anim) { hero.anim = name; hero.t = 0; } else hero.t += name === 'run' ? dt * Math.max(0.55, Math.min(1, Math.abs(pl.vx) / P.maxRun)) : dt;   // the stride slows with the speed, so a run start does not paddle
@@ -3026,7 +3063,7 @@
                keys: roomKeys.map(function (k) { return k.state; }), doors: doors.map(function (d) { return d.open; }),
                jets: jets.map(function (j) { var p = jetPhase(j); return { x: j.x, y: j.y, on: p.on, warn: p.warn, left: p.left }; }), lava: lava ? lava.y : null,
                drones: drones.map(function (d) { return { x: d.x, y: d.y, dir: d.dir, wait: d.wait, fire: d.fire }; }),
-               foes: foes.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, state: f.state }; }), barrels: barrels.map(function (b) { return b.state; }), shots: shots.length, foeShots: foeShots.map(function (s) { return { x: s.x, y: s.y }; }) };
+               foes: foes.map(function (f) { return { x: f.x, y: f.y, dir: f.dir, state: f.state, hp: f.hp, big: f.big }; }), barrels: barrels.map(function (b) { return b.state; }), shots: shots.length, foeShots: foeShots.map(function (s) { return { x: s.x, y: s.y }; }) };
     },
     reset: function () { scene = 'play'; mode = 'endless'; resetRun(); }, kill: die,
     view: function () { return { scene: scene, pause: { on: pause.on, pick: pause.pick }, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },

@@ -233,7 +233,7 @@
     ['Fire', [['F', 'Fire', 'T'], ['*', 'Fireball', 'Y'], ['J', 'Fire jet', 'H'], ['~', 'Lava', 'V']]],
     ['Temple', [['L', 'Laser', 'F'], ['O', 'Drone', 'G']]],
     ['Neon Row', [['w', 'Spark', 'J'], ['%', 'Holo sign', 'O']]],
-    ['Combat', [['R', 'Raider', 'A'], ['B', 'Barrel', 'P']]],
+    ['Combat', [['R', 'Raider', 'A'], ['H', 'Heavy', 'I'], ['B', 'Barrel', 'P']]],
     ['Moving', [['=', 'Platform', '8'], ['z', 'Zip mover', 'K'], ['-', 'Track side', '9'], ['|', 'Track up', '0']]],
     ['Markers', [['S', 'Start', 'Q'], ['E', 'Exit', 'W'], ['o', 'Stamina', 'R'], ['u', 'Spring', 'U'], ['G', 'Gem', 'M'], ['k', 'Key', 'L'], ['D', 'Door', 'N']]],
     ['Scenery', [['b', 'Backdrop', 'B']]],
@@ -243,7 +243,7 @@
   GROUPS.forEach(function (g) { g[1].forEach(function (t) { TILES.push(t); }); });
   var LEGEND = { '.': 'empty', '#': 'solid', '^': 'spike_up', 'v': 'spike_down', '<': 'spike_left', '>': 'spike_right',
                  'S': 'start', 'E': 'exit', 'o': 'dash_refill',
-                 'b': 'backdrop', 'u': 'spring', 'G': 'gem', 'F': 'fire', '*': 'fireball', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical', 'R': 'raider', 'B': 'barrel' };
+                 'b': 'backdrop', 'u': 'spring', 'G': 'gem', 'F': 'fire', '*': 'fireball', 'I': 'ice', 'C': 'crumble', '=': 'platform', '-': 'track_horizontal', '|': 'track_vertical', 'R': 'raider', 'H': 'heavy', 'B': 'barrel' };
   var $ = function (id) { return document.getElementById(id); };
 
 /*SHARED_CONFIG*/
@@ -260,6 +260,7 @@
 
   var heroImg = new Image(); heroImg.onload = function () { if (tiles) draw(); }; if (HERO.enabled) heroImg.src = HERO.src;
   var foeImg = new Image(); foeImg.onload = function () { if (tiles) draw(); }; foeImg.src = FOES.src;
+  var heavyImg = new Image(); heavyImg.onload = function () { if (tiles) draw(); }; heavyImg.src = FOES.heavy.src;
   var room, tiles, brush = '#', undoStack = [], redoStack = [], cleared = false, playing = false;
 
   // ---- room data ----
@@ -341,6 +342,8 @@
     else if (ch === 'R' && foeImg.complete && foeImg.naturalWidth) b.drawImage(foeImg, 0, 0, 16, 16, x - 2, y - 6, 16, 16);   // a raider, facing right as in the sheet
     else if (ch === 'R') { b.fillStyle = '#2A2530'; b.fillRect(x + 1, y, 8, 10); b.fillStyle = '#D7F25A'; b.fillRect(x + 4, y + 3, 4, 1); }
     else if (ch === 'B') drawBarrel(b, x, y, false);
+    else if (ch === 'H' && heavyImg.complete && heavyImg.naturalWidth) { var HV = FOES.heavy; if (icon) b.drawImage(heavyImg, 0, 0, HV.w, HV.h, x - 1, y - 2, 14, 14); else b.drawImage(heavyImg, 0, 0, HV.w, HV.h, x + 5 - HV.cx, y + 10 - HV.h, HV.w, HV.h); }   // a heavy: this tile is his feet, he fills 3 across and 4 up
+    else if (ch === 'H') { b.fillStyle = '#40444B'; b.fillRect(x - 10, y - 30, 30, 40); }
     else if (ch === '~') drawLava(b, x, y, icon || r === 0 || tiles[r - 1][c] !== '~');
     else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);

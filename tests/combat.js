@@ -38,8 +38,20 @@ const { chromium } = require('playwright');
     for (let i = 0; i < 60; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1); out.barrel = s.barrels[0]; out.blastKill = s.foes[0].state; out.blastAlive = !s.dead;
     G.load(rooms.d); settle();                                       // a raider a level up: he cannot see the hero, and shots pass under him
     for (let i = 0; i < 200; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1); out.highFoe = s.foes[0].state; out.highSafe = !s.dead;
+    G.load(rooms.e); settle();                                       // a heavy: one shot only dents him; he goes down to enough of them
+    for (let i = 0; i < 30; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1);
+    out.heavyAfterFew = s.foes[0].state + ' hp' + s.foes[0].hp;
+    G.load(rooms.g); settle();                                       // from a step two tiles up: above his line of fire, still hitting his big body
+    for (let i = 0; i < 300 && s.foes[0].state !== 'dead' && !s.dead; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1);
+    out.heavyDown = s.foes[0].state; out.heavySafe = !s.dead && !s.deaths;
+    G.load(rooms.e); settle(); for (let i = 0; i < 400 && !(s = G.step(none, 1)).dead; i++); out.heavyKills = s.dead;
+    G.load(rooms.f); settle();                                       // hanging on a wall, SHOOT fires away from it
+    for (let i = 0; i < 6; i++) s = G.step(Object.assign({}, none, { x: 1, grab: true }), 1);
+    out.climbing = s.state;
+    for (let i = 0; i < 40 && s.foes[0].state !== 'dead'; i++) s = G.step(Object.assign({}, none, { grab: true, shoot: true }), 1);
+    out.wallShot = s.foes[0].state; out.stillOnWall = s.state;
     return out;
-  }, { a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
+  }, { g: room([[43, 3, 'S'], [44, 2, '#'], [44, 3, '#'], [44, 4, '#'], [44, 5, '#'], [45, 2, '#'], [45, 3, '#'], [45, 4, '#'], [45, 5, '#'], [45, 15, 'H']]), e: room([[45, 3, 'S'], [45, 15, 'H']]), f: room([[45, 3, 'R'], [45, 9, 'S'], [44, 10, '#'], [45, 10, '#'], [43, 10, '#']]), a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
   console.log('mechanics:', JSON.stringify(m));
   ok(m.alerted === 'alert' || m.alerted === 'fire', 'raider does not notice the hero on his level');
   ok(m.shotKill === 'dead' && m.aliveAfterShot, 'a shot does not kill a raider');
@@ -48,6 +60,10 @@ const { chromium } = require('playwright');
   ok(m.dashKill === 'dead' && m.dashAlive, 'a dash does not kill a raider');
   ok(m.barrel === 'gone' && m.blastKill === 'dead' && m.blastAlive, 'the barrel blast does not take the raider');
   ok(m.highFoe !== 'dead' && m.highSafe, 'a raider a level up is hit or shoots down');
+  ok(/^(alert|fire|patrol) hp\d+$/.test(m.heavyAfterFew) && +m.heavyAfterFew.split('hp')[1] < 12 && +m.heavyAfterFew.split('hp')[1] > 0, 'a heavy does not take several hits');
+  ok(m.heavyDown === 'dead' && m.heavySafe, 'a heavy cannot be shot down from above his line of fire');
+  ok(m.heavyKills, 'a heavy does not kill the hero on his level');
+  ok(m.climbing === 'climb' && m.wallShot === 'dead' && m.stillOnWall === 'climb', 'shooting from a wall does not fire away from it');
   if (process.env.SHOTS) {
     await p.reload(); await p.waitForTimeout(400);
     await p.evaluate(() => { window.__climber.manual(true); window.__climber.demoStart(); });
