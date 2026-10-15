@@ -846,7 +846,7 @@
   }
 
   function readInput() {
-    var x = 0, y = 0, jump = false, dash = false, grab = false, back = !!keys[27], i;
+    var x = 0, y = 0, jump = false, dash = false, grab = false, back = !!keys[27], i, pageL = !!keys[81], pageR = !!keys[69];   // pageL/R: the map's world switch (Q and E on a keyboard)
     var gp = firstPad();
     padInfo = 'none seen yet, press a button on it';
     if (gp) {
@@ -865,6 +865,8 @@
         for (i = 0; i < ASSIGNABLE.length; i++) { var an = ASSIGNABLE[i]; if (c.act[an] && isDown(gp, c, an)) acts[c.act[an]] = true; }
         if (acts.jump) jump = true; if (acts.dash) dash = true; if (acts.grab) grab = true;
         if (isDown(gp, c, 'start')) back = true;   // Start: back to the map or menu
+        if (isDown(gp, c, 'l2')) pageL = true;       // the triggers flip worlds on the map, whatever job they have in play
+        if (isDown(gp, c, 'r2')) pageR = true;
       }
       // Start or Select: back to the map or menu
       if (x || y || jump || dash || grab) usedPad = true;
@@ -876,7 +878,7 @@
     if (keys[67] || keys[32]) jump = true;
     if (keys[88]) dash = true;
     if (keys[90] || keys[16]) grab = true;
-    return { x: x, y: y, jump: jump, dash: dash, grab: grab, back: back };
+    return { x: x, y: y, jump: jump, dash: dash, grab: grab, back: back, pageL: pageL, pageR: pageR };
   }
 
   // ---- demo: the game plays the starter room by itself when nobody is at the controls ----
@@ -2218,6 +2220,10 @@
     MAPV.lift = rows < V ? Math.floor((V - rows) * MAPV.pitch / 2) : 0;   // a short world sits in the middle of the view
     return MAPV.scroll;
   }
+  function mapWorld(d) {                           // the next or previous world, on its first unbeaten level
+    if (!levels[sel.w + d]) return;
+    sel.w += d; sel.i = worldOpen(sel.w) ? firstOpen(sel.w) : 0; lastSig = '';
+  }
   function tileY(row) { return MAPV.bot - MAPV.th - MAPV.lift - (row - MAPV.scroll) * MAPV.pitch; }
   function screenInput(inp) {
     var p = navPrev, dx = inp.x && !p.x ? inp.x : 0, dy = inp.y && !p.y ? inp.y : 0;
@@ -2234,6 +2240,8 @@
       if (go) MENU[sel.menu][2]();
       return;
     }
+    var pg = inp.pageL && !p.pageL ? -1 : inp.pageR && !p.pageR ? 1 : 0;
+    if (pg) { mapWorld(pg); return; }
     var list = levels[sel.w], n = list.length;
     if (cancel) { toMenu(); return; }
     if (go) { startLevel(sel.w, sel.i); return; }
@@ -2332,8 +2340,16 @@
     pxStar(135 - gw / 2, 58, 0.62, C.flame, C.flame); pxText(gs, 135 - gw / 2 + 11, 58.5, 1, C.text, 'left');
     var dx0 = 135 - (levels.length * 8 + 6 - 4) / 2;                                 // one dot per world, the current one long
     for (i = 0; i < levels.length; i++) { var dw = i === w ? 10 : 4; box(dx0, 74, dw, 3, i === w ? th.accent : (worldOpen(i) ? '#3a4677' : '#1c2448')); dx0 += dw + 4; }
-    if (levels[w - 1]) { arrow(12, 30, -1, C.text); hits.push({ x: 0, y: 14, w: 44, h: 50, fn: function () { sel.w--; sel.i = firstOpen(sel.w); lastSig = ''; } }); }
-    if (levels[w + 1]) { arrow(252, 30, 1, C.text); hits.push({ x: 226, y: 14, w: 44, h: 50, fn: function () { sel.w++; sel.i = worldOpen(sel.w) ? firstOpen(sel.w) : 0; lastSig = ''; } }); }
+    // arrows to the neighbouring worlds, each with the button that gets there: the triggers on a pad, Q and E on a keyboard
+    var gp = firstPad(), PL = padLetters(gp && gp.id), kl = usedPad ? PL.l2 : 'Q', kr = usedPad ? PL.r2 : 'E';
+    function chip(cx, label, on) {
+      var cw = label.length * 6 + 3, x = Math.round(cx - cw / 2);
+      box(x, 47, cw, 10, on ? '#3a4677' : '#1c2448'); box(x + 0.5, 47.5, cw - 1, 9, '#1a2140'); box(x + 0.5, 47.5, cw - 1, 1, on ? '#4a5a9e' : '#232c55');
+      pxText(label, x + 2, 49, 1, on ? C.text : '#3a4677', 'left');
+    }
+    if (levels[w - 1]) { arrow(12, 30, -1, C.text); hits.push({ x: 0, y: 14, w: 44, h: 50, fn: function () { mapWorld(-1); } }); }
+    if (levels[w + 1]) { arrow(252, 30, 1, C.text); hits.push({ x: 226, y: 14, w: 44, h: 50, fn: function () { mapWorld(1); } }); }
+    chip(15, kl, !!levels[w - 1]); chip(255, kr, !!levels[w + 1]);
 
     // info panel: the chosen level
     var cur = list[sel.i], cp = cur && prog[cur.id];
@@ -2390,7 +2406,7 @@
       }
       var inp = readInput();
       if (wiz.on) { wizTick(); acc = 0; render(); window.requestAnimationFrame(frame); return; }
-      var any = inp.x || inp.y || inp.jump || inp.dash || inp.grab || inp.back;
+      var any = inp.x || inp.y || inp.jump || inp.dash || inp.grab || inp.back || inp.pageL || inp.pageR;
       if (scene !== 'play') {                      // menu or map: nothing moves, so nothing is redrawn until you press something
         if (any) demo.idle = 0;
         else { demo.idle += Math.min(dt, 0.1); if (demo.idle >= DEMO_IDLE || location.hash === '#demo') startDemo(); }
@@ -2443,7 +2459,7 @@
     view: function () { return { scene: scene, pause: { on: pause.on, pick: pause.pick }, set: { page: set.page, row: set.row, note: set.note }, mode: mode, sel: sel, lvl: lvl, room: room.name, prog: prog, levels: levels.map(function (l) { return l.map(function (r) { return r.name; }); }), result: run.result, time: run.time }; },
     weather: function (on) { setWeather(on); return weather.on; },
     city: function (on) { if (on === 'ship') { if (city) city.nextShip = ct; } else if (on !== undefined) setCity(on); return { on: cityOn, live: !!city, movers: city ? city.movers.map(function (m) { return { kind: m.kind, x: Math.round(m.x), y: m.y }; }) : [], stats: city ? city.stats : null, lanes: city ? city.lanes.map(function (l) { return l.depth.charAt(1) + l.y; }) : [], chunks: chunkCopies, tick: tick, ms: fps.ms, fps: fps.now }; },
-    nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false }); return this.view(); },
+    nav: function (o) { screenInput(Object.assign({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false, pageL: false, pageR: false }, o)); screenInput({ x: 0, y: 0, jump: false, dash: false, grab: false, back: false, pageL: false, pageR: false }); return this.view(); },
     startLevel: startLevel,
     mapTile: function (i) { mapScroll(levels[sel.w].length); var q = nodePos(i); return { x: q.x, y: tileY(q.row) + MAPV.th / 2 }; },   // tests: where a tile sits on the map
     padLevels: function (w, n) { var l = levels[w], k = l.length; while (l.length < n) l.push(l[l.length % k]); dataVer++; lastSig = ''; },   // tests only: fill a world to n levels to check the map
