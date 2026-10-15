@@ -2198,7 +2198,7 @@
     else if (fx.mode === 'spawn') drawSpawn();
     else if (hero.ready) drawHeroState();
     else drawBody(pl.x + tremble(), pl.y, pl.h, pl.facing, pl.stamina < P.tiredBelow ? C.tired : C.body, pl.dashes > 0 ? C.flame : C.flameOut);
-    var sig = [pause.on, pause.pick, padVer, mode === 'map' ? Math.floor(run.time * 3) : 0, mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
+    var sig = [pause.on, pause.pick, padVer, mode, gems.length ? gotGem() : 0, shaky() ? Math.floor(tick / 6) % 2 : 0, run.result ? run.result.pick : 0, Math.ceil(pl.stamina / P.stamina * 10 - 0.001), pl.stamina >= P.dashCost, hud.width, run.deaths, Math.floor(run.time), run.won, usedPad, demo.on, testMode, room.name, run.count, check, fps.now, fps.low, fps.ms, fps.city, cityOn, wiz.on, wiz.i, wiz.armed, wiz.on ? wiz.see : '', check ? padInfo : ''].join('|');
     flush();
     drawWeather();
     var hy0 = (fx.mode === 'none' ? pl.y : fx.y) - (cam.y || 0), hx0 = fx.mode === 'none' ? pl.x + pl.w / 2 : fx.x;
@@ -2503,46 +2503,21 @@
     for (i = 0; i < 10; i++) hudBox(u, 13 + i * 5, 6 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 5, i < segs ? mc : '#1a2140');
     for (i = 0; i < 10 && i < segs; i++) hudBox(u, 13 + i * 5, 6 + (wob >= 0 && i % 2 === wob ? 1 : 0), 4, 1, canDash ? '#ffe2a8' : '#ffc4b8');   // a lit top edge on each cell
     hudBox(u, 12.5 + P.dashCost / P.stamina * 50, 1, 1, 2, EDGE);
-    // the level tag, a key cap: a lighter top border, the number inside with a pixel of room all round
-    var tag = testMode ? 'TEST' : demo.on ? 'DEMO' : mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : String(run.count), tw = tag.length * 6 + 5, tx = 69;
+    // middle: the clock, big. White, red once it passes par.
+    var par = mode === 'map' && !testMode && !demo.on ? parOf(room) : 0, late = par && run.time > par, cs = clock(run.time), csc = cs.length <= 4 ? 3 : 2.4;
+    pxText(cs, 135, (D - 0.5 - 7 * csc) / 2, csc, late ? C.hurt : C.text, 'center');
+
+    // right: the level tag as a key cap at the edge, and before it the stars you would earn if you finished now
+    var tag = testMode ? 'TEST' : demo.on ? 'DEMO' : mode === 'map' ? (lvl.w + 1) + '-' + (lvl.i + 1) : String(run.count), tw = tag.length * 6 + 5, tx = 267 - tw;
     hudRound(u, tx, 3, tw, 11, 1.5, EDGE); hudRound(u, tx + 1, 4, tw - 2, 9, 1, '#1a2140');
     pxText(tag, tx + 3, 5, 1, th.accent, 'left');
-
-    // middle: hourglass and par bar, the room name under it
-    var par = mode === 'map' && !testMode && !demo.on ? parOf(room) : 0, late = par && run.time > par, cs = clock(run.time);
-    var hgc = late ? C.hurt : th.accent, hx = L0 + 9, hy = 4;
-    hudBox(u, hx, hy, 7, 1, hgc); hudBox(u, hx, hy + 8, 7, 1, hgc);                                       // an hourglass: caps, glass, sand
-    hudPoly(u, [[hx + 1, hy + 1], [hx + 6, hy + 1], [hx + 3.5, hy + 4.5], [hx + 6, hy + 8], [hx + 1, hy + 8], [hx + 3.5, hy + 4.5]], null, EDGE, 0.8);
-    var sand = par ? Math.max(0, Math.min(1, 1 - run.time / par)) : 0.5;
-    hudPoly(u, [[hx + 2 + (1 - sand) * 1.2, hy + 1.6 + (1 - sand) * 2.2], [hx + 5 - (1 - sand) * 1.2, hy + 1.6 + (1 - sand) * 2.2], [hx + 3.5, hy + 4.2]], hgc);
-    hudPoly(u, [[hx + 1.8, hy + 7.6], [hx + 5.2, hy + 7.6], [hx + 3.5, hy + 7.6 - (1 - sand) * 2.6]], hgc);
-    var bx = hx + 10, bw = R0 - 4 - bx;
-    if (par) {
-      hudBox(u, bx, 5, bw, 7, '#3a4677'); hudBox(u, bx + 1, 6, bw - 2, 5, '#05070e');
-      var fw = Math.round((bw - 2) * sand);
-      if (fw > 0) {
-        var g = h.createLinearGradient((bx + 1) * u, 0, (bx + bw - 1) * u, 0); g.addColorStop(0, C.teal); g.addColorStop(1, th.accent);
-        h.fillStyle = g; h.fillRect(Math.round((bx + 1) * u), Math.round(6 * u), Math.round(fw * u), Math.round(5 * u));
-        hudBox(u, bx + 1, 6, fw, 1, 'rgba(255,255,255,0.35)');
-      }
-    } else pxText(cs, bx + bw / 2, 5, 1, C.text, 'center');
-    var nm = demo.on ? 'ANY BUTTON TO PLAY' : hudClean(room.name), maxN = Math.floor((R0 - L0 - 6) / 6);
-    if (nm.length > maxN) nm = nm.substring(0, maxN - 1).replace(/ +$/, '') + '.';
-    pxText(nm, 135, 17.5, 1, demo.on ? th.accent : C.text, 'center');
-
-    // right: clock, falls, then the stars you would earn if you finished now
-    var rx = 266;
-    if (par) { pxText(cs, rx, 5, 1, late ? C.hurt : C.text, 'right'); rx -= cs.length * 6 - 1 + 7; }
-    var fs = String(run.deaths);
-    pxText(fs, rx, 5, 1, par && run.deaths > STAR_FALLS ? C.hurt : C.text, 'right'); rx -= fs.length * 6 - 1 + 7;
-    hudBox(u, rx + 2, 5, 1, 4, C.dim); hudBox(u, rx, 8, 1, 1, C.dim); hudBox(u, rx + 4, 8, 1, 1, C.dim); hudBox(u, rx + 1, 9, 3, 1, C.dim); hudBox(u, rx + 2, 10, 1, 2, C.dim);   // a falls mark: an arrow down
     if (!par) return;
     var on = [true, run.deaths <= STAR_FALLS, run.time <= par];
     if (gems.length) on.push(gotGem());
-    var sx = Math.max(R0 + K, rx - 4 - on.length * 8.5);
+    var sx = tx - 5 - on.length * 9 + 1;
     for (i = 0; i < on.length; i++) {
       var gemStar = i === 3, col = gemStar ? (on[i] ? C.teal : C.tealDim) : (on[i] ? th.accent : '#3a4677');
-      pxStar(sx + i * 8.5, 4.5, 0.62, col, on[i] ? col : null);
+      pxStar(sx + i * 9, 4.5, 0.62, col, on[i] ? col : null);
     }
   }
   function drawHud() {
