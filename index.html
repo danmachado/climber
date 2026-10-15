@@ -2906,9 +2906,37 @@
   }
   // The main menu: the hero, the title, MAP and ENDLESS as two big buttons, and settings, reload and exit as a row of
   // small icon buttons. Under them, what the chosen one does. A still picture, drawn only when something changes.
+  // The title, lettered by hand: chunky slab-serif capitals on a 7 x 9 grid (original), filled with horizontal bands from
+  // pale yellow to deep red, lit along every top edge, with an indigo drop shadow a cell down and right and a dark outline.
+  var LOGO = {
+    C: ['.#####.', '##...##', '##.....', '##.....', '##.....', '##.....', '##.....', '##...##', '.#####.'],
+    L: ['####...', '.##....', '.##....', '.##....', '.##....', '.##....', '.##....', '.##..##', '#######'],
+    I: ['######', '..##..', '..##..', '..##..', '..##..', '..##..', '..##..', '..##..', '######'],
+    M: ['##...##', '###.###', '#######', '##.#.##', '##...##', '##...##', '##...##', '##...##', '###.###'],
+    B: ['######.', '.##..##', '.##..##', '.#####.', '.##..##', '.##..##', '.##..##', '.##..##', '######.'],
+    E: ['#######', '.##...#', '.##....', '.#####.', '.##....', '.##....', '.##....', '.##...#', '#######'],
+    R: ['######.', '.##..##', '.##..##', '.##..##', '.#####.', '.##.##.', '.##..##', '.##..##', '###.###']
+  };
+  var LOGO_BANDS = ['#fff07a', '#ffd84a', '#ffbd36', '#ffa02a', '#ff8524', '#f76a22', '#ea5024', '#da3c27', '#c22d2d'];
+  function drawLogo(box, cx, y, sc) {
+    var word = 'CLIMBER', cells = [], on = {}, x = 0, i, r, c, k;
+    for (i = 0; i < word.length; i++) {
+      var g = LOGO[word.charAt(i)];
+      for (r = 0; r < g.length; r++) for (c = 0; c < g[r].length; c++) if (g[r].charAt(c) === '#') { cells.push([x + c, r]); on[(x + c) + ',' + r] = 1; }
+      x += g[0].length + 2;
+    }
+    var x0 = cx - (x - 2 + 1) * sc / 2;
+    function px(cx2, cy2, col) { box(x0 + cx2 * sc, y + cy2 * sc, sc, sc, col); }
+    for (k = 0; k < cells.length; k++) for (var dx = -1; dx <= 2; dx++) for (var dy = -1; dy <= 2; dy++) px(cells[k][0] + dx, cells[k][1] + dy, '#05070e');   // outline round letter and shadow
+    for (k = 0; k < cells.length; k++) if (!on[(cells[k][0] + 1) + ',' + (cells[k][1] + 1)]) px(cells[k][0] + 1, cells[k][1] + 1, '#3a3db8');   // the drop shadow
+    for (k = 0; k < cells.length; k++) {
+      var cx3 = cells[k][0], cy3 = cells[k][1], top = !on[cx3 + ',' + (cy3 - 1)];
+      px(cx3, cy3, top ? (cy3 < 3 ? '#fff6c0' : LOGO_BANDS[Math.max(0, cy3 - 2)]) : LOGO_BANDS[cy3]);
+    }
+  }
   function drawMenu(u, box) {
     var INK = '#101426', i, k;
-    pxText('CLIMBER', 135, 150, 5, C.flame, 'center');
+    drawLogo(box, 135, 146, 4);
     for (i = 0; i < MENU_BIG; i++) {
       var on = i === sel.menu, y = 206 + i * 52;
       keyButton(box, 35, y, 200, 42, on);
