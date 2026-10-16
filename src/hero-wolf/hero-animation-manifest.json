@@ -10,12 +10,16 @@
    "hex": "#0D0F18"
   },
   "d": {
-   "name": "Hair",
-   "hex": "#2E201C"
+   "name": "Hair shadow",
+   "hex": "#3A2620"
   },
   "D": {
-   "name": "Hair tuft",
-   "hex": "#543A30"
+   "name": "Hair",
+   "hex": "#5E4034"
+  },
+  "l": {
+   "name": "Hair highlight",
+   "hex": "#8A6250"
   },
   "B": {
    "name": "Bandana highlight",

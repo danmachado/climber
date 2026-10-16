@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 
 C = {
     'o': '#0D0F18',                                   # outline
-    'd': '#2E201C', 'D': '#543A30',                   # hair, hair tuft
+    'd': '#3A2620', 'D': '#5E4034', 'l': '#8A6250',   # hair shadow, hair, hair highlight (lifted well off the outline)
     'B': '#F05C46', 'b': '#D93A2E', 'k': '#A0261E',   # bandana highlight, main, knot / shadow
     's': '#D8A77A', 'S': '#B2805A', 'T': '#9A6D4C',   # skin, skin shadow, far arm shadow
     'e': '#14101A',                                   # eye
@@ -23,7 +23,7 @@ C = {
     'g': '#3B414E', 'G': '#9AA4B8', 'a': '#FFB74A',   # blaster body, its lit top and muzzle, the amber cell on its side
 }
 NAMES = {
-    'o': 'Outline', 'd': 'Hair', 'D': 'Hair tuft', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
+    'o': 'Outline', 'd': 'Hair shadow', 'D': 'Hair', 'l': 'Hair highlight', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
     's': 'Skin', 'S': 'Skin shadow', 'T': 'Far arm shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
     'y': 'Buckle', 'Q': 'Pants lit', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
     'g': 'Blaster', 'G': 'Blaster highlight', 'a': 'Blaster cell',
@@ -36,54 +36,54 @@ def G(s): return [r for r in s.strip('\n').split('\n')]
 # the last row is the chin and always lands on the row above the torso. ----
 HEAD = {
     'normal': G("""
-..o.o.o..
-.odDdddo.
-oddddddo.
-oddddddo.
+..oooo...
+.oDllDo..
+oddDDDDo.
+oddddDDo.
 kobBBBBo.
 .odSSSSo.
-.oSsssso.
-..oSSSo..
+.oTsssso.
+..oTsSo..
 """),
     'up': G("""
-..o.o.o..
-.odDdddo.
-oddddddo.
-oddddddo.
+..oooo...
+.oDllDo..
+oddDDDDo.
+oddddDDo.
 kobBBBBo.
 .odSssso.
-.oSsssSo.
-..oSSSo..
+.oTsssSo.
+..oTsSo..
 """),
     'down': G("""
-..o.o.o..
-.odDdddo.
-oddddddo.
-oddddddo.
+..oooo...
+.oDllDo..
+oddDDDDo.
+oddddDDo.
 kobBBBBo.
 .odSSSSo.
-.oSSssSo.
-..oSSsso.
+.oTSssso.
+..oTSso..
 """),
     'shut': G("""
-..o.o.o..
-.odDdddo.
-oddddddo.
-oddddddo.
+..oooo...
+.oDllDo..
+oddDDDDo.
+oddddDDo.
 kobBBBBo.
 .odSSSSo.
-.oSSSSso.
-..oSSSo..
+.oTSSSso.
+..oTSSo..
 """),
     'tuft': G("""
-...o.o.o.
-.odDdddo.
-oddddddo.
-oddddddo.
+...oooo..
+.oDDllDo.
+oddDDDDo.
+oddddDDo.
 kobBBBBo.
 .odSSSSo.
-.oSsssso.
-..oSSSo..
+.oTsssso.
+..oTsSo..
 """),
 }
 HEAD_H = 8
@@ -222,6 +222,21 @@ class Pose:
             if self.mask.get((cx, y - 1)) == who: self.px(cx, y - 1, cuff, who)
             self.px(cx, y, cuff if near and cx == x + 1 and kind == 'flat' else sole, who)
 
+def selout(fr):
+    # Selective outline: where an arm lies against the shirt (below the chin), the black seam between them becomes the
+    # arm's dark skin tone, so the arm joins the shoulder instead of being cut off from the body. Everywhere else,
+    # including the whole silhouette, the face and the legs, the outline stays black.
+    bands = [y for y in range(16) for x in range(16) if fr[y][x] == 'B']
+    below = (min(bands) + 4) if bands else 0
+    swap = []
+    for y in range(below, 16):
+        for x in range(16):
+            if fr[y][x] != 'o': continue
+            nb = [fr[ay][ax] if 0 <= ax < 16 and 0 <= ay < 16 else '.' for ax, ay in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))]
+            if '.' in nb: continue
+            if any(n in 'sST' for n in nb) and any(n in 'vhH' for n in nb): swap.append((x, y))
+    for x, y in swap: fr[y][x] = 'T'
+    return fr
 def outline(fr):
     add = []
     for y in range(16):
@@ -230,7 +245,7 @@ def outline(fr):
             for ax, ay in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
                 if 0 <= ax < 16 and 0 <= ay < 16 and fr[ay][ax] not in '.ok': add.append((x, y)); break
     for x, y in add: fr[y][x] = 'o'
-    return fr
+    return selout(fr)
 
 def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg=None, near_boot=None, far_boot=None,
          near_arm=None, far_arm=None, hips=True, near_behind=False, shift=0, gun=False):
