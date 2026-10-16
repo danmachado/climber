@@ -243,7 +243,7 @@ def selout(fr):
 # OUTLINE: 'black' (one dark line all round), 'color' (every line takes a deep shade of the material it closes, so the
 # silhouette stays crisp without black), or 'none' (no line on the outside at all; inside, parts are split by the
 # same deep shades). Set by the HERO_OUTLINE environment variable for trying the looks side by side.
-OUTLINE = os.environ.get('HERO_OUTLINE', 'black')
+OUTLINE = os.environ.get('HERO_OUTLINE', 'none')   # Dan, Oct 2026: no outline reads crisper
 LINE_OF = [('dDl', '1'), ('sST', '2'), ('vhHy', '3'), ('pPQ', '4'), ('cC', '5'), ('bBk', '6'), ('gGa', '7')]
 def line_for(nb):
     for mats, ch in LINE_OF:
