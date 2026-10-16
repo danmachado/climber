@@ -1180,6 +1180,7 @@
     demo.room = list[Math.floor(Math.random() * list.length)];
     demo.rec = demo.room === starters[0] ? null : DEMOS[demo.room.id]; demo.rk = 0; demo.rleft = demo.rec ? demo.rec[1] : 0;
   }
+  function foeOn(feet, big) { for (var i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead' && !!f.big === big && f.y + f.h === feet) return f; } return null; }
   function foeAhead() {
     for (var i = 0; i < foes.length; i++) { var f = foes[i], dx = f.x - pl.x; if (f.state !== 'dead' && pl.y + 4 >= f.y && pl.y + 3 < f.y + f.h && (dx > 0 ? 1 : -1) === pl.facing && Math.abs(dx) < P.shotRange - 10) return true; }   // the shot's row crosses him
     return false;
@@ -1202,7 +1203,11 @@
     var sf = demo.f - demo.t0;
     switch (demo.stage) {
       case 1: // hop the step, jump the spikes, reach the block face (a heavy on the floor: stop on the step and blast him)
-        if (x < 100 && foes.some(function (f) { return f.big && f.state !== 'dead'; })) I({ x: x < 80 ? 1 : 0, jump: (ground && x >= 40 && x < 48) || (!ground && vy < 0) });
+        if (x < 100 && foes.some(function (f) { return f.big && f.state !== 'dead' && f.y + f.h === 460; })) I({ x: x < 80 ? 1 : 0, jump: (ground && x >= 40 && x < 48) || (!ground && vy < 0) });
+        else if (ground && y === 450 && x >= 90 && x < 140 && foeOn(460, false)) {   // a raider on the floor below the step: face him, keep a little room, blast him
+          var fl = foeOn(460, false), d = fl.x - x, sd = d > 0 ? 1 : -1;
+          if (Math.abs(d) < 14) I({ x: -sd }); else I({ x: sd !== pl.facing ? sd : 0 });
+        }
         else I({ x: 1, jump: (ground && ((x >= 40 && x < 48) || (x >= 112 && x < 132))) || (!ground && vy < 0) });
         if (x >= 190) next();
         break;
@@ -1214,15 +1219,23 @@
         I({ x: -1, jump: x <= 203, dash: !ground && vy >= -10 && x < 200 && dashes > 0 });
         if (ground && y === 380) next();
         break;
-      case 4: // run to the left wall, then climb the shaft
-        if (x > 10) I({ x: -1 }); else I({ x: -1, y: -1, grab: true });
+      case 4: // run to the left wall, then climb the shaft (a heavy there: hold back, blast him, jump each scattergun blast)
+        var hv = foeOn(390, true), near = foeShots.some(function (s) { return s.vx > 0 && s.x < x && s.x > x - 30; }), live = foeShots.some(function (s) { return s.vx > 0 && s.x < x; });
+        if (hv) I({ x: x > 135 ? -1 : x < 118 ? 1 : (pl.facing > 0 ? -1 : 0), jump: (ground && near) || (!ground && vy < 0) });
+        else if (live) I({ jump: (ground && near) || (!ground && vy < 0) });   // his last pellets are still coming: wait and jump them
+        else if (x > 10) I({ x: -1 }); else I({ x: -1, y: -1, grab: true });
         if (x === 10 && y <= 258) next();
         break;
       case 5: // wall jump off to the right, land on the block
         I({ x: 1, jump: sf < 12 });
         if (ground && y === 270) next();
         break;
-      case 6: // jump the spike gap with a dash
+      case 6: // jump the spike gap with a dash (a raider on the far ledge: hold on the block, blast him, jump his shots)
+        if (foeOn(280, false) && (ground ? y === 270 : y > 240) && x < 90) {
+          var inbound = foeShots.some(function (s) { return s.vx < 0 && s.x > x && s.x < x + 34; });
+          I({ x: x < 76 ? 1 : (pl.facing < 0 ? 1 : 0), jump: (ground && inbound) || (!ground && vy < 0) });
+          break;
+        }
         I({ x: 1, jump: x >= 80, dash: !ground && vy >= -10 && x > 90 && dashes > 0 });
         if (ground && y === 270 && x >= 182) next();
         break;
