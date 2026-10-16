@@ -96,6 +96,34 @@
   "a": {
    "name": "Blaster cell",
    "hex": "#FFB74A"
+  },
+  "1": {
+   "name": "Hair line",
+   "hex": "#1E1310"
+  },
+  "2": {
+   "name": "Skin line",
+   "hex": "#6A4430"
+  },
+  "3": {
+   "name": "Shirt line",
+   "hex": "#1A2018"
+  },
+  "4": {
+   "name": "Pants line",
+   "hex": "#171B24"
+  },
+  "5": {
+   "name": "Boot line",
+   "hex": "#2E221A"
+  },
+  "6": {
+   "name": "Band line",
+   "hex": "#5E1610"
+  },
+  "7": {
+   "name": "Blaster line",
+   "hex": "#1C2028"
   }
  },
  "animations": [

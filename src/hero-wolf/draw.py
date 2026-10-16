@@ -21,12 +21,15 @@ C = {
     'Q': '#5C6478', 'P': '#424858', 'p': '#2A2F3A',   # near leg lit, pants highlight, pants
     'c': '#604C3C', 'C': '#80665A',                   # boots, boot highlight
     'g': '#3B414E', 'G': '#9AA4B8', 'a': '#FFB74A',   # blaster body, its lit top and muzzle, the amber cell on its side
+    # line colours for OUTLINE = 'color': each edge drawn in a deep shade of the material it closes
+    '1': '#1E1310', '2': '#6A4430', '3': '#1A2018', '4': '#171B24', '5': '#2E221A', '6': '#5E1610', '7': '#1C2028',
 }
 NAMES = {
     'o': 'Outline', 'd': 'Hair shadow', 'D': 'Hair', 'l': 'Hair highlight', 'B': 'Bandana highlight', 'b': 'Bandana', 'k': 'Bandana knot',
     's': 'Skin', 'S': 'Skin shadow', 'T': 'Far arm shadow', 'e': 'Eye', 'H': 'Shirt highlight', 'h': 'Shirt', 'v': 'Shirt shadow',
     'y': 'Buckle', 'Q': 'Pants lit', 'P': 'Pants highlight', 'p': 'Pants', 'c': 'Boots', 'C': 'Boot highlight',
     'g': 'Blaster', 'G': 'Blaster highlight', 'a': 'Blaster cell',
+    '1': 'Hair line', '2': 'Skin line', '3': 'Shirt line', '4': 'Pants line', '5': 'Boot line', '6': 'Band line', '7': 'Blaster line',
 }
 
 def G(s): return [r for r in s.strip('\n').split('\n')]
@@ -237,6 +240,27 @@ def selout(fr):
             if any(n in 'sST' for n in nb) and any(n in 'vhH' for n in nb): swap.append((x, y))
     for x, y in swap: fr[y][x] = 'T'
     return fr
+# OUTLINE: 'black' (one dark line all round), 'color' (every line takes a deep shade of the material it closes, so the
+# silhouette stays crisp without black), or 'none' (no line on the outside at all; inside, parts are split by the
+# same deep shades). Set by the HERO_OUTLINE environment variable for trying the looks side by side.
+OUTLINE = os.environ.get('HERO_OUTLINE', 'black')
+LINE_OF = [('dDl', '1'), ('sST', '2'), ('vhHy', '3'), ('pPQ', '4'), ('cC', '5'), ('bBk', '6'), ('gGa', '7')]
+def line_for(nb):
+    for mats, ch in LINE_OF:
+        if any(n in mats for n in nb): return ch
+    return 'o'
+def recolor_lines(fr):
+    if OUTLINE == 'black': return fr
+    out = [row[:] for row in fr]
+    for y in range(16):
+        for x in range(16):
+            if fr[y][x] != 'o': continue
+            nb4 = [fr[ay][ax] if 0 <= ax < 16 and 0 <= ay < 16 else '.' for ax, ay in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))]
+            if OUTLINE == 'none' and '.' in nb4: out[y][x] = '.'; continue
+            # which material is this line closing: the one below or in front first (lines sit on top of the part they bound)
+            order = [fr[y + 1][x] if y < 15 else '.', fr[y][x + 1] if x < 15 else '.', fr[y][x - 1] if x > 0 else '.', fr[y - 1][x] if y > 0 else '.']
+            out[y][x] = line_for([n for n in order if n not in '.o'])
+    return out
 def outline(fr):
     add = []
     for y in range(16):
@@ -245,7 +269,7 @@ def outline(fr):
             for ax, ay in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
                 if 0 <= ax < 16 and 0 <= ay < 16 and fr[ay][ax] not in '.ok': add.append((x, y)); break
     for x, y in add: fr[y][x] = 'o'
-    return selout(fr)
+    return recolor_lines(selout(fr))
 
 def pose(hip=12, tx=3, torso='mid', head='normal', hdx=0, near_leg=None, far_leg=None, near_boot=None, far_boot=None,
          near_arm=None, far_arm=None, hips=True, near_behind=False, shift=0, gun=False):
