@@ -323,7 +323,7 @@
         else if (ch === 'O') drones.push({ x: x, y: y, axis: '', min: 0, max: 0, dir: 1, wait: 0, rem: 0, fire: 0 });   // a patrol drone: rides a track, fires straight down at each stop
         else if (ch === '~') { if (!lava) lava = { y0: y, y: y }; else lava.y0 = lava.y = Math.min(lava.y0, y); }                  // lava: everything below the top lava tile, and it rises
         else if (ch === 'R') foes.push({ c: c, r: r, x0: x + 1, y0: y, x: x + 1, y: y, w: 8, h: 10, big: 0 });               // a raider: walks a short beat on his floor, shoots on sight
-        else if (ch === 'H') foes.push({ c: c, r: r, x0: x - 3, y0: y - 18, x: x - 3, y: y - 18, w: 16, h: 28, big: 1 });     // a heavy: the tile is his feet, middle column; he needs 3 tiles across and 3 up
+        else if (ch === 'H') foes.push({ c: c, r: r, x0: x - 2, y0: y - 14, x: x - 2, y: y - 14, w: 14, h: 24, big: 1 });     // a heavy: the tile is his feet, middle column; he needs 3 tiles across and 3 up
         else if (ch === 'B') barrels.push({ x: x + 1, y: y, w: 8, h: 10, state: 'idle', t: 0 });                             // a barrel: blows up when shot
       }
     }
@@ -1216,12 +1216,13 @@
         if (ground && y <= 400) next();
         break;
       case 3: // jump left to the shelf, dash at the top of the jump
-        I({ x: -1, jump: x <= 203, dash: !ground && vy >= -10 && x < 200 && dashes > 0 });
+        if (foeOn(390, true)) I({ x: x > 146 ? -1 : 0, jump: x <= 203 && (ground || vy < 0) });   // a heavy in the corridor: hop in without the dash and stop at its right end
+        else I({ x: -1, jump: x <= 203, dash: !ground && vy >= -10 && x < 200 && dashes > 0 });
         if (ground && y === 380) next();
         break;
       case 4: // run to the left wall, then climb the shaft (a heavy there: hold back, blast him, jump each scattergun blast)
         var hv = foeOn(390, true), near = foeShots.some(function (s) { return s.vx > 0 && s.x < x && s.x > x - 30; }), live = foeShots.some(function (s) { return s.vx > 0 && s.x < x; });
-        if (hv) I({ x: x > 135 ? -1 : x < 118 ? 1 : (pl.facing > 0 ? -1 : 0), jump: (ground && near) || (!ground && vy < 0) });
+        if (hv) I({ x: x > 150 ? -1 : x < 138 ? 1 : (pl.facing > 0 ? -1 : 0), jump: (ground && near) || (!ground && vy < 0) });
         else if (live) I({ jump: (ground && near) || (!ground && vy < 0) });   // his last pellets are still coming: wait and jump them
         else if (x > 10) I({ x: -1 }); else I({ x: -1, y: -1, grab: true });
         if (x === 10 && y <= 258) next();

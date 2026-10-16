@@ -41,7 +41,7 @@ const { chromium } = require('playwright');
     G.load(rooms.e); settle();                                       // a heavy: one shot only dents him; he goes down to enough of them
     for (let i = 0; i < 30; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1);
     out.heavyAfterFew = s.foes[0].state + ' hp' + s.foes[0].hp;
-    G.load(rooms.g); settle();                                       // from a step two tiles up: above his line of fire, still hitting his big body
+    G.load(rooms.g); settle();                                       // from a step one tile up: above his line of fire, still hitting his big body
     for (let i = 0; i < 300 && s.foes[0].state !== 'dead' && !s.dead; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1);
     out.heavyDown = s.foes[0].state; out.heavySafe = !s.dead && !s.deaths;
     G.load(rooms.e); settle(); for (let i = 0; i < 400 && !(s = G.step(none, 1)).dead; i++); out.heavyKills = s.dead;
@@ -56,7 +56,7 @@ const { chromium } = require('playwright');
     for (let i = 0; i < 40 && s.foes[0].state !== 'dead'; i++) s = G.step(Object.assign({}, none, { grab: true, shoot: true }), 1);
     out.wallShot = s.foes[0].state; out.stillOnWall = s.state;
     return out;
-  }, { h: room([[45, 3, 'S'], [45, 8, 'H']]), g: room([[43, 3, 'S'], [44, 2, '#'], [44, 3, '#'], [44, 4, '#'], [44, 5, '#'], [45, 2, '#'], [45, 3, '#'], [45, 4, '#'], [45, 5, '#'], [45, 15, 'H']]), e: room([[45, 3, 'S'], [45, 15, 'H']]), f: room([[45, 3, 'R'], [45, 9, 'S'], [44, 10, '#'], [45, 10, '#'], [43, 10, '#']]), a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
+  }, { h: room([[45, 3, 'S'], [45, 8, 'H']]), g: room([[44, 3, 'S'], [45, 2, '#'], [45, 3, '#'], [45, 4, '#'], [45, 5, '#'], [45, 15, 'H']]), e: room([[45, 3, 'S'], [45, 15, 'H']]), f: room([[45, 3, 'R'], [45, 9, 'S'], [44, 10, '#'], [45, 10, '#'], [43, 10, '#']]), a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
   console.log('mechanics:', JSON.stringify(m));
   ok(m.alerted === 'alert' || m.alerted === 'fire', 'raider does not notice the hero on his level');
   ok(m.shotKill === 'dead' && m.aliveAfterShot, 'a shot does not kill a raider');

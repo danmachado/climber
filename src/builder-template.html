@@ -343,7 +343,7 @@
     else if (ch === 'R') { b.fillStyle = '#2A2530'; b.fillRect(x + 1, y, 8, 10); b.fillStyle = '#D7F25A'; b.fillRect(x + 4, y + 3, 4, 1); }
     else if (ch === 'B') drawBarrel(b, x, y, false);
     else if (ch === 'H' && heavyImg.complete && heavyImg.naturalWidth) { var HV = FOES.heavy; if (icon) b.drawImage(heavyImg, 0, 0, HV.w, HV.h, x - 1, y - 2, 14, 14); else b.drawImage(heavyImg, 0, 0, HV.w, HV.h, x + 5 - HV.cx, y + 10 - HV.h, HV.w, HV.h); }   // a heavy: this tile is his feet, he fills 3 across and 4 up
-    else if (ch === 'H') { b.fillStyle = '#40444B'; b.fillRect(x - 10, y - 30, 30, 40); }
+    else if (ch === 'H') { b.fillStyle = '#40444B'; b.fillRect(x - 2, y - 14, 14, 24); }
     else if (ch === '~') drawLava(b, x, y, icon || r === 0 || tiles[r - 1][c] !== '~');
     else if (ch === 'D') drawDoor(b, x, y, !icon && r > 0 && tiles[r - 1][c] === 'D', !icon && r < ROWS - 1 && tiles[r + 1][c] === 'D');
     else if (ch === '*') drawFireball(b, x, y, 0, 0, 0);

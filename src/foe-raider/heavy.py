@@ -6,8 +6,14 @@
 # at the hero's chest height. Frames face right, 32 x 31, feet on the bottom row, body centred on column CX.
 # Shapes are drawn with a dark rim so each mass reads on its own, then a shading pass (lit tops, shaded undersides,
 # skin lit along its front edge) and one outline pass.
-W, H, CX = 32, 31, 11
+# The shapes below are laid out on a 32 x 31 drawing board (feet on row 30) and rasterised at scale S about the feet,
+# so the sprite is drawn natively at its real size (Dan, Oct 2026: smaller, so he fits a three-tile corridor with room).
+S, FEET0 = 0.8, 30
+W, H = 27, 27
+CX = round(11 * S)
 OY = 0
+def _x(x): return x * S
+def _y(y): return (H - 1) - (FEET0 - y) * S
 PAL = {
     'o': '#0D0F18',
     'm': '#2A2530', 'M': '#4A4252', 'n': '#1A161E',                    # balaclava
@@ -26,28 +32,29 @@ LIT = {'k': 'K', 'v': 'V', 'q': 'p', 'm': 'M', 'g': 'G', 'c': 'C', 'b': 'B'}
 SHADE = {'k': 'j', 'v': 'w', 'P': 'p', 'm': 'n', 'g': 'h'}
 
 def blank(): return [['.'] * W for _ in range(H)]
-def px(f, x, y, ch):
-    y += OY
+def put(f, x, y, ch):                                                  # a pixel on the real grid
     if 0 <= x < W and 0 <= y < H: f[y][x] = ch
+def px(f, x, y, ch): put(f, int(round(_x(x))), int(round(_y(y))), ch)
 def rect(f, x0, y0, x1, y1, ch):
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1): px(f, x, y, ch)
-def ell(f, cx, cy, rx, ry, ch):
+    for y in range(int(round(_y(y0))), int(round(_y(y1))) + 1):
+        for x in range(int(round(_x(x0))), int(round(_x(x1))) + 1): put(f, x, y, ch)
+def ell(f, cx, cy, rx, ry, ch, grow=0):                                 # board units, grow in real pixels
+    cx, cy, rx, ry = _x(cx), _y(cy), rx * S + grow, ry * S + grow
     for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
         for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
-            if ((x - cx) / (rx + 0.35)) ** 2 + ((y - cy) / (ry + 0.35)) ** 2 <= 1: px(f, x, y, ch)
-def limb(f, pts, r, ch):                                                # a thick line through joints (r: half width)
+            if ((x - cx) / (rx + 0.35)) ** 2 + ((y - cy) / (ry + 0.35)) ** 2 <= 1: put(f, x, y, ch)
+def limb(f, pts, r, ch, grow=0):                                        # a thick line through joints (r: half width)
     for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
         n = max(abs(x1 - x0), abs(y1 - y0), 1)
         for i in range(n + 1):
-            ell(f, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, r, r, ch)
+            ell(f, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, r, r, ch, grow)
 def part(f, shapes, ch, rim=True):
     """shapes: ('e', cx, cy, rx, ry) ellipses or ('l', pts, r) thick lines. A dark rim one pixel out first (so the
     part reads as its own mass over whatever is behind it), then the fill."""
     for grow, c in ((1, 'o'), (0, ch)) if rim else ((0, ch),):
         for sh in shapes:
-            if sh[0] == 'e': ell(f, sh[1], sh[2], sh[3] + grow, sh[4] + grow, c)
-            else: limb(f, sh[1], sh[2] + grow, c)
+            if sh[0] == 'e': ell(f, sh[1], sh[2], sh[3], sh[4], c, grow)
+            else: limb(f, sh[1], sh[2], c, grow)
 
 def shade(f):
     out = [row[:] for row in f]
@@ -72,7 +79,8 @@ def outline(f):
 
 GUN_Y = 22                                                               # the scattergun's barrel row (8 above the feet)
 
-def poly(f, pts, ch):                                                    # a filled polygon (scanline, pixel centres)
+def poly(f, pts, ch, real=False):                                       # a filled polygon (scanline, pixel centres)
+    if not real: pts = [(_x(x), _y(y)) for x, y in pts]
     ys = [p[1] for p in pts]
     for y in range(int(min(ys)), int(max(ys)) + 1):
         xs = []
@@ -80,13 +88,13 @@ def poly(f, pts, ch):                                                    # a fil
             if (y0 <= y + 0.5 < y1) or (y1 <= y + 0.5 < y0): xs.append(x0 + (y + 0.5 - y0) * (x1 - x0) / (y1 - y0))
         xs.sort()
         for a, b in zip(xs[::2], xs[1::2]):
-            for x in range(int(round(a)), int(round(b))): px(f, x, y, ch)
+            for x in range(int(round(a)), int(round(b))): put(f, x, y, ch)
 def rimpoly(f, pts, ch):
-    grown = []
+    pts = [(_x(x), _y(y)) for x, y in pts]; grown = []
     cx = sum(p[0] for p in pts) / len(pts); cy = sum(p[1] for p in pts) / len(pts)
     for x, y in pts:
         dx, dy = x - cx, y - cy; d = max(1e-6, (dx * dx + dy * dy) ** 0.5); grown.append((x + dx / d * 1.2, y + dy / d * 1.2))
-    poly(f, grown, 'o'); poly(f, pts, ch)
+    poly(f, grown, 'o', True); poly(f, pts, ch, True)
 
 def frame(breath=0, step=None, kick=0, pump=0):
     """breath: 0/1 (chest, head and arms up a pixel). step: None standing, or 0..3 walk phase. kick: the gun shoved back
@@ -110,7 +118,7 @@ def frame(breath=0, step=None, kick=0, pump=0):
     # traps and neck: bare and thick, the head pushed forward off them
     rimpoly(f, sh([(11, 6), (15, 3), (18, 5), (17, 8), (12, 8)]), 'k')
     # head: masked, the red visor across the front
-    part(f, [('e', 18, 3.3 + b, 3, 2.9)], 'm')
+    part(f, [('e', 18, 3.6 + b, 3.1, 2.6)], 'm')
     rect(f, 18, 3 + b, 21, 3 + b, 'l'); px(f, 17, 3 + b, 'L')
     # the scattergun: wooden stock under the forearm, a receiver with a red cell, a long barrel over the magazine tube,
     # a wooden pump, a hot muzzle
@@ -134,7 +142,7 @@ def frame(breath=0, step=None, kick=0, pump=0):
     for x in (11, 12, 13): px(f, x, 15 + b, 'j')                                            # the crook of the elbow
     return outline(f)
 
-def muzzle(kick): return [30 - kick, GUN_Y + OY]
+def muzzle(kick): return [int(round(_x(30 - kick))), int(round(_y(GUN_Y)))]
 ANIMS = [
     ('idle', 3, True, [frame(0), frame(0), frame(1), frame(1)], [muzzle(0)] * 4),
     ('walk', 6, True, [frame(0, s) for s in range(4)], [muzzle(0)] * 4),
