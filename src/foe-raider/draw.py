@@ -121,8 +121,8 @@ if __name__ == '__main__':
         hmeta[name] = {'row': i, 'n': len(frames), 'fps': fps, 'loop': loop, 'muzzles': muz}
     hatlas.save('heavy-sheet.png'); hbuf = io.BytesIO(); hatlas.save(hbuf, 'PNG', optimize=True)
     rcut = cut(ANIMS[0][3][0], [('head', 'mMlL'), ('gun', 'gGa'), ('legs', 'QPpcC'), ('torso', 'sSTHhvy')], 16, 16)
-    hcut = cut(HV.ANIMS[0][3][0], [('head', 'mMnlL'), ('gun', 'gGhrR'), ('legs', 'pPqcC'), ('torso', 'kKjvVwz')], HV.W, HV.H,
-               lambda x, y, ch: 'arm' if ch in 'kKj' and x >= HV.CX + 4 and y >= 7 + HV.OY else None)
+    hcut = cut(HV.ANIMS[0][3][0], [('head', 'mMnlL'), ('gun', 'gGhrRbB'), ('legs', 'pPqcC'), ('torso', 'kKjvVwzyY')], HV.W, HV.H,
+               lambda x, y, ch: 'arm' if ch in 'kKj' and y >= 8 else None)
     pw = sum(c[4] - c[2] + 1 for c in rcut + hcut); ph = max(HV.H, 16)
     patlas = Image.new('RGBA', (pw, ph), (0, 0, 0, 0)); pmeta = {'raider': [], 'heavy': []}; px_ = 0
     for kind, cuts, fr, pal in (('raider', rcut, ANIMS[0][3][0], C), ('heavy', hcut, HV.ANIMS[0][3][0], HV.PAL)):

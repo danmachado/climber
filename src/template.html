@@ -49,9 +49,10 @@
     shotRate: 0.13, shotSpeed: 420, shotRange: 190, gunHold: 0.45, hitStop: 0.05,
     foeWalk: 16, foeWait: 0.9, foeSight: 150, foeAlert: 0.6, foeFireGap: 1.1, foeShot: 125, foeForget: 1.5, foeLevel: 6,
     blastR: 28, barrelFuse: 0.12, barrelChain: 0.1,
-    // the heavy: the raider three times bigger. Takes heavyHP shots (a dash through him is heavyDash, a barrel heavyBlast),
-    // walks slower, and fires bursts of heavyBurst shots at hip height
-    heavyHP: 12, heavyDash: 3, heavyBlast: 8, heavyWalk: 9, heavyAlert: 0.5, heavyBurst: 3, heavyBurstGap: 0.14, heavyGap: 1.5, heavyShot: 140
+    // the heavy: a brute twice the raider's height. Takes heavyHP shots (a barrel heavyBlast), touching him kills you (a
+    // dash too), walks slower, and fires a scattergun: heavyPellets pellets fanned heavySpread up and down, flying
+    // heavyShot px/s for heavyRange px, one blast every heavyGap (the pump)
+    heavyHP: 12, heavyBlast: 8, heavyWalk: 9, heavyAlert: 0.5, heavyGap: 1.3, heavyShot: 150, heavyRange: 120, heavyPellets: 3, heavySpread: 0.22
   };
 
   var C = {
@@ -621,11 +622,14 @@
         if (!sees) { f.lost += dt; if (f.lost > P.foeForget) { f.state = 'patrol'; f.wait = P.foeWait; f.q = 0.8; } continue; }
         f.cd -= dt;
         if (f.cd <= 0) {
-          if (f.big) { if (f.burst <= 0) f.burst = P.heavyBurst; f.burst--; f.cd = f.burst > 0 ? P.heavyBurstGap : P.heavyGap; }   // the heavy: a burst, then a breather
-          else f.cd = P.foeFireGap;
-          f.shotT = 0;
-          var reach = f.big ? FOES.heavy.anims.idle.muzzles[0][0] - FOES.heavy.cx - 1 : 0, mid = f.x + f.w / 2;   // a heavy's shots leave from the end of his cannon
-          foeShots.push({ x: f.big ? Math.round(f.dir > 0 ? mid + reach : mid - reach - 4) : (f.dir > 0 ? f.x + f.w + 1 : f.x - 4), y: f.y + f.h - 7, vx: f.dir * (f.big ? P.heavyShot : P.foeShot), rem: 0, big: f.big });
+          f.cd = f.big ? P.heavyGap : P.foeFireGap; f.shotT = 0;
+          var reach = f.big ? FOES.heavy.anims.idle.muzzles[0][0] - FOES.heavy.cx - 1 : 0, mid = f.x + f.w / 2;   // a heavy's shots leave from the end of his gun
+          var sx = f.big ? Math.round(f.dir > 0 ? mid + reach : mid - reach - 4) : (f.dir > 0 ? f.x + f.w + 1 : f.x - 4);
+          if (f.big) for (var pn = 0; pn < P.heavyPellets; pn++) {      // the scattergun: a fan of pellets, short range
+            var spread = (pn - (P.heavyPellets - 1) / 2) / ((P.heavyPellets - 1) / 2 || 1) * P.heavySpread;
+            foeShots.push({ x: sx, y: f.y + f.h - 7, vx: f.dir * P.heavyShot, vy: spread * P.heavyShot, rem: 0, ry: 0, dist: 0, max: P.heavyRange, big: 1 });
+          }
+          else foeShots.push({ x: sx, y: f.y + f.h - 7, vx: f.dir * P.foeShot, rem: 0, big: 0 });
         }
       }
     }
@@ -638,6 +642,8 @@
       var n = Math.floor(s.rem), d = s.vx > 0 ? 1 : -1, gone = false; s.rem -= n;
       while (n-- > 0) {
         s.x += d;
+        if (s.vy) { s.ry += s.vy / Math.abs(s.vx); var my = Math.round(s.ry); if (my) { s.y += my; s.ry -= my; } }   // a pellet in the fan drifts up or down as it goes
+        if (s.max && ++s.dist > s.max) { gone = true; break; }                                                  // a pellet's range runs out
         var tip = d > 0 ? s.x + 3 : s.x;
         if (tip < 0 || tip >= LW || solidTile(Math.floor(tip / T), Math.floor((s.y + 1) / T))) { pushEv({ kind: 'spark', x: tip - d, y: s.y + 1, dir: -d, foe: true }); gone = true; break; }
       }
@@ -997,7 +1003,11 @@
       var sd = shotDir(); pl.shotDir = sd;
       shots.push({ x: sd > 0 ? pl.x + pl.w + 2 : pl.x - 6, y: pl.y + 3, vx: sd * P.shotSpeed, dist: 0 });
     }
-    for (i = 0; i < foes.length; i++) if (pl.state === 'dash' && foes[i].state !== 'dead' && foes[i].dashHit !== pl.dashN && overlap(foeBox(foes[i]), pl.x, pl.y, pl.w, pl.h)) { foes[i].dashHit = pl.dashN; hurtFoe(foes[i], pl.facing, foes[i].big ? P.heavyDash : 1, 'dash', pl.y + 4); }
+    for (i = 0; i < foes.length; i++) {
+      var fo = foes[i]; if (fo.state === 'dead' || !overlap(foeBox(fo), pl.x, pl.y, pl.w, pl.h)) continue;
+      if (fo.big) { die(); return; }                                   // a heavy: touching him kills you, dashing or not
+      if (pl.state === 'dash' && fo.dashHit !== pl.dashN) { fo.dashHit = pl.dashN; hurtFoe(fo, pl.facing, 1, 'dash', pl.y + 4); }   // a raider: a dash through him takes him out
+    }
     stepShots(dt); stepFoes(dt); stepFoeShots(dt); stepBarrels(dt);
     if (pl.dead) return;
     for (i = 0; i < foeShots.length; i++) if (overlap(pl, foeShots[i].x, foeShots[i].y, 4, 2)) { foeShots.splice(i, 1); die(); return; }
@@ -2110,7 +2120,7 @@
   function drawFoe(f) {
     if (!foeArt.ready) return;
     var HV = FOES.heavy, A = f.big ? HV.anims : FOES.anims, fw = f.big ? HV.w : FOES.frame, fh = f.big ? HV.h : FOES.frame, cx = f.big ? HV.cx : fw / 2, name, fr;
-    if (f.shotT < 0.15) { name = 'fire'; fr = Math.min(A.fire.n - 1, Math.floor(f.shotT * A.fire.fps)); }
+    if (f.shotT < A.fire.n / A.fire.fps) { name = 'fire'; fr = Math.min(A.fire.n - 1, Math.floor(f.shotT * A.fire.fps)); }   // a raider's kick, a heavy's blast and pump
     else if (f.state === 'patrol' && f.wait <= 0 && f.min !== f.max) { name = 'walk'; fr = Math.floor(f.walkT * A.walk.fps) % A.walk.n; }
     else { name = 'idle'; fr = GB.on ? 0 : Math.floor(run.time * A.idle.fps + f.c) % A.idle.n; }
     var a = A[name], kick = f.hurtT < 0.08 ? -f.dir : 0, mid = Math.round(f.x + f.w / 2);   // a hit knocks a heavy back a pixel for a moment (drawn only)
@@ -2146,9 +2156,14 @@
     for (i = 0; i < foes.length; i++) { var f = foes[i]; if (f.state !== 'dead') drawFoe(f); else if (f.sig) { f.sig = ''; if (f.rect) mark(f.rect[0], f.rect[1], f.rect[2], f.rect[3]); } }
     for (i = 0; i < foeShots.length; i++) {                           // the raiders' shots: a hot orange slug with a pale core
       var s = foeShots[i];
-      g.fillStyle = '#B8301E'; g.fillRect(s.x - (s.vx > 0 ? 2 : -4), s.y + 1, 2, 1);
-      g.fillStyle = '#FF5A3C'; g.fillRect(s.x, s.y - (s.big ? 1 : 0), 4, s.big ? 4 : 2);
-      g.fillStyle = '#FFD0A0'; g.fillRect(s.x + (s.vx > 0 ? 2 : 0), s.y, 2, 1);
+      if (s.big) {                                                    // a scattergun pellet: a small hot ball
+        g.fillStyle = '#FF5A3C'; g.fillRect(s.x + 1, s.y - 1, 2, 4); g.fillRect(s.x, s.y, 4, 2);
+        g.fillStyle = '#FFE0A0'; g.fillRect(s.x + 1, s.y, 2, 2);
+      } else {
+        g.fillStyle = '#B8301E'; g.fillRect(s.x - (s.vx > 0 ? 2 : -4), s.y + 1, 2, 1);
+        g.fillStyle = '#FF5A3C'; g.fillRect(s.x, s.y, 4, 2);
+        g.fillStyle = '#FFD0A0'; g.fillRect(s.x + (s.vx > 0 ? 2 : 0), s.y, 2, 1);
+      }
       mark(s.x - 5, s.y - 2, 14, 6);
     }
   }

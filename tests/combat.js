@@ -45,13 +45,18 @@ const { chromium } = require('playwright');
     for (let i = 0; i < 300 && s.foes[0].state !== 'dead' && !s.dead; i++) s = G.step(Object.assign({}, none, { shoot: true }), 1);
     out.heavyDown = s.foes[0].state; out.heavySafe = !s.dead && !s.deaths;
     G.load(rooms.e); settle(); for (let i = 0; i < 400 && !(s = G.step(none, 1)).dead; i++); out.heavyKills = s.dead;
+    const al = G.tune('heavyAlert', 99); G.load(rooms.h); settle();  // touching a heavy kills (he is held from firing for this one)
+    for (let i = 0; i < 60 && !(s = G.step(Object.assign({}, none, { x: 1 }), 1)).dead; i++); out.heavyTouch = s.dead;
+    G.load(rooms.h); settle(); for (let i = 0; i < 30 && !(s = G.step(Object.assign({}, none, { x: 1, dash: i === 0 }), 1)).dead; i++); out.heavyDash = s.dead; G.tune('heavyAlert', al);
+    G.load(rooms.e); settle(); for (let i = 0; i < 200; i++) { s = G.step(none, 1); if (s.foeShots.length > 1) break; }   // the scattergun: a fan of pellets
+    out.pellets = s.foeShots.length;
     G.load(rooms.f); settle();                                       // hanging on a wall, SHOOT fires away from it
     for (let i = 0; i < 6; i++) s = G.step(Object.assign({}, none, { x: 1, grab: true }), 1);
     out.climbing = s.state;
     for (let i = 0; i < 40 && s.foes[0].state !== 'dead'; i++) s = G.step(Object.assign({}, none, { grab: true, shoot: true }), 1);
     out.wallShot = s.foes[0].state; out.stillOnWall = s.state;
     return out;
-  }, { g: room([[43, 3, 'S'], [44, 2, '#'], [44, 3, '#'], [44, 4, '#'], [44, 5, '#'], [45, 2, '#'], [45, 3, '#'], [45, 4, '#'], [45, 5, '#'], [45, 15, 'H']]), e: room([[45, 3, 'S'], [45, 15, 'H']]), f: room([[45, 3, 'R'], [45, 9, 'S'], [44, 10, '#'], [45, 10, '#'], [43, 10, '#']]), a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
+  }, { h: room([[45, 3, 'S'], [45, 8, 'H']]), g: room([[43, 3, 'S'], [44, 2, '#'], [44, 3, '#'], [44, 4, '#'], [44, 5, '#'], [45, 2, '#'], [45, 3, '#'], [45, 4, '#'], [45, 5, '#'], [45, 15, 'H']]), e: room([[45, 3, 'S'], [45, 15, 'H']]), f: room([[45, 3, 'R'], [45, 9, 'S'], [44, 10, '#'], [45, 10, '#'], [43, 10, '#']]), a: room([[45, 3, 'S'], [45, 15, 'R']]), b: room([[45, 3, 'S'], [45, 5, 'R']]), c: room([[45, 3, 'S'], [45, 14, 'B'], [45, 16, 'R']]), d: room([[45, 3, 'S'], [43, 10, '#'], [43, 11, '#'], [43, 12, '#'], [43, 13, '#'], [42, 12, 'R']]) });
   console.log('mechanics:', JSON.stringify(m));
   ok(m.alerted === 'alert' || m.alerted === 'fire', 'raider does not notice the hero on his level');
   ok(m.shotKill === 'dead' && m.aliveAfterShot, 'a shot does not kill a raider');
@@ -63,6 +68,8 @@ const { chromium } = require('playwright');
   ok(/^(alert|fire|patrol) hp\d+$/.test(m.heavyAfterFew) && +m.heavyAfterFew.split('hp')[1] < 12 && +m.heavyAfterFew.split('hp')[1] > 0, 'a heavy does not take several hits');
   ok(m.heavyDown === 'dead' && m.heavySafe, 'a heavy cannot be shot down from above his line of fire');
   ok(m.heavyKills, 'a heavy does not kill the hero on his level');
+  ok(m.heavyTouch && m.heavyDash, 'touching or dashing into a heavy does not kill the hero');
+  ok(m.pellets === 3, 'the heavy does not fire a three-pellet spread');
   ok(m.climbing === 'climb' && m.wallShot === 'dead' && m.stillOnWall === 'climb', 'shooting from a wall does not fire away from it');
   const packed = await p.evaluate(() => ['"wall_aim"', '"idle_aim"', '"run_aim"'].filter(k => !document.documentElement.innerHTML.includes(k)));
   ok(!packed.length, 'hero sheet is missing ' + packed.join(' ') + ' (run make-hero.py after hero-wolf/draw.py)');
