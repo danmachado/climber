@@ -27,6 +27,8 @@ PAL = {
     'g': '#3A3F4A', 'G': '#7C8494', 'h': '#24272F',                    # gun metal
     'b': '#6E4428', 'B': '#94603A',                                    # wooden stock and pump
     'r': '#C0392B', 'R': '#FF6A3C',                                    # the red cell, the hot muzzle
+    # seams inside the sprite (no outline outside, like the hero): deep shades of each material
+    '1': '#120F15', '2': '#6A4426', '3': '#33321C', '4': '#1C2216', '5': '#141110', '6': '#15171C', '7': '#3E2614',
 }
 LIT = {'k': 'K', 'v': 'V', 'q': 'p', 'm': 'M', 'g': 'G', 'c': 'C', 'b': 'B'}
 SHADE = {'k': 'j', 'v': 'w', 'P': 'p', 'm': 'n', 'g': 'h'}
@@ -68,6 +70,19 @@ def shade(f):
         for x in range(1, W - 1):
             if f[y][x] == 'k' and f[y][x + 1] == 'o': out[y][x] = 'K'
             elif f[y][x] == 'k' and f[y][x - 1] == 'o': out[y][x] = 'j'
+    return out
+LINE_OF = [('mMnlL', '1'), ('kKj', '2'), ('vVwzyY', '3'), ('pPq', '4'), ('cC', '5'), ('gGhrR', '6'), ('bB', '7')]
+def deline(f):
+    # No outline on the outside (Dan, Oct 2026, to match the hero): a dark pixel on the silhouette goes, and a dark
+    # pixel inside, where two parts meet, takes a deep shade of the part below or in front of it.
+    out = [row[:] for row in f]
+    for y in range(H):
+        for x in range(W):
+            if f[y][x] != 'o': continue
+            nb = [f[y + dy][x + dx] if 0 <= x + dx < W and 0 <= y + dy < H else '.' for dx, dy in ((0, 1), (1, 0), (-1, 0), (0, -1))]
+            if '.' in nb: out[y][x] = '.'; continue
+            mats = [n for n in nb if n not in 'o']
+            out[y][x] = next((ch for m, ch in LINE_OF if any(n in m for n in mats)), 'o')
     return out
 def outline(f):
     out = [row[:] for row in f]
@@ -140,7 +155,7 @@ def frame(breath=0, step=None, kick=0, pump=0):
     for dx, dy in ((-1, -2), (0, -2), (1, -2), (-2, -1)): px(f, 12 + dx, 9 + b + dy, 'K')   # the shoulder catches the light
     for dy in (11, 12, 13): px(f, 15, dy + b, 'K')                                          # the bicep's front
     for x in (11, 12, 13): px(f, x, 15 + b, 'j')                                            # the crook of the elbow
-    return outline(f)
+    return deline(outline(f))
 
 def muzzle(kick): return [int(round(_x(30 - kick))), int(round(_y(GUN_Y)))]
 ANIMS = [

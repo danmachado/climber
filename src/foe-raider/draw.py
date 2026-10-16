@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'hero-wolf'))
 import draw as H                                                   # the pose system (Pose, pose, run_frame, outline ...)
+H.LINE_OF = [('mMlL', '1'), ('sST', '2'), ('Hhvy', '3'), ('QPp', '4'), ('cC', '5'), ('gGa', '7')]   # the raider's own materials for the seams
 
 C = {
     'o': '#0D0F18',                                                # outline
@@ -20,6 +21,8 @@ C = {
     'c': '#2A2420', 'C': '#4A3E36',                                # boots
     'g': '#2E2E35', 'G': '#74747E', 'a': '#E8433A',                # carbine: body, lit top and muzzle, red cell
     'd': '#2A2530', 'D': '#4A4252', 'B': '#D7F25A', 'b': '#7E9A2A', 'k': '#2A2530', 'e': '#0D0F18',   # (hero keys, unused by the mask)
+    # seams inside the sprite (no outline outside, like the hero): deep shades of mask, sleeve, vest, pants, boots, gun
+    '1': '#141118', '2': '#3A3224', '3': '#2E2718', '4': '#1A2014', '5': '#141110', '6': '#141118', '7': '#16161B',
 }
 H.HEAD['mask'] = H.G("""
 ..ooooo..
